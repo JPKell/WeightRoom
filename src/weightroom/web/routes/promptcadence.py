@@ -97,11 +97,16 @@ def _trajectories(
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = request.app.state.http, request.app.state.settings
+    page_rows = settings.ui.page_rows
     sourced = read_app_page(
         request,
         view,
-        api=lambda: pc.trajectories_api(client, settings, state=state, cursor=cursor),
-        database=lambda handle: pc.trajectories_db(handle, state=state, page=page),
+        api=lambda: pc.trajectories_api(
+            client, settings, state=state, cursor=cursor, page_rows=page_rows
+        ),
+        database=lambda handle: pc.trajectories_db(
+            handle, state=state, page=page, page_rows=page_rows
+        ),
     )
     data = sourced.data or {}
     next_href = None
@@ -324,6 +329,8 @@ def _approvals(
     request: Request,
     principal: Principal,
     *,
+    cursor: str | None = None,
+    page: int = 1,
     action_error: SuiteError | None = None,
     done: str | None = None,
 ) -> HTMLResponse:
@@ -331,12 +338,22 @@ def _approvals(
 
     view = app_view(request, APP)
     client, settings = request.app.state.http, request.app.state.settings
+    page_rows = settings.ui.page_rows
     pending = read_app_page(
         request, view, api=lambda: pc.pending_api(client, settings), database=pc.pending_db
     )
     history = read_app_page(
-        request, view, api=lambda: pc.requests_api(client, settings), database=pc.requests_db
+        request,
+        view,
+        api=lambda: pc.requests_api(client, settings, cursor=cursor, page_rows=page_rows),
+        database=lambda handle: pc.requests_db(handle, page=page, page_rows=page_rows),
     )
+    history_data = history.data or {}
+    next_href = None
+    if history_data.get("next_cursor"):
+        next_href = _href(f"{BASE}/approvals", cursor=history_data["next_cursor"])
+    elif history_data.get("next_page"):
+        next_href = _href(f"{BASE}/approvals", page=history_data["next_page"])
     return render_app_page(
         request,
         principal,
@@ -346,6 +363,7 @@ def _approvals(
         view=view,
         pending=pending,
         history=history,
+        history_next_href=next_href,
         can_approve=token_can_approve(settings) if pending.live else None,
         action_error=action_error,
         done_message=_DONE.get(done or ""),
@@ -353,9 +371,15 @@ def _approvals(
 
 
 @ui_router.get(f"{BASE}/approvals", summary="Approvals", response_class=HTMLResponse)
-def approvals_page(request: Request, principal: CurrentOperator, done: str = "") -> HTMLResponse:
+def approvals_page(
+    request: Request,
+    principal: CurrentOperator,
+    done: str = "",
+    cursor: str | None = None,
+    page: int = 1,
+) -> HTMLResponse:
     """What is waiting for a person, and every request ever raised."""
-    return _approvals(request, principal, done=done)
+    return _approvals(request, principal, cursor=cursor or None, page=page, done=done)
 
 
 def _decide(
@@ -475,17 +499,34 @@ def ledger_page(
     principal: CurrentOperator,
     trajectory_id: str | None = None,
     tag: str | None = None,
+    cursor: str | None = None,
+    page: int = 1,
 ) -> HTMLResponse:
     """Today's position against every ceiling, and the recorded debits behind it."""
     view = app_view(request, APP)
     client, settings = request.app.state.http, request.app.state.settings
+    page_rows = settings.ui.page_rows
     wanted, tagged = trajectory_id or None, tag or None
     sourced = read_app_page(
         request,
         view,
-        api=lambda: pc.ledger_api(client, settings, trajectory_id=wanted, tag=tagged),
-        database=lambda handle: pc.ledger_db(handle, trajectory_id=wanted),
+        api=lambda: pc.ledger_api(
+            client, settings, trajectory_id=wanted, tag=tagged, cursor=cursor, page_rows=page_rows
+        ),
+        database=lambda handle: pc.ledger_db(
+            handle, trajectory_id=wanted, page=page, page_rows=page_rows
+        ),
     )
+    data = sourced.data or {}
+    next_href = None
+    if data.get("next_cursor"):
+        next_href = _href(
+            f"{BASE}/ledger", trajectory_id=wanted, tag=tagged, cursor=data["next_cursor"]
+        )
+    elif data.get("next_page"):
+        next_href = _href(
+            f"{BASE}/ledger", trajectory_id=wanted, tag=tagged, page=data["next_page"]
+        )
     return render_app_page(
         request,
         principal,
@@ -496,6 +537,7 @@ def ledger_page(
         sourced=sourced,
         trajectory_id=wanted or "",
         tag=tagged or "",
+        next_href=next_href,
     )
 
 
@@ -505,21 +547,45 @@ def egress_page(
     principal: CurrentOperator,
     verdict: str | None = None,
     trajectory_id: str | None = None,
+    cursor: str | None = None,
+    page: int = 1,
 ) -> HTMLResponse:
     """Every decision about whether data could leave, newest first, approvals and refusals alike."""
     view = app_view(request, APP)
     client, settings = request.app.state.http, request.app.state.settings
+    page_rows = settings.ui.page_rows
     wanted_verdict, wanted_trajectory = verdict or None, trajectory_id or None
     sourced = read_app_page(
         request,
         view,
         api=lambda: pc.egress_api(
-            client, settings, verdict=wanted_verdict, trajectory_id=wanted_trajectory
-        ),
+            client,
+            settings,
+            verdict=wanted_verdict,
+            trajectory_id=wanted_trajectory,
+            cursor=cursor,
+            page_rows=page_rows,
+        ),  # fmt: skip
         database=lambda handle: pc.egress_db(
-            handle, verdict=wanted_verdict, trajectory_id=wanted_trajectory
-        ),
+            handle,
+            verdict=wanted_verdict,
+            trajectory_id=wanted_trajectory,
+            page=page,
+            page_rows=page_rows,
+        ),  # fmt: skip
     )
+    data = sourced.data or {}
+    next_href = None
+    if data.get("next_cursor"):
+        next_href = _href(
+            f"{BASE}/egress", verdict=wanted_verdict, trajectory_id=wanted_trajectory,
+            cursor=data["next_cursor"],
+        )  # fmt: skip
+    elif data.get("next_page"):
+        next_href = _href(
+            f"{BASE}/egress", verdict=wanted_verdict, trajectory_id=wanted_trajectory,
+            page=data["next_page"],
+        )  # fmt: skip
     return render_app_page(
         request,
         principal,
@@ -531,6 +597,7 @@ def egress_page(
         verdict=wanted_verdict or "",
         verdicts=pc.VERDICTS,
         trajectory_id=wanted_trajectory or "",
+        next_href=next_href,
     )
 
 

@@ -62,7 +62,6 @@ __all__ = [
 ]
 
 APP: Final = "promptcadence"
-PAGE_ROWS: Final = 50
 LIST_CAP: Final = 200
 """PromptCadence clamps every listing to 200 (API standards §6); a database read keeps the cap."""
 
@@ -114,9 +113,17 @@ def _items(body: Any) -> list[dict[str, Any]]:  # noqa: ANN401 — a collection 
 
 
 def trajectories_api(
-    client: httpx.Client, settings: Settings, *, state: str | None, cursor: str | None
+    client: httpx.Client,
+    settings: Settings,
+    *,
+    state: str | None,
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /trajectories``: one page, newest first, with PromptCadence's own cursor.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: PromptCadence refused (an unknown ``state`` is its ``VALIDATION_ERROR``).
@@ -124,7 +131,7 @@ def trajectories_api(
     """
     body = call(
         client, settings, APP, "GET", "trajectories",
-        params={"state": state, "cursor": cursor, "limit": PAGE_ROWS},
+        params={"state": state, "cursor": cursor, "limit": page_rows},
     )  # fmt: skip
     page = body.get("page") if isinstance(body, Mapping) else None
     return {
@@ -153,8 +160,13 @@ def _trajectory_row(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def trajectories_db(handle: AppDatabase, *, state: str | None, page: int) -> dict[str, Any]:
+def trajectories_db(
+    handle: AppDatabase, *, state: str | None, page: int, page_rows: int
+) -> dict[str, Any]:
     """The ``trajectories`` table, newest first, one page by number.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         TableUnknown: The database has no ``trajectories`` table.
@@ -163,12 +175,12 @@ def trajectories_db(handle: AppDatabase, *, state: str | None, page: int) -> dic
     page = max(1, page)
     rows = rows_where(
         handle, "trajectories", equals={"status": state}, order_by="created_at",
-        limit=PAGE_ROWS + 1, offset=(page - 1) * PAGE_ROWS,
+        limit=page_rows + 1, offset=(page - 1) * page_rows,
     )  # fmt: skip
     return {
-        "items": [_trajectory_row(row) for row in rows[:PAGE_ROWS]],
+        "items": [_trajectory_row(row) for row in rows[:page_rows]],
         "next_cursor": None,
-        "next_page": page + 1 if len(rows) > PAGE_ROWS else None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
     }
 
 
@@ -352,8 +364,13 @@ def pending_db(handle: AppDatabase) -> list[dict[str, Any]]:
     ]  # fmt: skip
 
 
-def requests_api(client: httpx.Client, settings: Settings) -> list[dict[str, Any]]:
-    """``GET /approvals?status=all``: every request ever raised, newest first — the first 200.
+def requests_api(
+    client: httpx.Client, settings: Settings, *, cursor: str | None, page_rows: int
+) -> dict[str, Any]:
+    """``GET /approvals?status=all``: one page, newest first, with PromptCadence's own cursor.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: PromptCadence refused (one older than row WPC1 answers the pending list here,
@@ -361,17 +378,33 @@ def requests_api(client: httpx.Client, settings: Settings) -> list[dict[str, Any
         AppUnreachable: It did not answer.
     """
     body = call(
-        client, settings, APP, "GET", "approvals", params={"status": "all", "limit": LIST_CAP}
-    )
-    return _items(body)
+        client, settings, APP, "GET", "approvals",
+        params={"status": "all", "limit": page_rows, "cursor": cursor},
+    )  # fmt: skip
+    page = body.get("page") if isinstance(body, Mapping) else None
+    return {
+        "items": _items(body),
+        "next_cursor": page.get("next_cursor") if isinstance(page, Mapping) else None,
+        "next_page": None,
+    }
 
 
-def requests_db(handle: AppDatabase) -> list[dict[str, Any]]:
-    """Every approval request, newest first, resolved ones included, while PromptCadence is down."""
-    return [
-        _approval_row(row)
-        for row in rows_where(handle, "approval_requests", order_by="created_at", limit=LIST_CAP)
-    ]
+def requests_db(handle: AppDatabase, *, page: int, page_rows: int) -> dict[str, Any]:
+    """Every approval request, newest first, one page by number, while PromptCadence is down.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
+    """
+    page = max(1, page)
+    rows = rows_where(
+        handle, "approval_requests", order_by="created_at",
+        limit=page_rows + 1, offset=(page - 1) * page_rows,
+    )  # fmt: skip
+    return {
+        "items": [_approval_row(row) for row in rows[:page_rows]],
+        "next_cursor": None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
+    }
 
 
 # --- Tiers, tools ---------------------------------------------------------------------------------
@@ -393,9 +426,18 @@ def tools_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
 
 
 def ledger_api(
-    client: httpx.Client, settings: Settings, *, trajectory_id: str | None, tag: str | None
+    client: httpx.Client,
+    settings: Settings,
+    *,
+    trajectory_id: str | None,
+    tag: str | None,
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /ledger`` and ``GET /ledger/entries``: today's position and the debits behind it.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: ``TRAJECTORY_NOT_FOUND`` for an unknown ``trajectory_id``, or another refusal.
@@ -404,11 +446,14 @@ def ledger_api(
     position = call(client, settings, APP, "GET", "ledger", params={"trajectory_id": trajectory_id})
     entries = call(
         client, settings, APP, "GET", "ledger/entries",
-        params={"trajectory_id": trajectory_id, "tag": tag, "limit": LIST_CAP},
+        params={"trajectory_id": trajectory_id, "tag": tag, "limit": page_rows, "cursor": cursor},
     )  # fmt: skip
+    page = entries.get("page") if isinstance(entries, Mapping) else None
     return {
         "position": position if isinstance(position, Mapping) else None,
         "entries": _items(entries),
+        "next_cursor": page.get("next_cursor") if isinstance(page, Mapping) else None,
+        "next_page": None,
     }
 
 
@@ -429,13 +474,26 @@ def _entry_row(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def ledger_db(handle: AppDatabase, *, trajectory_id: str | None) -> dict[str, Any]:
-    """The recorded debits, newest first. No position: that is PromptCadence's arithmetic, live."""
+def ledger_db(
+    handle: AppDatabase, *, trajectory_id: str | None, page: int, page_rows: int
+) -> dict[str, Any]:
+    """The recorded debits, newest first, one page by number. No position: that is
+    PromptCadence's arithmetic, live.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
+    """
+    page = max(1, page)
     rows = rows_where(
         handle, "ledger_entries", equals={"run_id": trajectory_id}, order_by="occurred_at",
-        limit=LIST_CAP,
+        limit=page_rows + 1, offset=(page - 1) * page_rows,
     )  # fmt: skip
-    return {"position": None, "entries": [_entry_row(row) for row in rows]}
+    return {
+        "position": None,
+        "entries": [_entry_row(row) for row in rows[:page_rows]],
+        "next_cursor": None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
+    }
 
 
 def _egress_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -456,12 +514,21 @@ def _egress_row(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def egress_api(
-    client: httpx.Client, settings: Settings, *, verdict: str | None, trajectory_id: str | None
-) -> list[dict[str, Any]]:
-    """``GET /egress-decisions?sort=-decided_at``: the newest 200, under the stopped reader's names.
+    client: httpx.Client,
+    settings: Settings,
+    *,
+    verdict: str | None,
+    trajectory_id: str | None,
+    cursor: str | None,
+    page_rows: int,
+) -> dict[str, Any]:
+    """``GET /egress-decisions?sort=-decided_at``: one page, under the stopped reader's names.
 
     Each item is SetSpec's ``governance.egress_decision``; the page's columns are read out of it
     here so the running and the stopped page render one shape.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: ``VALIDATION_ERROR`` for an unknown verdict, or another refusal.
@@ -469,8 +536,8 @@ def egress_api(
     """
     body = call(
         client, settings, APP, "GET", "egress-decisions",
-        params={"sort": "-decided_at", "limit": LIST_CAP, "verdict": verdict,
-                "trajectory_id": trajectory_id},
+        params={"sort": "-decided_at", "limit": page_rows, "verdict": verdict,
+                "trajectory_id": trajectory_id, "cursor": cursor},
     )  # fmt: skip
     rows = []
     for one in _items(body):
@@ -490,7 +557,12 @@ def egress_api(
                 "decided_at": one.get("decided_at"),
             }
         )
-    return rows
+    page = body.get("page") if isinstance(body, Mapping) else None
+    return {
+        "items": rows,
+        "next_cursor": page.get("next_cursor") if isinstance(page, Mapping) else None,
+        "next_page": None,
+    }
 
 
 def system_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
@@ -519,11 +591,25 @@ def system_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
 
 
 def egress_db(
-    handle: AppDatabase, *, verdict: str | None, trajectory_id: str | None
-) -> list[dict[str, Any]]:
-    """The ``egress_decisions`` rows, newest first, filtered by verdict and trajectory."""
+    handle: AppDatabase,
+    *,
+    verdict: str | None,
+    trajectory_id: str | None,
+    page: int,
+    page_rows: int,
+) -> dict[str, Any]:
+    """The ``egress_decisions`` rows, newest first, one page by number.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
+    """
+    page = max(1, page)
     rows = rows_where(
         handle, "egress_decisions", equals={"verdict": verdict, "run_id": trajectory_id},
-        order_by="decided_at", limit=LIST_CAP,
+        order_by="decided_at", limit=page_rows + 1, offset=(page - 1) * page_rows,
     )  # fmt: skip
-    return [_egress_row(row) for row in rows]
+    return {
+        "items": [_egress_row(row) for row in rows[:page_rows]],
+        "next_cursor": None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
+    }

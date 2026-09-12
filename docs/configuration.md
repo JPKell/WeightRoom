@@ -168,6 +168,14 @@ The alert evaluator (spec §7.10).
 | `alerts.interval_seconds` | `WEIGHTROOM_ALERTS__INTERVAL_SECONDS` | `int` | `30` | ≥ 5, ≤ 3600 | yes | — | `30` | How often the five sources are evaluated. Runtime-changeable. |
 | `alerts.gpu_temperature_c` | `WEIGHTROOM_ALERTS__GPU_TEMPERATURE_C` | `int` | `85` | ≥ 40, ≤ 120 | yes | — | `85` | GPU temperature that opens a gpu_thermal alert. Runtime-changeable. |
 
+## `[ui]`
+
+The console's own display defaults (row WX5).
+
+| Key | Environment variable | Type | Default | Range | Runtime-changeable | Security | Example | Description |
+|---|---|---|---|---|---|---|---|---|
+| `ui.page_rows` | `WEIGHTROOM_UI__PAGE_ROWS` | `int` | `50` | ≥ 10, ≤ 500 | yes | — | `50` | Rows per page on every table the owning API can page. Runtime-changeable. |
+
 ## `[logging]`
 
 Log level and content policy.

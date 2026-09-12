@@ -1,8 +1,9 @@
 """weightroom.services.settings — the runtime-changeable registry and the schema document.
 
-Spec §12 names six runtime-changeable keys (ADR-0100's test: re-read by the running process, no
-security surface) and makes every key under ``[server]``, ``[tls]``, ``[auth]``, ``[apps.*]``
-and ``[host]`` a security key. Both sets are data here, read by ``config show``, ``config
+Spec §12 names six runtime-changeable keys, plus ``ui.page_rows`` since row WX5 (ADR-0100's test:
+re-read by the running process, no security surface) and makes every key under ``[server]``,
+``[tls]``, ``[auth]``, ``[apps.*]`` and ``[host]`` a security key. Both sets are data here, read
+by ``config show``, ``config
 schema``, the configuration reference and — at W4 — WeightRoomGym's own settings page, so none of
 them can disagree. Precedence follows configuration standards §7: a stored row sits between the
 file and the environment, and a row the environment shadows is reported as such.
@@ -140,9 +141,16 @@ RUNTIME_SETTINGS: Final[dict[str, RuntimeSetting]] = {
         RuntimeSetting(
             "chat.default_task_profile", str, "The LoadCoach task profile a new chat starts with."
         ),
+        RuntimeSetting(
+            "ui.page_rows",
+            int,
+            "Rows per page on every table the owning API can page.",
+            minimum=10,
+            maximum=500,
+        ),
     )
 }
-"""Spec §12's six runtime-changeable keys."""
+"""Spec §12's runtime-changeable keys (row WX5 adds ``ui.page_rows``)."""
 
 
 def shadowing_source(key: str) -> str | None:

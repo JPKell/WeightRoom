@@ -34,7 +34,8 @@ def ready(tmp_path: Path):  # type: ignore[no-untyped-def]  # (settings, databas
     return settings, database, file
 
 
-def test_the_registry_is_spec_12s_six_keys() -> None:
+def test_the_registry_is_spec_12s_keys() -> None:
+    """Spec §12's six, plus ``ui.page_rows`` (row WX5)."""
     assert set(RUNTIME_SETTINGS) == {
         "telemetry.interval_ms",
         "telemetry.history_hours",
@@ -42,6 +43,7 @@ def test_the_registry_is_spec_12s_six_keys() -> None:
         "alerts.gpu_temperature_c",
         "jobs.poll_interval_ms",
         "chat.default_task_profile",
+        "ui.page_rows",
     }
 
 

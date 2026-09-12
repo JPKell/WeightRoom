@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, card, table, empty_state %}
+{% from "mirrorwall/components.html" import badge, card, table, empty_state, pagination %}
 {% from "_app_page.html" import page_source, refusal %}
 {% from "_pc.html" import short, measure, trajectory_link %}
 {% block title %}Ledger — PromptCadence — WeightRoom{% endblock %}
@@ -64,6 +64,7 @@ answering; the <a href="/costs">Costs</a> page reads the same balances from its 
 {% set _ = rows.append([trajectory_link(one.get("trajectory_id")), short(one.get("turn_id")), one.get("occurred_at") or "—", measure(usage.get("input")), measure(usage.get("output")), measure(usage.get("cache_read")), badge("unpriced", tone="neutral") if one.get("unpriced") else badge("priced", tone="success"), (one.get("tags") or []) | join(", ") or "—"]) %}
 {% endfor %}
 {{ table([{"label": "Trajectory"}, {"label": "Turn"}, {"label": "When", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Cache read", "numeric": true}, {"label": "Priced"}, {"label": "Tags"}], rows, caption="Recorded debits, newest first", density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=next_href) }}
 {% else %}
 {{ empty_state("No debits recorded for this filter.", "Every debit", "/apps/promptcadence/ledger") }}
 {% endif %}

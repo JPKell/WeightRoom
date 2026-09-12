@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, json_viewer %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, json_viewer, pagination %}
 {% from "_app_page.html" import page_source, refusal %}
 {% from "_pc.html" import short, trajectory_link, outcome_badge, approval_forms with context %}
 {% block title %}Approvals — PromptCadence — WeightRoom{% endblock %}
@@ -38,12 +38,14 @@ are recorded, not only the one that let work continue.</p>
 <h3>Every request</h3>
 {{ refusal(history.error) }}
 {% if history.data is not none %}
-{% if history.data %}
+{% set found = history.data["items"] %}
+{% if found %}
 {% set rows = [] %}
-{% for one in history.data %}
+{% for one in found %}
 {% set _ = rows.append([short(one.get("request_id")), trajectory_link(one.get("trajectory_id")), one.get("kind") or "—", outcome_badge(one.get("status")), one.get("approver_token_id") or "—", one.get("resolution_reason") or "—", one.get("created_at") or "—", one.get("resolved_at") or "—"]) %}
 {% endfor %}
 {{ table([{"label": "Request"}, {"label": "Trajectory"}, {"label": "Kind"}, {"label": "Status"}, {"label": "Approver", "mono": true}, {"label": "Reason"}, {"label": "Requested", "mono": true}, {"label": "Resolved", "mono": true}], rows, caption="Every approval request, newest first", density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=history_next_href) }}
 {% else %}
 {{ empty_state("No approval request has been raised.") }}
 {% endif %}
