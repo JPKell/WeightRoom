@@ -178,7 +178,12 @@ def test_the_approval_history_and_egress_read_the_api_while_promptcadence_runs(
             "age_seconds": 60.0,
         }
     ]
-    history["page"] = {"limit": 50, "next_cursor": "history-cursor-1", "has_more": True, "total": None}
+    history["page"] = {
+        "limit": 50,
+        "next_cursor": "history-cursor-1",
+        "has_more": True,
+        "total": None,
+    }
     egress = _fixture("egress-newest")
     egress["page"]["next_cursor"] = "egress-cursor-1"
     egress["page"]["has_more"] = True

@@ -80,14 +80,17 @@ def audit_page(
     action: str | None = None,
     since: str | None = None,
     limit: int | None = None,
+    cursor: str | None = None,
 ) -> HTMLResponse:
     """A filtered page of the trail: by application, by action, and from an instant.
 
     ``since`` is accepted as a date or a full timestamp because that is what an operator types.
     A value that is neither is ignored with a note rather than refused: a filter box is not a
-    place to make somebody re-enter a whole query over a typo.
+    place to make somebody re-enter a whole query over a typo. ``cursor`` continues from the
+    previous page's last row id, so the trail no longer stops at one page with no way further
+    back (row WX5); the default page size is ``[ui] page_rows``, not a fixed 50.
     """
-    effective = clamp_limit(limit or 50)
+    effective = clamp_limit(limit or request.app.state.settings.ui.page_rows)
     parsed_since, since_problem = _parse_since(since)
     rows, has_more = list_audit(
         request.app.state.database,
@@ -95,13 +98,32 @@ def audit_page(
         app=_blank_to_none(app),
         action=_blank_to_none(action),
         since=parsed_since,
+        before_id=cursor or None,
     )
+    next_cursor = rows[-1].id if has_more and rows else None
+    next_href = None
+    if next_cursor:
+        from urllib.parse import urlencode
+
+        kept = {
+            key: value
+            for key, value in {
+                "app": app or "",
+                "action": action or "",
+                "since": since or "",
+                "limit": limit or "",
+                "cursor": next_cursor,
+            }.items()
+            if value
+        }
+        next_href = f"/audit?{urlencode(kept)}"
     return render_shell_page(
         request,
         "audit.html",
         page="audit",
         rows=rows,
         has_more=has_more,
+        next_href=next_href,
         principal=principal,
         applications=[*APPLICATIONS, "weightroom", "ollama", "host"],
         actions=sorted(ACTIONS),
