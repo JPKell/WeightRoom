@@ -136,7 +136,10 @@ def test_a_found_server_is_described_by_its_own_argv_and_its_own_props(tmp_path:
     # This process's own /proc entry is the argv read; it is pytest's, which names no llama.cpp
     # flag — the point proved here is that the read happened and invented nothing.
     assert servers[0].pid == os.getpid()
-    assert servers[0].argv[0].endswith("python")
+    # Whatever launched this test (`python -m pytest`, `.venv/bin/pytest`, …) is argv[0]; the read
+    # is proved by matching this process's own cmdline, not by guessing the launcher's name.
+    own_argv = Path("/proc/self/cmdline").read_bytes().split(b"\0")[0].decode()
+    assert servers[0].argv[0] == own_argv
     assert servers[0].port is None
     assert servers[0].served_context_tokens is None  # no port: /props was not asked
     assert servers[0].build_info is None
