@@ -374,3 +374,20 @@ def test_javascript_per_page_stays_under_the_total_budget(console: Console) -> N
     print(f"\n  {htmx_pair / 1024:6.1f} KB  htmx + its SSE extension together")  # noqa: T201
     _report(f"JS in total on the heaviest page ({worst_path})", worst / 1024, 120, unit="KB")
     assert worst <= _TOTAL_BUDGET_BYTES, totals
+
+
+# --- the shell's stylesheet ≤ 32 KB (row WX3) ---------------------------------------------------
+
+_SHELL_CSS_BUDGET_BYTES = 32 * 1024
+"""The shell's own stylesheet, on every page and cached once. ADR-0139 budgets JavaScript only;
+this is its sibling, so that moving the `<style>` block out of `_shell.html` cannot quietly turn
+into an unbounded stylesheet the same way an unbudgeted script would."""
+
+
+def test_the_shell_stylesheet_stays_under_its_budget() -> None:
+    stylesheet = (
+        Path(__file__).resolve().parents[2] / "src/weightroom/web/static/css/weightroom-shell.css"
+    )
+    size = stylesheet.stat().st_size
+    _report("the shell's stylesheet", size / 1024, 32, unit="KB")
+    assert size <= _SHELL_CSS_BUDGET_BYTES

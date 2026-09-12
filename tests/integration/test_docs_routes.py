@@ -146,7 +146,7 @@ class TestPages:
         assert '<h3 class="docs-folder-title" id="docs-apps-loadcoach">loadcoach</h3>' in page
         assert 'href="/docs/page?path=apps/loadcoach/spec.md"' in page
         # The selected section expands in the left menu to its folders, as in-page links.
-        assert '<a href="#docs-apps-loadcoach">loadcoach</a>' in page
+        assert '<a class="docs-nav-folder-link" href="#docs-apps-loadcoach">loadcoach</a>' in page
         # A section link replaces the side menu and main pane only, leaving the top bar's stream.
         assert 'hx-target=".shell-body" hx-select=".shell-body"' in page
 

@@ -1,6 +1,38 @@
 {#- Macros every page under an application's tab shares (row WP1's page kit). -#}
 {% from "mirrorwall/components.html" import badge, empty_state, table %}
 
+{% macro app_page_header(view, title, section, supporting) -%}
+{#- The common head of a page under an application's tab: where the page sits (application /
+    section), its title, that application's availability, and one sentence saying what the page
+    is for. The caller owns the actions — `{% call app_page_header(...) %}<a …>{% endcall %}` —
+    so a page's own forms and links keep their existing routes without this macro learning any
+    application's vocabulary.
+
+    Availability is `view.pill` verbatim, not a friendlier two-state guess: *starting*,
+    *stopped*, *unsupported* and *version mismatch* are operationally different answers, and
+    `_app_state.html` below the header is what explains the one that applies. -#}
+<header class="page-head app-page-intro">
+  <div class="app-page-copy">
+    <p class="app-page-eyebrow">{{ view.name | app_label }} / {{ section }}</p>
+    <div class="app-page-heading-row">
+      <h2 class="app-page-title">{{ title }}</h2>
+      <div class="app-page-availability">
+        <span class="app-page-availability-label">Availability</span>
+        {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}
+      </div>
+    </div>
+    {% if supporting %}
+    <p class="muted app-page-supporting">{{ supporting }}</p>
+    {% endif %}
+  </div>
+  {% if caller is defined %}
+  <nav class="page-actions app-page-actions" aria-label="{{ title }} actions">
+    {{ caller() }}
+  </nav>
+  {% endif %}
+</header>
+{%- endmacro %}
+
 {% macro page_source(sourced) -%}
 {#- Spec §7.3: every page names its source in the footer — from the API, from the database at a
     revision, or why neither answered. -#}
