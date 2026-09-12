@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, context_k %}
 {% from "_fw.html" import run_link, value, machine_link %}
 {% block title %}Compare — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
@@ -34,7 +34,7 @@ other, and it has no database reading behind it. Start FreeWeight to compare.</p
 {% if refused.get("offenders") %}
 {% set rows = [] %}
 {% for one in refused.get("offenders") %}{% set _ = rows.append([run_link(one.get("run_id")), one.get("suite") or "—"]) %}{% endfor %}
-{{ table([{"label": "Run"}, {"label": "Its suite", "mono": true}], rows, caption="The subjects FreeWeight refused, and why", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Its suite", "mono": true}], rows, caption="The subjects FreeWeight refused, and why", density="dense", row_count=rows | length, table_id="fw-compare-1", sortable=true) }}
 {% endif %}
 {% set comparison = sourced.data %}
 {% if comparison %}
@@ -51,13 +51,13 @@ other, and it has no database reading behind it. Start FreeWeight to compare.</p
   (one.get("suite") or "—") ~ " " ~ (one.get("suite_version") or ""),
   one.get("quantization") or "—",
   one.get("kv_cache_precision") or "—",
-  value(one.get("context_size"), fmt="%d"),
+  context_k(one.get("context_size")),
   machine_link(one.get("machine_fingerprint"), one.get("machine_hostname")),
   value(one.get("gpu_index"), fmt="%d"),
   one.get("started_at") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Run"}, {"label": "Label"}, {"label": "Model", "mono": true}, {"label": "Identity"}, {"label": "Suite"}, {"label": "Quantization"}, {"label": "KV precision"}, {"label": "Context", "numeric": true}, {"label": "Machine"}, {"label": "GPU", "numeric": true}, {"label": "Started", "mono": true}], rows, caption="What each column was measured against", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Label"}, {"label": "Model", "mono": true}, {"label": "Identity"}, {"label": "Suite"}, {"label": "Quantization"}, {"label": "KV precision"}, {"label": "Context", "numeric": true}, {"label": "Machine"}, {"label": "GPU", "numeric": true}, {"label": "Started", "mono": true}], rows, caption="What each column was measured against", density="dense", row_count=rows | length, table_id="fw-compare-2", sortable=true) }}
 
 {% if comparison.get("context_sweep") %}
 {% set sweep = comparison.get("context_sweep") %}
@@ -84,7 +84,7 @@ runs, not a benchmark result.</p>
   {% set rows = [] %}
   {% for entry in verdict.get("fingerprint_diff") %}{% set _ = rows.append([entry.get("path") or "—", entry.get("left") | string, entry.get("right") | string]) %}{% endfor %}
   <details class="kit-details"><summary>Provenance differs on {{ rows | length }} field(s)</summary>
-  {{ table([{"label": "Field", "mono": true}, {"label": "Left"}, {"label": "Right"}], rows, density="dense", row_count=rows | length) }}
+  {{ table([{"label": "Field", "mono": true}, {"label": "Left"}, {"label": "Right"}], rows, density="dense", row_count=rows | length, table_id="fw-compare-3", sortable=true) }}
   </details>
   {% else %}
   <p class="muted">No stored fingerprint document to diff: the reason above is the whole of what is known.</p>
@@ -110,7 +110,7 @@ runs, not a benchmark result.</p>
 {% set _ = cells.append("yes" if row.get("mergeable") else ("no — " ~ ((row.get("groups") or []) | length) ~ " groups: " ~ ((row.get("groups") or []) | map(attribute="reason") | join(" "))) ) %}
 {% set _ = rows.append(cells) %}
 {% endfor %}
-{{ table(head, rows, caption="One cell per run; cells in different groups are never to be read against each other", density="dense", row_count=rows | length) }}
+{{ table(head, rows, caption="One cell per run; cells in different groups are never to be read against each other", density="dense", row_count=rows | length, table_id="fw-compare-4", sortable=true) }}
 {% else %}
 {{ empty_state("No aggregate metrics on these runs: most often none of them completed.") }}
 {% endif %}

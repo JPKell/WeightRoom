@@ -1,6 +1,26 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, json_viewer %}
 {% block title %}{{ app | app_label }} settings — WeightRoom{% endblock %}
+{% block extra_head %}
+<style>
+  /* Row WX1: the hint spans move off the key cell into their own row, one per field, spanning the
+     table; a long description clamps to one line until the <details> is opened (native, no JS).
+     Range and default are never inside the <details> — they stay visible either way. */
+  tr.field-hint-row td { padding-top: 0; border-top: none; }
+  tr.field-hint-row .field-hint { margin-right: 12px; }
+  .field-hint-details { display: inline; }
+  .field-hint-details summary {
+    display: inline-block;
+    max-width: 60ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    cursor: pointer;
+  }
+  .field-hint-details p.field-hint { margin: 4px 0 0; }
+</style>
+{% endblock %}
 {% block page_content %}
 {% set is_own = app == "weightroom" %}
 <h2>Settings
@@ -82,9 +102,6 @@ Each one below offers <em>save to the file instead</em>, which takes effect at t
       <tr{% if one.shadowed %} class="shadowed"{% endif %}>
         <th scope="row">
           <label for="{{ field_id }}"><code>{{ one.key }}</code></label>
-          {% if one.description %}<span class="field-hint">{{ one.description }}</span>{% endif %}
-          {% if one.bounds_text %}<span class="field-hint">range {{ one.bounds_text }}</span>{% endif %}
-          <span class="field-hint">default <code>{{ one.default_text or "—" }}</code></span>
         </th>
         <td>
           {#- A select always posts something, so a key the model allows to be unset needs an
@@ -133,6 +150,19 @@ Each one below offers <em>save to the file instead</em>, which takes effect at t
           {%- if one.security %} {{ badge("security key", tone="danger", title="Needs the operator's password again (ADR-0127 rule 6).") }}{% endif %}
         </td>
       </tr>
+      {% if one.description or one.bounds_text or one.default_text %}
+      <tr class="field-hint-row{% if one.shadowed %} shadowed{% endif %}">
+        <td colspan="4">
+          {% if one.description %}
+          <details class="field-hint-details"><summary>{{ one.description }}</summary>
+            <p class="field-hint">{{ one.description }}</p>
+          </details>
+          {% endif %}
+          {% if one.bounds_text %}<span class="field-hint">range {{ one.bounds_text }}</span>{% endif %}
+          <span class="field-hint">default <code>{{ one.default_text or "—" }}</code></span>
+        </td>
+      </tr>
+      {% endif %}
       {% endfor %}
       </tbody>
     </table>

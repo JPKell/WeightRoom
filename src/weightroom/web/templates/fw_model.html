@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, params_b, context_k %}
 {% from "_fw.html" import run_link, short, value, machine_link, model_switch with context %}
 {% block title %}Model — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
@@ -31,7 +31,7 @@
 <h3>Known aliases</h3>
 {% set rows = [] %}
 {% for one in model.get("aliases") %}{% set _ = rows.append([one.get("alias") if one is mapping else one, (one.get("resolved_at") if one is mapping else none) or "—"]) %}{% endfor %}
-{{ table([{"label": "Alias", "mono": true}, {"label": "Resolved", "mono": true}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Alias", "mono": true}, {"label": "Resolved", "mono": true}], rows, density="dense", row_count=rows | length, table_id="fw-model-1", sortable=true) }}
 {% endif %}
 
 <h3>Latest descriptor</h3>
@@ -40,13 +40,13 @@
 {{ kv_list([
   {"label": "Family", "value": latest.get("family") or "—"},
   {"label": "Architecture", "value": latest.get("architecture") or "—"},
-  {"label": "Parameters", "value": latest.get("parameter_count") if latest.get("parameter_count") is not none else "—"},
-  {"label": "Active parameters", "value": latest.get("active_parameter_count") if latest.get("active_parameter_count") is not none else "—"},
+  {"label": "Parameters", "value": params_b(latest.get("parameter_count"))},
+  {"label": "Active parameters", "value": params_b(latest.get("active_parameter_count"))},
   {"label": "Experts", "value": latest.get("expert_count") if latest.get("expert_count") is not none else "—"},
   {"label": "Quantization", "value": latest.get("quantization") or "—"},
   {"label": "Weight format", "value": latest.get("weight_format") or "—"},
   {"label": "Size", "value": (latest.get("size_bytes") | bytes_human) if latest.get("size_bytes") is number else "—"},
-  {"label": "Max context", "value": latest.get("max_context") if latest.get("max_context") is not none else "—"},
+  {"label": "Max context", "value": context_k(latest.get("max_context"))},
   {"label": "Layers", "value": latest.get("layers") if latest.get("layers") is not none else "—"},
   {"label": "Attention heads", "value": latest.get("attention_heads") if latest.get("attention_heads") is not none else "—"},
   {"label": "Observed", "value": latest.get("observed_at") or "—"},
@@ -59,8 +59,8 @@
 {% if history | length > 1 %}
 <h3>Descriptor history</h3>
 {% set rows = [] %}
-{% for one in history %}{% set _ = rows.append([one.get("observed_at") or "—", one.get("family") or "—", one.get("quantization") or "—", value(one.get("parameter_count"), fmt="%d"), value(one.get("max_context"), fmt="%d"), (one.get("size_bytes") | bytes_human) if one.get("size_bytes") is number else "—"]) %}{% endfor %}
-{{ table([{"label": "Observed", "mono": true}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Size", "numeric": true}], rows, caption=(history | length) ~ " snapshots, most recent first; each is immutable once recorded", density="dense", row_count=rows | length) }}
+{% for one in history %}{% set _ = rows.append([one.get("observed_at") or "—", one.get("family") or "—", one.get("quantization") or "—", params_b(one.get("parameter_count")), context_k(one.get("max_context")), (one.get("size_bytes") | bytes_human) if one.get("size_bytes") is number else "—"]) %}{% endfor %}
+{{ table([{"label": "Observed", "mono": true}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Size", "numeric": true}], rows, caption=(history | length) ~ " snapshots, most recent first; each is immutable once recorded", density="dense", row_count=rows | length, table_id="fw-model-2", sortable=true) }}
 {% endif %}
 
 <h3>Evidence</h3>
@@ -72,7 +72,7 @@
 {% for one in evidence %}
 {% set _ = rows.append([one.get("capability_id") or "—", one.get("adapter") or "bare base", value(one.get("score"), fmt="%.3f"), value(one.get("confidence"), fmt="%.2f"), value(one.get("sample_count"), fmt="%d"), one.get("measured_at") or "—", short(one.get("runtime_profile_hash")), machine_link(one.get("machine_fingerprint"))]) %}
 {% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Subject"}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile"}, {"label": "Machine"}], rows, caption="A capability nobody measured is absent, never scored zero", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Subject"}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile"}, {"label": "Machine"}], rows, caption="A capability nobody measured is absent, never scored zero", density="dense", row_count=rows | length, table_id="fw-model-3", sortable=true) }}
 <p class="muted"><a href="/apps/freeweight/evidence?model={{ (model.get('id') or '') | urlencode }}">Every factor behind these scores</a></p>
 {% else %}
 <p class="muted">No evidence: nothing measured on this model has produced a capability record.</p>
@@ -93,7 +93,7 @@
 {% for one in results %}
 {% set _ = rows.append([one.get("metric_key") or "—", value(one.get("value"), one.get("unavailable_reason")), one.get("unit") or "—", value(one.get("sample_count"), fmt="%d"), value(one.get("excluded_count"), fmt="%d"), (one.get("suite") or "—") ~ " " ~ (one.get("suite_version") or ""), one.get("run_test_key") or "run", short(one.get("runtime_profile_hash")), machine_link(one.get("machine_fingerprint")), run_link(one.get("run_id")), one.get("created_at") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Suite"}, {"label": "Test"}, {"label": "Runtime profile"}, {"label": "Machine"}, {"label": "Run"}, {"label": "Created", "mono": true}], rows, caption="Completed runs' metrics for this model, newest first", density="dense", complete=next_href is none, row_count=rows | length) }}
+{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Suite"}, {"label": "Test"}, {"label": "Runtime profile"}, {"label": "Machine"}, {"label": "Run"}, {"label": "Created", "mono": true}], rows, caption="Completed runs' metrics for this model, newest first", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-model-4", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 {% else %}
 {{ empty_state("Nothing measured on this model under these filters.", "Start a run", "/apps/freeweight/runs") }}

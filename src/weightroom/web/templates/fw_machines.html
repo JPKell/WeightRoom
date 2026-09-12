@@ -29,7 +29,7 @@ legitimately empty before anything has been measured, and reading it never makes
 ]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Fingerprint"}, {"label": "Hostname"}, {"label": "OS"}, {"label": "CPU"}, {"label": "Cores", "numeric": true}, {"label": "RAM", "numeric": true}, {"label": "First seen", "mono": true}, {"label": "Last seen", "mono": true}, {"label": "Current"}], rows, caption="The current host is flagged: a fingerprint is not a name anyone recognises", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Fingerprint"}, {"label": "Hostname"}, {"label": "OS"}, {"label": "CPU"}, {"label": "Cores", "numeric": true}, {"label": "RAM", "numeric": true}, {"label": "First seen", "mono": true}, {"label": "Last seen", "mono": true}, {"label": "Current"}], rows, caption="The current host is flagged: a fingerprint is not a name anyone recognises", density="dense", row_count=rows | length, table_id="fw-machines", sortable=true) }}
 {% else %}
 {{ empty_state("No machine recorded yet: one is recorded when a run is created on it.") }}
 {% endif %}

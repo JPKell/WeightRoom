@@ -18,7 +18,7 @@
 {% if imported.get("rejected") %}
 {% set rows = [] %}
 {% for one in imported.get("rejected") %}{% set _ = rows.append([one.get("index"), one.get("canonical_id") or "—", one.get("capability_id") or "—", one.get("reason") or "—", one.get("detail") or "—"]) %}{% endfor %}
-{{ table([{"label": "#", "numeric": true}, {"label": "Subject", "mono": true}, {"label": "Capability", "mono": true}, {"label": "Reason", "mono": true}, {"label": "Detail"}], rows, caption="Rejected records, with why", density="dense", row_count=rows | length) }}
+{{ table([{"label": "#", "numeric": true}, {"label": "Subject", "mono": true}, {"label": "Capability", "mono": true}, {"label": "Reason", "mono": true}, {"label": "Detail"}], rows, caption="Rejected records, with why", density="dense", row_count=rows | length, table_id="lc-evidence-1", sortable=true) }}
 {% endif %}
 {% endif %}
 <p class="muted">Benchmark evidence imported from FreeWeight. Evidence for a model LoadCoach has not
@@ -81,7 +81,7 @@ Confidence is FreeWeight's, applied here and never recomputed.</p>
 {% for one in data.get("sources") %}
 {% set _ = rows.append([one.get("source_id") or "—", one.get("kind") or "—", one.get("url") or "—", one.get("last_import_at") or "never", badge(one.get("last_status") or "unknown", tone="success" if one.get("last_status") == "ok" else "danger"), measure(one.get("rows") if one.get("rows") is not none else one.get("record_count")), measure(one.get("stale_rows")), one.get("error_text") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Source", "mono": true}, {"label": "Kind"}, {"label": "URL", "mono": true}, {"label": "Last import", "mono": true}, {"label": "Status"}, {"label": "Records", "numeric": true}, {"label": "Stale", "numeric": true}, {"label": "Error"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Source", "mono": true}, {"label": "Kind"}, {"label": "URL", "mono": true}, {"label": "Last import", "mono": true}, {"label": "Status"}, {"label": "Records", "numeric": true}, {"label": "Stale", "numeric": true}, {"label": "Error"}], rows, density="dense", row_count=rows | length, table_id="lc-evidence-2", sortable=true) }}
 {% else %}
 {{ empty_state("No evidence source has been imported from.") }}
 {% endif %}

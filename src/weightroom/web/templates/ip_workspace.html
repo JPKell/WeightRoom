@@ -98,7 +98,7 @@
 {% for c in u.get("coverage") or [] %}
 {% set _ = rows.append([c.get("requirement_key") or "—", state_badge("passed" if c.get("satisfied") else "failed"), c.get("satisfied_by") or "—", (c.get("detail") or "—") | cell_text]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Requirement", "mono": true}, {"label": "Satisfied"}, {"label": "Decided by"}, {"label": "Detail"}], rows, caption="What settled each requirement", density="dense", complete=true, row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Requirement", "mono": true}, {"label": "Satisfied"}, {"label": "Decided by"}, {"label": "Detail"}], rows, caption="What settled each requirement", density="dense", complete=true, row_count=rows | length, table_id="ip-workspace-1", sortable=true) }}{% endif %}
 
 <h4>Content</h4>
 {% if content_html %}<div class="ip-content">{{ content_html }}</div>{% else %}{{ empty_state("No committed content yet.") }}{% endif %}
@@ -108,7 +108,7 @@
 {% for f in u.get("findings") or [] %}
 {% set _ = rows.append([f.get("round"), badge(f.get("severity") or "—", tone="danger" if f.get("severity") in ("critical", "major") else "neutral"), (f.get("problem") or "—") | cell_text(limit=400), (f.get("fix") or "—") | cell_text(limit=400)]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Round"}, {"label": "Severity"}, {"label": "Problem"}, {"label": "Would resolve it"}], rows, caption="What the reviews found", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Round"}, {"label": "Severity"}, {"label": "Problem"}, {"label": "Would resolve it"}], rows, caption="What the reviews found", density="dense", complete=true, row_count=rows | length, table_id="ip-workspace-2", sortable=true) }}
 {% else %}{{ empty_state("No findings.") }}{% endif %}
 
 <h4>Versions</h4>
@@ -135,7 +135,7 @@
 {% for line in diff.get("diff_lines") or [] %}
 {% set _ = rows.append([line.get("old_number") if line.get("old_number") is not none else "", line.get("new_number") if line.get("new_number") is not none else "", line.get("marker") or "", line.get("text") or ""]) %}
 {% endfor %}
-<div class="ip-diff">{{ table([{"label": "Old", "mono": true}, {"label": "New", "mono": true}, {"label": "±", "mono": true}, {"label": "Line"}], rows, caption="Line-by-line difference: + is new text, - is removed", density="dense", complete=true, row_count=rows | length) }}</div>
+<div class="ip-diff">{{ table([{"label": "Old", "mono": true}, {"label": "New", "mono": true}, {"label": "±", "mono": true}, {"label": "Line"}], rows, caption="Line-by-line difference: + is new text, - is removed", density="dense", complete=true, row_count=rows | length, table_id="ip-workspace-3", sortable=true) }}</div>
 {% endif %}
 {% endif %}
 
@@ -145,7 +145,7 @@
 {% set routing = a.get("routing") or {} %}
 {% set _ = rows.append([a.get("stage") or "—", a.get("attempt"), a.get("backend") or "—", a.get("model_canonical_id") or "—", (a.get("prompt_id") or "—") ~ " " ~ (a.get("prompt_version") or ""), ("decision " ~ (routing.get("decision_id") or "—")) if routing else "—", ((a.get("degradations") or []) | join("; ")) or "—"]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Stage"}, {"label": "Attempt"}, {"label": "Backend"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Routing"}, {"label": "Degradations"}], rows, caption="Every attempt, with its model, prompt and routing decision", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Stage"}, {"label": "Attempt"}, {"label": "Backend"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Routing"}, {"label": "Degradations"}], rows, caption="Every attempt, with its model, prompt and routing decision", density="dense", complete=true, row_count=rows | length, table_id="ip-workspace-4", sortable=true) }}
 {% else %}{{ empty_state("No attempts recorded.") }}{% endif %}
 <p><a href="{{ proj }}/units/{{ u.get('unit_key') | urlencode }}">The full unit record</a></p>
 {% endif %}

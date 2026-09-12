@@ -13,7 +13,7 @@
 it has no unit. Set <code>[apps.{{ view.name }}] executable</code> in WeightRoom's
 configuration and run <code>wr-gym units sync</code>.</p>
 {% elif full_controls | default(false) %}
-<form method="post" action="/apps/{{ view.name }}/control" class="field">
+<form method="post" action="/apps/{{ view.name }}/control" class="kit-actions">
   <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
   <input type="hidden" name="next" value="{{ current_path }}">
   <button type="submit" name="verb" value="start" {% if view.running %}disabled{% endif %}>Start</button>

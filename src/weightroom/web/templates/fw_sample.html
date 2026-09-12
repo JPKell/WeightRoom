@@ -64,14 +64,14 @@ responses apart, not to read one.</p>
 {% for score in data.get("criterion_scores") %}
 {% set _ = rows.append([score.get("criterion_key") or "—", score.get("rung") or "—", value(score.get("raw_score")), value(score.get("weight"), fmt="%.3g"), status_badge(score.get("status")), score.get("skip_reason") or "—", (score.get("verdicts") | length) ~ " verdict(s)"]) %}
 {% endfor %}
-{{ table([{"label": "Criterion", "mono": true}, {"label": "Rung"}, {"label": "Raw score", "numeric": true}, {"label": "Weight", "numeric": true}, {"label": "Status"}, {"label": "Skip reason"}, {"label": "Jurors"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Criterion", "mono": true}, {"label": "Rung"}, {"label": "Raw score", "numeric": true}, {"label": "Weight", "numeric": true}, {"label": "Status"}, {"label": "Skip reason"}, {"label": "Jurors"}], rows, density="dense", row_count=rows | length, table_id="fw-sample-1", sortable=true) }}
 {% for score in data.get("criterion_scores") if score.get("verdicts") %}
 <details class="kit-details"><summary><span class="mono">{{ score.get("criterion_key") }}</span> — {{ score.get("verdicts") | length }} juror verdict(s)</summary>
 {% set rows = [] %}
 {% for verdict in score.get("verdicts") %}
 {% set _ = rows.append([verdict.get("juror_canonical_id") or "—", value(verdict.get("repetition"), fmt="%d"), value(verdict.get("grade"), fmt="%d"), verdict.get("pairwise_choice") or "—", "remote" if verdict.get("remote") else "local", verdict.get("rationale") or verdict.get("refused_reason") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Juror", "mono": true}, {"label": "Rep", "numeric": true}, {"label": "Grade", "numeric": true}, {"label": "Pairwise"}, {"label": "Where"}, {"label": "Rationale"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Juror", "mono": true}, {"label": "Rep", "numeric": true}, {"label": "Grade", "numeric": true}, {"label": "Pairwise"}, {"label": "Where"}, {"label": "Rationale"}], rows, density="dense", row_count=rows | length, table_id="fw-sample-2", sortable=true) }}
 </details>
 {% endfor %}
 {% endif %}
@@ -82,7 +82,7 @@ responses apart, not to read one.</p>
 {% for call in data.get("tool_calls") %}
 {% set _ = rows.append([value(call.get("turn_index"), fmt="%d"), value(call.get("call_index"), fmt="%d"), call.get("tool_name") or "—", call.get("expected_tool") or "—", "yes" if call.get("schema_valid") else "no", "—" if call.get("correct_tool") is none else ("yes" if call.get("correct_tool") else "no"), "—" if call.get("correct_arguments") is none else ("yes" if call.get("correct_arguments") else "no"), status_badge(call.get("status")), value(call.get("latency_ms"), fmt="%.1f"), json_viewer(call.get("arguments"), label="Arguments") if call.get("arguments") is not none else "—"]) %}
 {% endfor %}
-{{ table([{"label": "Turn", "numeric": true}, {"label": "Call", "numeric": true}, {"label": "Tool", "mono": true}, {"label": "Expected", "mono": true}, {"label": "Schema valid"}, {"label": "Correct tool"}, {"label": "Correct arguments"}, {"label": "Status"}, {"label": "Latency ms", "numeric": true}, {"label": "Arguments"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Turn", "numeric": true}, {"label": "Call", "numeric": true}, {"label": "Tool", "mono": true}, {"label": "Expected", "mono": true}, {"label": "Schema valid"}, {"label": "Correct tool"}, {"label": "Correct arguments"}, {"label": "Status"}, {"label": "Latency ms", "numeric": true}, {"label": "Arguments"}], rows, density="dense", row_count=rows | length, table_id="fw-sample-3", sortable=true) }}
 {% else %}
 <p class="muted">This sample made no tool calls.</p>
 {% endif %}
@@ -95,7 +95,7 @@ responses apart, not to read one.</p>
 {% for one in data.get("telemetry") %}
 {% set _ = rows.append([value(one.get("gpu_index"), fmt="%d"), value(one.get("gpu_utilization_percent"), fmt="%.0f"), (one.get("vram_used_bytes") | bytes_human) if one.get("vram_used_bytes") is number else "—", value(one.get("gpu_power_watts"), fmt="%.1f"), value(one.get("gpu_temperature_c"), fmt="%.0f")]) %}
 {% endfor %}
-{{ table([{"label": "GPU", "numeric": true}, {"label": "Utilization %", "numeric": true}, {"label": "VRAM used", "numeric": true}, {"label": "Power W", "numeric": true}, {"label": "Temperature °C", "numeric": true}], rows, caption="The window is reconstructed from the recorded wall time, not stored: an observation on its edge may be the neighbouring request's", density="dense", row_count=rows | length) }}
+{{ table([{"label": "GPU", "numeric": true}, {"label": "Utilization %", "numeric": true}, {"label": "VRAM used", "numeric": true}, {"label": "Power W", "numeric": true}, {"label": "Temperature °C", "numeric": true}], rows, caption="The window is reconstructed from the recorded wall time, not stored: an observation on its edge may be the neighbouring request's", density="dense", row_count=rows | length, table_id="fw-sample-4", sortable=true) }}
 {% else %}
 <p class="muted">No observation fell inside this request's window: no readable GPU, sampling off, or a request shorter than the interval. No reading, not zero usage.</p>
 {% endif %}

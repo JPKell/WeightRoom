@@ -42,7 +42,7 @@
 {% set mine, theirs = measured.get(capability), bare.get(capability) %}
 {% set _ = rows.append([capability, value(mine, "not measured on this subject — never the base's number", fmt="%.3f"), value(theirs, "not measured on the bare base", fmt="%.3f"), ("%+.3f" | format(mine - theirs)) if mine is number and theirs is number else "—"]) %}
 {% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "With the adapter", "numeric": true}, {"label": "Bare base", "numeric": true}, {"label": "Difference", "numeric": true}], rows, caption="Side by side, never merged (ADR-0059)", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "With the adapter", "numeric": true}, {"label": "Bare base", "numeric": true}, {"label": "Difference", "numeric": true}], rows, caption="Side by side, never merged (ADR-0059)", density="dense", row_count=rows | length, table_id="fw-adapter-1", sortable=true) }}
 {% else %}
 <p class="muted">Nothing measured on this base yet, with or without the adapter.</p>
 {% endif %}
@@ -62,7 +62,7 @@ the fixed regression rows (<code>instruction_following</code>, <code>structured_
 {% if data.get("runs") %}
 {% set rows = [] %}
 {% for run in data.get("runs") %}{% set _ = rows.append([run_link(run.get("id")), status_badge(run.get("status")), (run.get("suite") or {}).get("key") or "—", run.get("model") or "—", run.get("label") or "—", machine_link(run.get("machine_fingerprint")), run.get("created_at") or "—"]) %}{% endfor %}
-{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Base", "mono": true}, {"label": "Label"}, {"label": "Machine"}, {"label": "Created", "mono": true}], rows, caption="Newest first; the first page", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Base", "mono": true}, {"label": "Label"}, {"label": "Machine"}, {"label": "Created", "mono": true}], rows, caption="Newest first; the first page", density="dense", row_count=rows | length, table_id="fw-adapter-2", sortable=true) }}
 {% elif sourced.data is not none %}
 <p class="muted">No run was created under it.</p>
 {% endif %}
@@ -73,7 +73,7 @@ the fixed regression rows (<code>instruction_following</code>, <code>structured_
 {% elif data.get("results") %}
 {% set rows = [] %}
 {% for row in data.get("results") %}{% set _ = rows.append([row.get("metric_key") or "—", value(row.get("value"), row.get("unavailable_reason"), fmt="%.6g"), row.get("unit") or "—", value(row.get("sample_count"), fmt="%d"), (row.get("suite") or "—"), status_badge(row.get("run_status")), run_link(row.get("run_id"))]) %}{% endfor %}
-{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Suite"}, {"label": "Run status"}, {"label": "Run"}], rows, caption="Every run's metrics, whatever its status; the first page", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Suite"}, {"label": "Run status"}, {"label": "Run"}], rows, caption="Every run's metrics, whatever its status; the first page", density="dense", row_count=rows | length, table_id="fw-adapter-3", sortable=true) }}
 <p><a href="/apps/freeweight/results?adapter={{ adapter_name | urlencode }}&amp;status=any">Every result under it</a></p>
 {% else %}
 <p class="muted">Nothing measured under it yet.</p>

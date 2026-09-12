@@ -33,7 +33,7 @@ model's cost is <em>unpriced</em>, never <code>$0.00</code>.</p>
 {% for one in position.get("projects") %}
 {% set _ = rows.append([one.get("project"), one.get("tokens_remaining_display") or "—", one.get("money_remaining_display") or "—", badge("binding", tone="warning") if one.get("binds") else "no"]) %}
 {% endfor %}
-{{ table([{"label": "Project"}, {"label": "Tokens left"}, {"label": "Money left"}, {"label": "Binds"}], rows, caption="Configured project ceilings", density="dense") }}
+{{ table([{"label": "Project"}, {"label": "Tokens left"}, {"label": "Money left"}, {"label": "Binds"}], rows, caption="Configured project ceilings", density="dense", table_id="pc-ledger-1", sortable=true) }}
 {% endif %}
 {% if position.get("tiers") %}
 <h3>Per-tier spend</h3>
@@ -42,7 +42,7 @@ model's cost is <em>unpriced</em>, never <code>$0.00</code>.</p>
 {% for one in position.get("tiers") %}
 {% set _ = rows.append([one.get("tier"), one.get("tokens_spent_display") or "—", one.get("money_spent_display") or "—", one.get("unpriced_debit_count")]) %}
 {% endfor %}
-{{ table([{"label": "Tier", "mono": true}, {"label": "Tokens"}, {"label": "Money"}, {"label": "Unpriced", "numeric": true}], rows, caption="Ledger-wide spend by tier", density="dense") }}
+{{ table([{"label": "Tier", "mono": true}, {"label": "Tokens"}, {"label": "Money"}, {"label": "Unpriced", "numeric": true}], rows, caption="Ledger-wide spend by tier", density="dense", table_id="pc-ledger-2", sortable=true) }}
 {% endif %}
 {% else %}
 <p class="notice">Today's position is PromptCadence's own arithmetic over its ceilings, and it is not

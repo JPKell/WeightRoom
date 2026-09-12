@@ -26,7 +26,7 @@ A unit's state comes from systemd; the version comes from the application's own
       <td><code>{{ view.unit }}</code></td>
       <td>
         {% if view.installed and view.unit_state != "unsupported" %}
-        <form method="post" action="/apps/{{ view.name }}/control" class="field">
+        <form method="post" action="/apps/{{ view.name }}/control" class="kit-actions">
           <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
           <button type="submit" name="verb" value="start" {% if view.running %}disabled{% endif %}>Start</button>
           <button type="submit" name="verb" value="stop" {% if not view.running %}disabled{% endif %}>Stop</button>

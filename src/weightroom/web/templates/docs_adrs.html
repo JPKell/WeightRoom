@@ -17,7 +17,7 @@
   badge(row.status, tone=status_tone)
 ]) %}
 {% endfor %}
-{{ table(columns, table_rows, table_id="adr-index", density="dense", row_count=rows | length) }}
+{{ table(columns, table_rows, table_id="adr-index", density="dense", row_count=rows | length, sortable=true) }}
 {% else %}
 {{ empty_state("No ADR index found under [docs] root.") }}
 {% endif %}

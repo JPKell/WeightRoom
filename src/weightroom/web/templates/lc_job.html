@@ -117,7 +117,7 @@ hashes, token counts, timings and routing decision remain.</p>
 {% if validation.get("checks") %}
 {% set rows = [] %}
 {% for one in validation.get("checks") %}{% set _ = rows.append([one.get("kind") or "—", badge("passed", tone="success") if one.get("passed") else badge("failed", tone="danger"), json_viewer(one.get("detail"), label="Detail") if one.get("detail") else "—"]) %}{% endfor %}
-{{ table([{"label": "Check", "mono": true}, {"label": "Result"}, {"label": "Detail"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Check", "mono": true}, {"label": "Result"}, {"label": "Detail"}], rows, density="dense", row_count=rows | length, table_id="lc-job-1", sortable=true) }}
 {% endif %}
 {% else %}
 <p class="muted">The task profile asked for no validation.</p>
@@ -129,7 +129,7 @@ hashes, token counts, timings and routing decision remain.</p>
 {% for one in job.get("attempts") %}
 {% set _ = rows.append([one.get("attempt"), one.get("model") or "—", one.get("rank") if one.get("rank") is not none else "—", one.get("outcome") or "—", measure(one.get("provider_ms"), "ms"), one.get("error_code") or "—", ((one.get("prompt_id") or "") ~ " " ~ (one.get("prompt_version") or "")) if one.get("prompt_id") else "—"]) %}
 {% endfor %}
-{{ table([{"label": "#", "numeric": true}, {"label": "Model", "mono": true}, {"label": "Rank", "numeric": true}, {"label": "Outcome"}, {"label": "Provider", "numeric": true}, {"label": "Error", "mono": true}, {"label": "Prompt record", "mono": true}], rows, caption="One row per attempt; a corrective retry is a new row", density="dense", row_count=rows | length) }}
+{{ table([{"label": "#", "numeric": true}, {"label": "Model", "mono": true}, {"label": "Rank", "numeric": true}, {"label": "Outcome"}, {"label": "Provider", "numeric": true}, {"label": "Error", "mono": true}, {"label": "Prompt record", "mono": true}], rows, caption="One row per attempt; a corrective retry is a new row", density="dense", row_count=rows | length, table_id="lc-job-2", sortable=true) }}
 {% else %}
 {{ empty_state("No attempt has been made yet.") }}
 {% endif %}
@@ -143,7 +143,7 @@ hashes, token counts, timings and routing decision remain.</p>
 {% for one in job.get("feedback") %}
 {% set _ = rows.append([one.get("source") or "—", "yes" if one.get("accepted") else "no", ("%.2f" | format(one.get("quality_score"))) if one.get("quality_score") is number else "—", "yes" if one.get("edited") else "no", one.get("notes") or "—", one.get("updated_at") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Source"}, {"label": "Accepted"}, {"label": "Quality", "numeric": true}, {"label": "Edited"}, {"label": "Notes"}, {"label": "Updated", "mono": true}], rows, caption="One record per source; a later verdict replaces the earlier one", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Source"}, {"label": "Accepted"}, {"label": "Quality", "numeric": true}, {"label": "Edited"}, {"label": "Notes"}, {"label": "Updated", "mono": true}], rows, caption="One record per source; a later verdict replaces the earlier one", density="dense", row_count=rows | length, table_id="lc-job-3", sortable=true) }}
 {% else %}
 <p class="muted">No caller has given feedback on this job.</p>
 {% endif %}
@@ -182,7 +182,7 @@ hashes, token counts, timings and routing decision remain.</p>
 {% elif data.get("events") %}
 {% set rows = [] %}
 {% for one in data.get("events") %}{% set _ = rows.append([one.get("sequence"), one.get("timestamp") or "—", one.get("type") or "—", one.get("message") or "—"]) %}{% endfor %}
-{{ table([{"label": "#", "numeric": true}, {"label": "When", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The persisted events a reconnecting client replays", density="dense", row_count=rows | length) }}
+{{ table([{"label": "#", "numeric": true}, {"label": "When", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The persisted events a reconnecting client replays", density="dense", row_count=rows | length, table_id="lc-job-4", sortable=true) }}
 {% else %}
 {{ empty_state("No event is recorded for this job.") }}
 {% endif %}

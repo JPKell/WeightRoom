@@ -29,10 +29,10 @@ grades. Minimum {{ data.get("min_samples") or "—" }} graded samples, target {{
 </div>
 {% set rows = [] %}
 {% for one in data.get("partitions") or [] %}{% set _ = rows.append([one.get("partition"), one.get("samples"), one.get("complete") if one.get("complete") is not none else "—"]) %}{% endfor %}
-{% if rows %}{{ table([{"label": "Partition"}, {"label": "Samples", "numeric": true}, {"label": "Fully graded", "numeric": true}], rows, caption="By partition — assigned when the calibration runs; until then every sample waits in the holdout", density="dense", row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Partition"}, {"label": "Samples", "numeric": true}, {"label": "Fully graded", "numeric": true}], rows, caption="By partition — assigned when the calibration runs; until then every sample waits in the holdout", density="dense", row_count=rows | length, table_id="fw-goal-calibration-1", sortable=true) }}{% endif %}
 {% set rows = [] %}
 {% for origin, count in (data.get("origins") or {}) | dictsort %}{% set _ = rows.append([origin, count]) %}{% endfor %}
-{% if rows %}{{ table([{"label": "Origin"}, {"label": "Samples", "numeric": true}], rows, caption="By where the samples came from", density="dense", row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Origin"}, {"label": "Samples", "numeric": true}], rows, caption="By where the samples came from", density="dense", row_count=rows | length, table_id="fw-goal-calibration-2", sortable=true) }}{% endif %}
 <p class="muted">No sample is listed one by one here: a row pairing a sample with its origin or its partition would unblind the grading page.</p>
 
 <h3 id="grade">Grade</h3>
@@ -79,7 +79,7 @@ FreeWeight skips a sample whose text is already in the set.</p>
   {% set promote %}<form method="post" action="{{ here }}/calibration/samples" class="kit-inline">{{ csrf() }}<input type="hidden" name="mode" value="promote"><input type="hidden" name="run_id" value="{{ run.get('id') }}"><button type="submit"{% if off %} disabled{% endif %}>Promote its samples</button></form>{% endset %}
   {% set _ = rows.append([run_link(run.get("id")), run.get("model") or "—", run.get("label") or "—", run.get("created_at") or "—", promote]) %}
   {% endfor %}
-  {{ table([{"label": "Run"}, {"label": "Model", "mono": true}, {"label": "Label"}, {"label": "Created", "mono": true}, {"label": ""}], rows, caption="Completed runs of goal." ~ slug, density="dense", row_count=rows | length) }}
+  {{ table([{"label": "Run"}, {"label": "Model", "mono": true}, {"label": "Label"}, {"label": "Created", "mono": true}, {"label": ""}], rows, caption="Completed runs of goal." ~ slug, density="dense", row_count=rows | length, table_id="fw-goal-calibration-3", sortable=true) }}
   {% else %}
   <p class="muted">No completed run of this goal yet.</p>
   {% endif %}

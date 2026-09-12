@@ -50,7 +50,7 @@ A <code>user.*</code> record carries its goal hash, jury and calibration beside 
   staleness(record.get("explanation"))
 ]) %}
 {% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Subject", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile"}, {"label": "Machine"}, {"label": "Schema"}, {"label": "Staleness"}], rows, caption="Current records, by capability", density="dense", complete=next_href is none, row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Subject", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile"}, {"label": "Machine"}, {"label": "Schema"}, {"label": "Staleness"}], rows, caption="Current records, by capability", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-evidence-1", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 
 <h3>Why each score is what it is</h3>
@@ -65,7 +65,7 @@ its freshness decayed below the threshold, or its environment drifted — and th
 {% set rows = [] %}
 {% for name in ["sample_factor", "consistency_factor", "freshness_factor", "environment_factor", "identity_factor", "judge_validity_factor"] %}{% set _ = rows.append([name, value(factors.get(name), fmt="%.3f")]) %}{% endfor %}
 {% set _ = rows.append(["confidence", value(factors.get("confidence"), fmt="%.3f")]) %}
-{{ table([{"label": "Confidence factor", "mono": true}, {"label": "Value", "numeric": true}], rows, caption="Multiplied into the confidence, as FreeWeight stored them", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Confidence factor", "mono": true}, {"label": "Value", "numeric": true}], rows, caption="Multiplied into the confidence, as FreeWeight stored them", density="dense", row_count=rows | length, table_id="fw-evidence-2", sortable=true) }}
 {% set now = explained.get("staleness") or {} %}
 <p class="muted">Freshness now {{ value(now.get("freshness_factor"), fmt="%.2f") }} after {{ value(now.get("age_days"), fmt="%.0f") }} day(s){% if now.get("drift") %}; drifted: {{ now.get("drift") | join(", ") }}{% endif %}.{% for reason in now.get("reasons") or [] %} {{ reason }}{% endfor %}</p>
 {% else %}
@@ -73,7 +73,7 @@ its freshness decayed below the threshold, or its environment drifted — and th
 {% endif %}
 {% set rows = [] %}
 {% for metric in record.get("contributing_metrics") or [] %}{% set _ = rows.append([metric.get("metric_key") or "—", value(metric.get("weight"), fmt="%.2f"), value(metric.get("sample_count"), fmt="%d")]) %}{% endfor %}
-{% if rows %}{{ table([{"label": "Contributing metric", "mono": true}, {"label": "Weight", "numeric": true}, {"label": "Samples", "numeric": true}], rows, density="dense", row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Contributing metric", "mono": true}, {"label": "Weight", "numeric": true}, {"label": "Samples", "numeric": true}], rows, density="dense", row_count=rows | length, table_id="fw-evidence-3", sortable=true) }}{% endif %}
 {% set runs = [] %}
 {% for run_id in record.get("source_run_ids") or [] %}{% set _ = runs.append(run_link(run_id)) %}{% endfor %}
 {{ kv_list([

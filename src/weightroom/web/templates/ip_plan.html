@@ -47,7 +47,7 @@ The plan is unchanged.</p>{% endif %}
 ]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Key", "mono": true}, {"label": "Requirement"}, {"label": "Class"}, {"label": "Checked by"}, {"label": "Source"}, {"label": "Units", "mono": true}], rows, caption="Compiled requirements", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Key", "mono": true}, {"label": "Requirement"}, {"label": "Class"}, {"label": "Checked by"}, {"label": "Source"}, {"label": "Units", "mono": true}], rows, caption="Compiled requirements", density="dense", complete=true, row_count=rows | length, table_id="ip-plan-1", sortable=true) }}
 {% else %}{{ empty_state("No requirements compiled yet.") }}{% endif %}
 
 <h3>Units</h3>
@@ -57,7 +57,7 @@ The plan is unchanged.</p>{% endif %}
 {% set _ = rows.append([u.get("key") or "—", u.get("title") or "—", u.get("goal") or "—", u.get("requirements") or "—", state_badge(u.get("state")), measure(u.get("target_words"))]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Key", "mono": true}, {"label": "Title"}, {"label": "Goal"}, {"label": "Requirements", "mono": true}, {"label": "State"}, {"label": "Target words"}], rows, caption="The unit plan, in reading order", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Key", "mono": true}, {"label": "Title"}, {"label": "Goal"}, {"label": "Requirements", "mono": true}, {"label": "State"}, {"label": "Target words"}], rows, caption="The unit plan, in reading order", density="dense", complete=true, row_count=rows | length, table_id="ip-plan-2", sortable=true) }}
 {% else %}{{ empty_state("No plan yet: run the plan to outline the units.") }}{% endif %}
 
 {% if sourced.live and units %}
@@ -125,7 +125,7 @@ units that are {{ data.get("editable_states") | join(", ") }}{% endif %}.</p>
 {% for n in r.get("notes") or [] %}
 {% set _ = rows.append([badge(n.get("kind") or "—"), n.get("citation") or "—", measure(n.get("characters")), short(n.get("sha256"))]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Kind"}, {"label": "Cites"}, {"label": "Characters"}, {"label": "Digest", "mono": true}], rows, caption="Notes the units are drafted against", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Kind"}, {"label": "Cites"}, {"label": "Characters"}, {"label": "Digest", "mono": true}], rows, caption="Notes the units are drafted against", density="dense", complete=true, row_count=rows | length, table_id="ip-plan-3", sortable=true) }}
 {% else %}{{ empty_state("No note: research has not run, or every call was refused.") }}{% endif %}
 {% set rows = [] %}
 {% for c in r.get("tool_calls") or [] %}
@@ -141,7 +141,7 @@ units that are {{ data.get("editable_states") | join(", ") }}{% endif %}.</p>
   short(c.get("invocation_id"))
 ]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Tool", "mono": true}, {"label": "Result"}, {"label": "Reason", "mono": true}, {"label": "Detail"}, {"label": "Egress decision"}, {"label": "Took"}, {"label": "Invocation", "mono": true}], rows, caption="Every research call, refused ones included, with the egress decision it ran under", density="dense", complete=true, row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Tool", "mono": true}, {"label": "Result"}, {"label": "Reason", "mono": true}, {"label": "Detail"}, {"label": "Egress decision"}, {"label": "Took"}, {"label": "Invocation", "mono": true}], rows, caption="Every research call, refused ones included, with the egress decision it ran under", density="dense", complete=true, row_count=rows | length, table_id="ip-plan-4", sortable=true) }}{% endif %}
 {% endif %}
 {{ page_source(research) }}
 {% endblock %}

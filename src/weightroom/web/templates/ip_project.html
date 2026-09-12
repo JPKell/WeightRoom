@@ -90,7 +90,7 @@
   {% set _ = rows.append([key, value if value is not none else "—", (definitions.get(key) or {}).get("source") or "—", (definitions.get(key) or {}).get("applies") or "—"]) %}
   {% endif %}
   {% endfor %}
-  {{ table([{"label": "Setting", "mono": true}, {"label": "The value this run uses", "mono": true}, {"label": "From"}, {"label": "Applies"}], rows, caption="What IdeaPress will use as the stage starts, before this run's overrides", density="dense", complete=true, row_count=rows | length) }}
+  {{ table([{"label": "Setting", "mono": true}, {"label": "The value this run uses", "mono": true}, {"label": "From"}, {"label": "Applies"}], rows, caption="What IdeaPress will use as the stage starts, before this run's overrides", density="dense", complete=true, row_count=rows | length, table_id="ip-project-1", sortable=true) }}
   {% else %}
   <p class="muted">IdeaPress's runtime settings could not be read, so the values a run would use are not shown.</p>
   {% endif %}
@@ -119,7 +119,7 @@
 {{ table([
   {"label": "Unit", "mono": true}, {"label": "Title"}, {"label": "State"}, {"label": "Version"},
   {"label": "Words"}, {"label": "Coverage"}, {"label": "Last validation"}, {"label": "Paused because"}
-], rows, caption="Units, in reading order", density="dense", complete=true, row_count=rows | length) }}
+], rows, caption="Units, in reading order", density="dense", complete=true, row_count=rows | length, table_id="ip-project-2", sortable=true) }}
 {% else %}
 {{ empty_state("No units yet: the plan outlines them.") }}
 {% endif %}

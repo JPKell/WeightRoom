@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_lc.html" import model_link, recorded, measure, breaker_badge, model_actions with context %}
+{% from "_app_page.html" import page_source, refusal, context_k %}
+{% from "_lc.html" import model_link, recorded, measure, breaker_badge, model_actions, capability_badges with context %}
 {% block title %}Models — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 <div class="page-head">
@@ -38,9 +38,9 @@ job takes, and opens that job.</p>
   model_link(model.get("model_ref"), model.get("canonical_id")) ~ " · " ~ recorded(model.get("provider_name")),
   badge("remote", tone="warning") if model.get("is_remote") else recorded(false),
   model.get("family") or "—",
-  measure(model.get("max_context")),
+  context_k(model.get("max_context")),
   (model.get("size_bytes") | bytes_human) if model.get("size_bytes") is number else measure(none),
-  (model.get("declared_capabilities") or {}).keys() | join(", ") or "none declared",
+  capability_badges((model.get("declared_capabilities") or {}).keys()) if model.get("declared_capabilities") else "none declared",
   measure(none) if evidence is none else ((evidence.get("bound") ~ " bound · " ~ evidence.get("capabilities") ~ " capabilities" ~ (" · " ~ evidence.get("stale") ~ " stale" if evidence.get("stale") else "") ~ (" · " ~ evidence.get("unmatched") ~ " unmatched" if evidence.get("unmatched") else "")) if evidence.get("bound") or evidence.get("unmatched") else "none imported"),
   measure(none) if reliability is none else ((("factor %.3f" | format(reliability.get("lowest_factor"))) if reliability.get("lowest_factor") is number else "neutral") ~ " · " ~ reliability.get("attempts_7d") ~ " attempts 7d" ~ (" · " ~ badge("regression", tone="danger") if reliability.get("regressions") else "") ~ (" · " ~ breaker_badge(reliability.get("circuit_state")) if reliability.get("circuit_state") != "closed" else "") if reliability.get("pairs") else "no production evidence"),
   measure(none) if residency is none else ((badge("resident", tone="success") ~ " GPU " ~ (residency.get("gpu_indexes") or []) | join(", ")) if residency.get("resident") else "no"),
@@ -53,7 +53,7 @@ job takes, and opens that job.</p>
   "adapter",
   "local only",
   "—", "—",
-  (adapter.get("declared_capabilities") or []) | join(", ") or "none declared",
+  capability_badges(adapter.get("declared_capabilities")) if adapter.get("declared_capabilities") else "none declared",
   (adapter.get("evidence_source") or "—") ~ " · " ~ (adapter.get("base_confidence") or "—") ~ " base",
   "per subject",
   "with its base",
@@ -62,7 +62,7 @@ job takes, and opens that job.</p>
 ]) %}
 {% endfor %}
 {% endfor %}
-{{ table([{"label": "Model · registration"}, {"label": "Egress"}, {"label": "Family"}, {"label": "Context", "numeric": true}, {"label": "Size", "numeric": true}, {"label": "Declared"}, {"label": "Evidence"}, {"label": "Reliability"}, {"label": "Resident"}, {"label": "Availability"}, {"label": "Use"}], rows, caption="Every model discovery has seen, each adapter subject under the base it runs on", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Model · registration"}, {"label": "Egress"}, {"label": "Family"}, {"label": "Context", "numeric": true}, {"label": "Size", "numeric": true}, {"label": "Declared"}, {"label": "Evidence"}, {"label": "Reliability"}, {"label": "Resident"}, {"label": "Availability"}, {"label": "Use"}], rows, caption="Every model discovery has seen, each adapter subject under the base it runs on", density="dense", row_count=rows | length, table_id="lc-models", sortable=true) }}
 {% else %}
 {{ empty_state("No model has been discovered yet. Scan for models once a registration answers.", "Providers", "/apps/loadcoach/providers") }}
 {% endif %}

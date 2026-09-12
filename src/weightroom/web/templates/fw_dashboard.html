@@ -71,7 +71,7 @@ never completed that suite — not that it scored zero.</p>
 {% endfor %}
 {% set _ = rows.append(cells) %}
 {% endfor %}
-{{ table(head, rows, caption=(models | length) ~ " models × " ~ (suites | length) ~ " suites.", density="dense", complete=true, row_count=rows | length) }}
+{{ table(head, rows, caption=(models | length) ~ " models × " ~ (suites | length) ~ " suites.", density="dense", complete=true, row_count=rows | length, table_id="fw-dashboard", sortable=true) }}
 {% else %}
 {{ empty_state("No suite in this scope has a declared headline metric yet.") }}
 {% endif %}

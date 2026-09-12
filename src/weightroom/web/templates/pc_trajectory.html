@@ -84,13 +84,13 @@ cancels any LoadCoach job in flight.</p>
   (one.get("issues") or []) | length
 ]) %}
 {% endfor %}
-{{ table([{"label": "Attempt", "numeric": true}, {"label": "Valid"}, {"label": "Model", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Issues", "numeric": true}], rows, caption="Drafting attempts", density="dense") }}
+{{ table([{"label": "Attempt", "numeric": true}, {"label": "Valid"}, {"label": "Model", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Issues", "numeric": true}], rows, caption="Drafting attempts", density="dense", table_id="pc-trajectory-1", sortable=true) }}
 {% if plan.get("steps") %}
 {% set rows = [] %}
 {% for one in plan.get("steps") %}
 {% set _ = rows.append([one.get("step_id"), one.get("description") | cell_text(limit=400), (one.get("depends_on") or []) | join(", ") or "—", one.get("tier") or "—", (one.get("tools") or []) | join(", ") or "none", outcome_badge(one.get("status"))]) %}
 {% endfor %}
-{{ table([{"label": "Step", "mono": true}, {"label": "Description"}, {"label": "Depends on"}, {"label": "Tier"}, {"label": "Tools"}, {"label": "Status"}], rows, caption="Validated steps", density="dense") }}
+{{ table([{"label": "Step", "mono": true}, {"label": "Description"}, {"label": "Depends on"}, {"label": "Tier"}, {"label": "Tools"}, {"label": "Status"}], rows, caption="Validated steps", density="dense", table_id="pc-trajectory-2", sortable=true) }}
 {% endif %}
 {% if plan.get("approval") %}{{ json_viewer(plan.get("approval").get("verdict"), label="Plan verdict — " ~ plan.get("approval").get("outcome")) }}{% endif %}
 {% else %}
@@ -103,7 +103,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([one.get("step_id"), one.get("revision"), one.get("approved_tier") or "—", (one.get("fallback_tiers") or []) | join(", ") or "—", (one.get("approved_tools") or []) | join(", ") or "none", one.get("max_classification") or "—", measure(one.get("max_turns")), one.get("minted_by") or "—"]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Step", "mono": true}, {"label": "Revision", "numeric": true}, {"label": "Tier"}, {"label": "Fallbacks"}, {"label": "Tools"}, {"label": "Max classification"}, {"label": "Max turns", "numeric": true}, {"label": "Minted by", "mono": true}], rows, caption="Every ExecutionIntent revision, superseded ones included", density="dense") }}
+{{ table([{"label": "Step", "mono": true}, {"label": "Revision", "numeric": true}, {"label": "Tier"}, {"label": "Fallbacks"}, {"label": "Tools"}, {"label": "Max classification"}, {"label": "Max turns", "numeric": true}, {"label": "Minted by", "mono": true}], rows, caption="Every ExecutionIntent revision, superseded ones included", density="dense", table_id="pc-trajectory-3", sortable=true) }}
 {% else %}{{ empty_state("No envelope has been minted.") }}{% endif %}
 
 <h3>Timeline</h3>
@@ -117,14 +117,14 @@ cancels any LoadCoach job in flight.</p>
   {% set _ = rows.append([turn.get("sequence"), turn.get("role"), turn.get("tier") or "—", (turn.get("model") or {}).get("canonical_id") or "—", turn.get("finish_reason") or "—", measure(usage.get("input_tokens")), measure(usage.get("output_tokens")), measure(turn.get("loadcoach_ms") | round(0) | int if turn.get("loadcoach_ms") is not none else none, "ms"), content_cell(turn.get("content"))]) %}
   {% endfor %}
   {% if rows %}
-  {{ table([{"label": "#", "numeric": true}, {"label": "Role"}, {"label": "Tier"}, {"label": "Model", "mono": true}, {"label": "Finish"}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "LoadCoach", "numeric": true}, {"label": "Content"}], rows, caption="Turns", density="dense") }}
+  {{ table([{"label": "#", "numeric": true}, {"label": "Role"}, {"label": "Tier"}, {"label": "Model", "mono": true}, {"label": "Finish"}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "LoadCoach", "numeric": true}, {"label": "Content"}], rows, caption="Turns", density="dense", table_id="pc-trajectory-4", sortable=true) }}
   {% else %}{{ empty_state("This thread has no recorded turn.") }}{% endif %}
   {% if thread.get("failed_attempts") %}
   {% set rows = [] %}
   {% for one in thread.get("failed_attempts") %}
   {% set _ = rows.append([one.get("attempt"), short(one.get("failed_turn_id")), one.get("failed_tier") or "—", one.get("error_code") or "—", one.get("cause") | cell_text(limit=400), one.get("at") or "—"]) %}
   {% endfor %}
-  {{ table([{"label": "Attempt", "numeric": true}, {"label": "Failed turn"}, {"label": "Tier"}, {"label": "Error"}, {"label": "Cause"}, {"label": "At", "mono": true}], rows, caption="Attempts that produced no turn", density="dense") }}
+  {{ table([{"label": "Attempt", "numeric": true}, {"label": "Failed turn"}, {"label": "Tier"}, {"label": "Error"}, {"label": "Cause"}, {"label": "At", "mono": true}], rows, caption="Attempts that produced no turn", density="dense", table_id="pc-trajectory-5", sortable=true) }}
   {% endif %}
 </section>
 {% else %}
@@ -137,7 +137,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([one.get("tool_name"), outcome_badge(one.get("status")), one.get("reason") or "—", one.get("risk_class") or "—", one.get("egress") or "—", one.get("isolation_tier") or "—", measure(one.get("duration_ms"), "ms"), content_cell(one.get("arguments")), content_cell(one.get("result"))]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Tool", "mono": true}, {"label": "Outcome"}, {"label": "Reason"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation"}, {"label": "Duration", "numeric": true}, {"label": "Arguments"}, {"label": "Result"}], rows, caption="Every recorded call, refusals and failures included", density="dense") }}
+{{ table([{"label": "Tool", "mono": true}, {"label": "Outcome"}, {"label": "Reason"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation"}, {"label": "Duration", "numeric": true}, {"label": "Arguments"}, {"label": "Result"}], rows, caption="Every recorded call, refusals and failures included", density="dense", table_id="pc-trajectory-6", sortable=true) }}
 {% else %}{{ empty_state("This trajectory called no tools.") }}{% endif %}
 
 <h3>Compactions</h3>
@@ -146,7 +146,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([one.get("step_id"), one.get("tier"), one.get("budget_tokens"), one.get("tokens_before"), one.get("tokens_after_estimate"), (one.get("turns_before") ~ " → " ~ one.get("turns_after")), badge("unmet", tone="warning") if one.get("budget_unmet") else badge("met", tone="success")]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Step", "mono": true}, {"label": "Tier"}, {"label": "Target", "numeric": true}, {"label": "Before", "numeric": true}, {"label": "After", "numeric": true}, {"label": "Turns"}, {"label": "Budget"}], rows, caption="Where the wire differed from the rows", density="dense") }}
+{{ table([{"label": "Step", "mono": true}, {"label": "Tier"}, {"label": "Target", "numeric": true}, {"label": "Before", "numeric": true}, {"label": "After", "numeric": true}, {"label": "Turns"}, {"label": "Budget"}], rows, caption="Where the wire differed from the rows", density="dense", table_id="pc-trajectory-7", sortable=true) }}
 {% else %}{{ empty_state("Nothing was compacted.") }}{% endif %}
 
 <h3>Debits</h3>
@@ -156,7 +156,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([short(one.get("turn_id")), one.get("occurred_at"), measure(usage.get("input")), measure(usage.get("output")), badge("unpriced", tone="neutral") if one.get("unpriced") else badge("priced", tone="success"), (one.get("tags") or []) | join(", ")]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Turn"}, {"label": "When", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Priced"}, {"label": "Tags"}], rows, caption="Recorded debits", density="dense") }}
+{{ table([{"label": "Turn"}, {"label": "When", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Priced"}, {"label": "Tags"}], rows, caption="Recorded debits", density="dense", table_id="pc-trajectory-8", sortable=true) }}
 {% else %}{{ empty_state("Nothing was debited.") }}{% endif %}
 
 <h3>Egress decisions</h3>
@@ -166,7 +166,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([verdict_badge(one.get("verdict")), (request_.get("target") or {}).get("name") or "—", request_.get("data_classification") or "—", one.get("policy_name") or "—", one.get("reason") or "—", one.get("decided_at")]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Verdict"}, {"label": "Target"}, {"label": "Classification"}, {"label": "Policy"}, {"label": "Reason"}, {"label": "When", "mono": true}], rows, caption="Every decision about whether data could leave", density="dense") }}
+{{ table([{"label": "Verdict"}, {"label": "Target"}, {"label": "Classification"}, {"label": "Policy"}, {"label": "Reason"}, {"label": "When", "mono": true}], rows, caption="Every decision about whether data could leave", density="dense", table_id="pc-trajectory-9", sortable=true) }}
 {% else %}{{ empty_state("No egress decision was recorded.") }}{% endif %}
 
 <h3>Deviations</h3>
@@ -175,7 +175,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([badge(one.get("category"), tone="danger" if one.get("disposition") == "halt" else "warning"), one.get("severity"), one.get("disposition"), short(one.get("turn_id")), one.get("created_at")]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Category"}, {"label": "Severity"}, {"label": "Disposition"}, {"label": "Turn"}, {"label": "When", "mono": true}], rows, caption="Where execution differed from its envelope", density="dense") }}
+{{ table([{"label": "Category"}, {"label": "Severity"}, {"label": "Disposition"}, {"label": "Turn"}, {"label": "When", "mono": true}], rows, caption="Where execution differed from its envelope", density="dense", table_id="pc-trajectory-10", sortable=true) }}
 {% else %}{{ empty_state("Execution never differed from its envelope.") }}{% endif %}
 
 <h3>Approvals</h3>
@@ -184,7 +184,7 @@ cancels any LoadCoach job in flight.</p>
 {% set _ = rows.append([one.get("kind"), outcome_badge(one.get("status")), one.get("reason") or "—", (one.get("step_ids") or []) | join(", ") or "—", one.get("approver_token_id") or "—", one.get("resolved_at") or "—"]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Kind"}, {"label": "Status"}, {"label": "Reason"}, {"label": "Steps"}, {"label": "Approver", "mono": true}, {"label": "Resolved", "mono": true}], rows, caption="Requests this trajectory raised", density="dense") }}
+{{ table([{"label": "Kind"}, {"label": "Status"}, {"label": "Reason"}, {"label": "Steps"}, {"label": "Approver", "mono": true}, {"label": "Resolved", "mono": true}], rows, caption="Requests this trajectory raised", density="dense", table_id="pc-trajectory-11", sortable=true) }}
 {% else %}{{ empty_state("Nothing about this trajectory needed a person.") }}{% endif %}
 
 <h3>Events</h3>
@@ -196,7 +196,7 @@ cancels any LoadCoach job in flight.</p>
 {% for one in doc.get("events") or [] %}
 {% set _ = rows.append([one.get("sequence"), one.get("event_type"), one.get("timestamp")]) %}
 {% endfor %}
-{{ table([{"label": "#", "numeric": true}, {"label": "Event", "mono": true}, {"label": "At", "mono": true}], rows, caption="Every persisted event, in sequence order", density="dense", row_count=rows | length) }}
+{{ table([{"label": "#", "numeric": true}, {"label": "Event", "mono": true}, {"label": "At", "mono": true}], rows, caption="Every persisted event, in sequence order", density="dense", row_count=rows | length, table_id="pc-trajectory-12", sortable=true) }}
 
 {% elif sourced.data is not none %}
 {% set data = sourced.data %}

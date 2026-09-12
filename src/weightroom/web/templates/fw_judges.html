@@ -29,7 +29,7 @@ remote permissions.</p>
 {% endfor %}
 {% set head = [{"label": "Model", "mono": true}, {"label": "Eligible"}, {"label": "Refused because"}, {"label": "native.judge run"}] %}
 {% for key in keys %}{% set _ = head.append({"label": key | replace("_", " "), "numeric": true}) %}{% endfor %}
-{{ table(head, rows, caption="Jury size " ~ (judges.get("jury_size") if judges.get("jury_size") is not none else "—"), density="dense", row_count=rows | length) }}
+{{ table(head, rows, caption="Jury size " ~ (judges.get("jury_size") if judges.get("jury_size") is not none else "—"), density="dense", row_count=rows | length, table_id="fw-judges-1", sortable=true) }}
 {% else %}
 {{ empty_state("FreeWeight's provider lists no model to seat on a jury.") }}
 {% endif %}
@@ -55,7 +55,7 @@ Nothing is generated.</p>
 {% if validation.get("refused") %}
 {% set rows = [] %}
 {% for one in validation.get("refused") %}{% set _ = rows.append([one.get("model_canonical_id") or one.get("model") or "—", (one.get("reasons") or []) | join(", ") or "—"]) %}{% endfor %}
-{{ table([{"label": "Refused", "mono": true}, {"label": "Why"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Refused", "mono": true}, {"label": "Why"}], rows, density="dense", row_count=rows | length, table_id="fw-judges-2", sortable=true) }}
 {% endif %}
 {% endif %}
 {% endif %}

@@ -7,6 +7,24 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **The kit pass** (row WX1): every application-tab table (`fw_*`, `lc_*`, `ip_*`, `pc_*`, plus
+  Audit and the ADR index) that renders its whole result set now opts into MirrorWall's
+  `table.js` — `sortable=true` and a page-unique `table_id` — so it sorts client-side and, at six
+  columns or more, offers a column-visibility `<details>`; a table that shows only one page of a
+  longer result stays as it was (`complete=false`, no sort control, per UI standards §5) and is
+  left untouched. The four Overviews' Start/Stop/Restart buttons sit side by side instead of
+  stacked (`_app_state.html`'s and `apps.html`'s control forms move from MirrorWall's `.field` to
+  the page kit's `.kit-actions`, already defined in `_shell.html`). Two new formatters in
+  `_app_page.html`, `params_b` (a parameter count in billions, `7.6B`) and `context_k` (a context
+  window in thousands, `32768` → `32k`), replace ad hoc formatting on FreeWeight's Models, Model
+  and Compare pages and LoadCoach's Models page; both render ADR-0016's `—` for an unsupported
+  measurement, never `0`. LoadCoach's Models page also renders declared capabilities as one badge
+  per key (a new `capability_badges` macro in `_lc.html`) instead of a comma-joined string. The
+  application settings page's per-key description, range and default move off the key cell into
+  their own row under it, spanning the table; a long description clamps to one line in a native
+  `<details><summary>` (no JavaScript) and expands on click, while the range and default stay
+  visible either way.
+
 - **IdeaPress's attempts tables name the transport call** (row WPF12). A stage run's *Attempts*
   table and a unit's *Provenance* table now fold `transport_call` (IdeaPress migration `0012`, row
   WPF7) into the attempt cell — `attempt N · round R · call C` — so two rows of one attempt are
