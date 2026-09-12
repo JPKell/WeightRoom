@@ -1,0 +1,360 @@
+/* weightroom-shell.css — the console shell's own stylesheet.
+ *
+ * MirrorWall owns the tokens, the components and their layout; this file owns only what is
+ * WeightRoomGym's composition around them — the top bar, the sidebar grid, the page kit's form
+ * chrome, the docs viewer and the responsive collapse. It was an inline `<style>` block in
+ * `_shell.html` until row WX3 moved it here, byte for byte, so a stylesheet is cached once per
+ * browser rather than re-sent with every page and so the JavaScript budget of ADR-0139 has a
+ * sibling it can be measured against (`tests/performance/test_budgets.py`, 32 KB).
+ *
+ * Rules that belong to one page live with that page; anything here is on every page. */
+
+/* The 200px sidebar grid the design brief asks for (design.md §2, §4) — MirrorWall's own
+   layout.css deliberately leaves this to the application (its side_nav rules style the menu's
+   contents, not the page grid around it). */
+.shell-body {
+  display: flex; gap: var(--mw-space-5, 20px); align-items: flex-start;
+  padding-top: var(--mw-space-4, 16px);  /* clear of the top bar and strip's bottom border */
+}
+.shell-side { width: var(--mw-sidebar-w, 200px); flex: 0 0 auto; }
+.shell-main { flex: 1 1 auto; min-width: 0; }
+.side-nav-stub { list-style: none; margin: 0; padding: 0; }
+.side-nav-stub li {
+  padding: var(--mw-space-1, 4px) var(--mw-space-2, 8px);
+  border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-subtle);
+  cursor: default;
+}
+/* A card stacks its label, its figure and its note (design brief §5). MirrorWall's `card` emits
+   three inline spans, so they ran on one line; fixed here rather than in the prepared MirrorWall
+   0.3.1 (row WP2, operator 2026-09-10). */
+.card > .card-label, .card > .card-value, .card > .card-note { display: block; }
+/* The application page kit's form chrome (row WP2): a button beside a heading, a row's small
+   action forms side by side, and a collapsible form laid out as a grid. */
+.kit-inline { display: inline; margin: 0 0 0 8px; }
+.kit-inline button, .kit-actions button { width: auto; }
+.kit-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.kit-actions form { margin: 0; }
+.kit-form { margin: 0 0 var(--mw-space-4, 16px); }
+/* The grid is the form's whether the card wraps a form or is the form itself (Results' and
+   Evidence's exports are `<form class="card kit-form">`, which the first selector missed, row WP4). */
+.kit-form form, form.kit-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; }
+.kit-form .kit-wide { grid-column: 1 / -1; }
+.kit-check { display: inline-flex; align-items: center; gap: 4px; margin: 0 12px 4px 0; }
+.kit-check input { width: auto; height: auto; margin: 0; }
+.kit-details { margin: 4px 0; }
+.kit-output, .kit-live { white-space: pre-wrap; overflow-wrap: anywhere; }
+.kit-output { max-height: 32rem; overflow: auto; }
+/* A fieldset's default `min-width: min-content` let a select whose options carry long scale
+   descriptors push the grading form to 839 px on a 412 px phone, and taps landed on the sample
+   text instead (row WP4's phone demonstration). */
+fieldset { min-width: 0; }
+select { max-width: 100%; }
+
+/* Top bar (design brief §4): brand, application tabs, console pages, then the Menu dropdown and
+   the operator menu at the right edge. It collapses in two steps as the viewport narrows —
+   below 1080 px the console pages move into Menu, below 860 px the application tabs follow — so
+   the row never wraps, never scrolls and never overlaps. Each group is rendered twice, inline
+   and inside Menu, and exactly one copy is displayed at any width: `display: none` also takes
+   the other copy out of the accessibility tree, so a screen reader never hears a link twice. */
+/* MirrorWall's page header only: a bare `header` also pinned every <header> inside page
+   content over the top bar (found at W6). */
+body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); }
+.masthead {
+  position: relative;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  min-height: var(--mw-header-h, 48px);
+  gap: var(--mw-space-3, 12px);
+}
+.masthead h1 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: var(--mw-font-size-base, 13px);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.masthead h1 .brand { color: var(--mw-text); text-decoration: none; }
+.masthead h1 .brand:hover { color: var(--mw-accent); }
+.app-tabs { display: flex; flex: 0 0 auto; gap: var(--mw-space-1, 4px); align-items: center; }
+.app-tab { white-space: nowrap; }
+/* The alerts count is what is left of the console's own group in the top bar (row WX3): the
+   pages themselves are a left-menu section now, but an unacknowledged alert has to be visible
+   from wherever the operator is, at every width. */
+.console-alerts {
+  color: var(--mw-text-subtle); white-space: nowrap;
+  font-size: var(--mw-font-size-sm, 12px); text-decoration: none;
+}
+.console-alerts:hover { color: var(--mw-text); }
+.console-alerts[data-open="true"] { color: var(--mw-status-degraded); }
+
+/* The alert banner (ADR-0137): one line under the top bar while an alert is unacknowledged. */
+.alert-banner {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--mw-space-2, 8px) var(--mw-space-3, 12px);
+  margin: var(--mw-space-3, 12px) 0 0; padding: var(--mw-space-2, 8px) var(--mw-space-3, 12px);
+  border: 1px solid var(--mw-status-degraded); border-radius: var(--mw-radius-md, 8px);
+  background: var(--mw-surface);
+}
+.alert-banner[data-severity="critical"] { border-color: var(--mw-status-down, var(--mw-status-degraded)); }
+.alert-banner form { margin: 0; }
+.alert-banner .alert-line { flex: 1 1 100%; overflow-wrap: anywhere; font-size: var(--mw-font-size-sm, 12px); }
+
+/* The two dropdowns. Menu holds whatever navigation has overflowed; the operator menu holds the
+   theme control and log out, so the row itself carries no form control that could collide. */
+.masthead-end {
+  display: flex; flex: 0 0 auto; align-items: center; gap: var(--mw-space-2, 8px);
+  margin-left: auto;
+}
+.dropdown { position: relative; }
+.dropdown > summary {
+  display: flex; align-items: center; gap: var(--mw-space-2, 8px);
+  height: 30px; padding: 0 var(--mw-space-3, 12px);
+  list-style: none; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius-sm, 6px);
+  background: var(--mw-surface);
+  font-size: var(--mw-font-size-sm, 12px); font-weight: 600;
+}
+.dropdown > summary::-webkit-details-marker { display: none; }
+.dropdown[open] > summary { background: var(--mw-accent-soft); }
+.dropdown-body {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 6;
+  display: flex; flex-direction: column; gap: var(--mw-space-3, 12px);
+  min-width: 220px;
+  max-width: calc(100vw - 2 * var(--mw-space-3, 12px));
+  padding: var(--mw-space-3, 12px);
+  background: var(--mw-surface);
+  border: 1px solid var(--mw-border);
+  border-radius: var(--mw-radius-md, 8px);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+.dropdown-group { display: flex; flex-direction: column; gap: 2px; margin: 0; }
+.dropdown-group a {
+  display: flex; align-items: center; gap: var(--mw-space-1, 4px);
+  padding: var(--mw-space-2, 8px);
+  border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-muted); text-decoration: none; white-space: nowrap;
+}
+.dropdown-group a:hover { background: var(--mw-surface-hover); color: var(--mw-text); }
+.dropdown-group a[aria-current="page"] { background: var(--mw-accent-soft); color: var(--mw-text); }
+.user-menu .chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--mw-accent-soft); font-size: var(--mw-font-size-xs, 11px); font-weight: 600;
+}
+.user-menu > summary { padding-left: var(--mw-space-1, 4px); }
+.user-menu .field {
+  flex-direction: row; align-items: center; justify-content: space-between;
+  gap: var(--mw-space-3, 12px);
+}
+.user-menu .field label { margin: 0; font-size: var(--mw-font-size-sm, 12px); color: var(--mw-text-muted); }
+.user-menu .field select {
+  width: auto; height: 26px; padding: 0 var(--mw-space-2, 8px);
+  font-size: var(--mw-font-size-xs, 11px);
+}
+.user-menu .dropdown-group + .dropdown-group {
+  padding-top: var(--mw-space-3, 12px); border-top: 1px solid var(--mw-border);
+}
+.user-menu form button { width: 100%; }
+.user-menu-note { color: var(--mw-text-subtle); font-size: var(--mw-font-size-sm, 12px); }
+
+/* The telemetry toggle. Hidden, the bar is not rendered, so no stream is open for it. */
+.icon-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; margin: 0;
+  border: 1px solid var(--mw-border); border-radius: var(--mw-radius-sm, 6px);
+  background: var(--mw-surface); color: var(--mw-text-muted); cursor: pointer;
+}
+.icon-button:hover { color: var(--mw-text); }
+.icon-button[aria-pressed="true"] { background: var(--mw-accent-soft); color: var(--mw-text); }
+.icon-button svg { width: 16px; height: 16px; }
+:root[data-telemetry="off"] #mw-telemetry-bar { display: none; }
+
+/* Which copy shows. Wide: the tabs inline and no Menu at all. Menu carries the application tabs
+   alone since row WX3 — everything else it used to overflow lives in the left menu, which is on
+   every page at every width. */
+.nav-more, .nav-more-apps { display: none; }
+
+/* The strip never scrolls: one row while it fits, a second row when it does not. */
+.telemetry-bar {
+  height: auto;
+  min-height: var(--mw-telemetry-h, 34px);
+  flex-wrap: wrap;
+  row-gap: var(--mw-space-1, 4px);
+  overflow-x: visible;
+}
+
+@media (max-width: 1080px) {
+  /* Values only from here down: the meter tracks are what made the strip wider than the row. */
+  .telemetry-track { display: none; }
+}
+@media (max-width: 860px) {
+  /* The one collapse the top bar still has: the four tabs become Menu's four links. */
+  .app-tabs { display: none; }
+  .nav-more { display: block; }
+  .nav-more-apps { display: flex; }
+  .user-menu-name { display: none; }
+}
+@media (max-width: 400px) {
+  .nav-more-label { display: none; }
+}
+
+/* Main pane head (design brief §4): the 18 px title with its status pill, and a right-aligned
+   action group that wraps under the title rather than pushing the page sideways. */
+.page-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--mw-space-3, 12px);
+  margin: 0 0 var(--mw-space-4, 16px);
+}
+.page-head h2 { margin: 0; font-size: var(--mw-font-size-title, 18px); font-weight: 600; }
+.page-actions {
+  display: flex; flex-wrap: wrap; gap: var(--mw-space-3, 12px); margin-left: auto;
+  font-size: var(--mw-font-size-sm, 12px);
+}
+.page-actions a { color: var(--mw-text-muted); text-decoration: none; }
+.page-actions a:hover { color: var(--mw-text); }
+
+.shell-menu > summary { display: none; }
+/* A config path or a command is one unbroken token; on a phone it would push the page sideways
+   rather than wrap, since `code` has no break opportunity of its own. `.mono` is the same token
+   in a `span` or a `p` — a machine fingerprint, a model identity with two digests in it — and it
+   scrolled FreeWeight's machine page by 138 px and its adapter page by 96 px at 412 px until it
+   was given the same rule (row WPF1; `WP6_HANDOFF.md` §4). `anywhere` rather than `break-word`
+   because only `anywhere` shrinks the element's own min-content width, which is what the page
+   was being stretched by. */
+.shell-main code,
+.shell-main .mono { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .telemetry-sep { display: none; }
+  .telemetry-bar { column-gap: var(--mw-space-3, 12px); padding: var(--mw-space-1, 4px) 0; }
+
+  /* `stretch`, not the wide layout's `flex-start`: in a column, `flex-start` sizes the main pane
+     to its widest content — one long log line — and that width is what scrolled the page. */
+  .shell-body { flex-direction: column; align-items: stretch; gap: var(--mw-space-3, 12px); }
+  .shell-side, .shell-main { width: 100%; }
+  .shell-menu > summary {
+    display: block;
+    padding: var(--mw-space-2, 8px);
+    border: 1px solid var(--mw-border);
+    border-radius: var(--mw-radius-sm, 6px);
+    background: var(--mw-surface);
+    cursor: pointer;
+    font-size: var(--mw-font-size-sm, 12px);
+    font-weight: 600;
+  }
+  .shell-menu[open] > summary { margin-bottom: var(--mw-space-2, 8px); }
+  .shell-menu .side-nav ul { display: grid; grid-template-columns: 1fr 1fr; }
+  /* The docs menu keeps one section per line, in order, with its folders under it; two columns
+     of sections scattered the order and pushed the expanded folders to one side. */
+  .shell-menu .docs-nav > ul { display: block; }
+}
+
+/* Phones: a hand-written dense table (the settings form, the doctor's findings, the token list —
+   no `data-table`, so MirrorWall's `table` macro tables and their `.table-scroll` are untouched)
+   stacks each row into a card instead of pushing the page sideways. Every cell is still read in
+   order, and a row's `th scope="row"` stays its heading. */
+@media (max-width: 700px) {
+  .shell-main table[data-density="dense"]:not([data-table]),
+  .shell-main table[data-density="dense"]:not([data-table]) caption,
+  .shell-main table[data-density="dense"]:not([data-table]) tbody,
+  .shell-main table[data-density="dense"]:not([data-table]) tr,
+  .shell-main table[data-density="dense"]:not([data-table]) th,
+  .shell-main table[data-density="dense"]:not([data-table]) td {
+    display: block;
+    width: 100%;
+  }
+  /* A caption keeps table-caption sizing inside a block table and shrinks to one word a line. */
+  .shell-main table[data-density="dense"]:not([data-table]) caption { text-align: left; }
+  .shell-main table[data-density="dense"]:not([data-table]) thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+  }
+  .shell-main table[data-density="dense"]:not([data-table]) tr {
+    padding: var(--mw-space-2, 8px) 0;
+    border-bottom: 1px solid var(--mw-border);
+  }
+  .shell-main table[data-density="dense"]:not([data-table]) th,
+  .shell-main table[data-density="dense"]:not([data-table]) td {
+    height: auto;
+    padding: var(--mw-space-1, 4px) 0;
+    border: 0;
+    text-align: left;
+  }
+  .shell-main table[data-density="dense"]:not([data-table]) :is(input, select, textarea) {
+    max-width: 100%;
+  }
+}
+/* Docs viewer (_docs_tree.html): the section menu with the selected section's folders under it,
+   the bare search form, and a section's files grouped under one heading per folder. */
+.docs-nav .docs-nav-folders {
+  margin: 2px 0 var(--mw-space-2, 8px) var(--mw-space-3, 12px);
+  padding-left: var(--mw-space-2, 8px);
+  border-left: 1px solid var(--mw-border);
+}
+.docs-nav .docs-nav-folders a { font-size: var(--mw-font-size-sm, 12px); color: var(--mw-text-muted); }
+.docs-nav a[aria-current="true"] { background: var(--mw-accent-soft); color: var(--mw-text); }
+.docs-search {
+  display: flex; gap: var(--mw-space-2, 8px); align-items: center;
+  max-width: 560px; margin: 0 0 var(--mw-space-4, 16px);
+}
+.docs-search input { flex: 1 1 auto; min-width: 0; }
+.docs-search button { flex: 0 0 auto; width: auto; }
+.docs-section-title {
+  margin: 0 0 var(--mw-space-3, 12px);
+  font-size: var(--mw-font-size-title, 18px); font-weight: 600;
+}
+.docs-files {
+  list-style: none; margin: 0 0 var(--mw-space-3, 12px); padding: 0;
+  columns: 3 220px; column-gap: var(--mw-space-5, 20px);
+}
+.docs-files li { padding: 3px 0; break-inside: avoid; }
+.docs-folder { margin-top: var(--mw-space-4, 16px); }
+.docs-folder:has(> h3) { padding-bottom: var(--mw-space-4, 16px); }  /* an app's or package's block */
+/* A section's own folders (an app, a package) are ruled and a step larger; a folder inside one
+   (guide/) keeps the plain 14 px heading, so the listing reads as a hierarchy. */
+h3.docs-folder-title {
+  padding-bottom: 4px; border-bottom: 1px solid var(--mw-border);
+  font-size: 16px;
+}
+.docs-folder-title {
+  margin: 0 0 var(--mw-space-2, 8px);
+  font-size: 14px; font-weight: 600;
+  scroll-margin-top: 120px;  /* clears the sticky top bar and strip when a folder link scrolls here */
+}
+.docs-search-results { list-style: none; margin: 0; padding: 0; }
+.docs-search-results li { padding: var(--mw-space-3, 12px) 0; border-top: 1px solid var(--mw-border); }
+
+/* The application page kit's common header (`_app_page.html` `app_page_header`, row WX3): the
+   eyebrow says where the page sits, the title and the application's availability share a line,
+   and one supporting sentence sits under both. `.page-head`'s own flex rules still place the
+   caller's actions, which wrap under the copy rather than pushing the page sideways. */
+.app-page-intro { align-items: flex-start; }
+.app-page-copy { flex: 1 1 32rem; min-width: 0; }
+.app-page-heading-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--mw-space-3, 12px);
+  margin-bottom: var(--mw-space-1, 4px);
+}
+.app-page-title { margin: 0; font-size: var(--mw-font-size-title, 18px); font-weight: 600; }
+.app-page-eyebrow {
+  margin: 0 0 2px; color: var(--mw-text-subtle);
+  font-size: var(--mw-font-size-xs, 11px); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.app-page-supporting { max-width: 72ch; margin: 0; }
+.app-page-availability { display: inline-flex; align-items: center; gap: var(--mw-space-2, 8px); white-space: nowrap; }
+.app-page-availability-label {
+  color: var(--mw-text-subtle); font-size: var(--mw-font-size-xs, 11px); text-transform: uppercase;
+}
+
+/* A document's own branch of the docs tree, opened folder by folder under its section. Each
+   level is indented by one rule rather than by a nesting-depth calculation, so a deep folder
+   stays readable in a 200 px rail; `is-current` is the folder the open document sits in. */
+.docs-nav-folder-link { overflow-wrap: anywhere; }
+.docs-nav-folder.is-ancestor > .docs-nav-folder-link { color: var(--mw-text); }
+.docs-nav-folder.is-current > .docs-nav-folder-link { color: var(--mw-text); font-weight: 600; }
+.docs-nav-depth-2, .docs-nav-depth-3, .docs-nav-depth-4, .docs-nav-depth-5, .docs-nav-depth-6 {
+  margin-bottom: var(--mw-space-1, 4px);
+}
+
+/* The llama.cpp page (row WX3): the found/expected checklist reuses the Ollama pane's table, and
+   a discovered server's argv is a long single token that must wrap rather than scroll the page. */
+.llamacpp-argv { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }

@@ -66,6 +66,7 @@ from weightroom.web.routes import freeweight as freeweight_routes
 from weightroom.web.routes import freeweight_goals as freeweight_goals_routes
 from weightroom.web.routes import ideapress as ideapress_routes
 from weightroom.web.routes import jobs as jobs_routes
+from weightroom.web.routes import llamacpp as llamacpp_routes
 from weightroom.web.routes import loadcoach as loadcoach_routes
 from weightroom.web.routes import ollama as ollama_routes
 from weightroom.web.routes import promptcadence as promptcadence_routes
@@ -435,6 +436,7 @@ def create_app(
     app.include_router(tokens_routes.ui_router)
     app.include_router(doctor_routes.ui_router)
     app.include_router(ollama_routes.ui_router)
+    app.include_router(llamacpp_routes.ui_router)
     app.include_router(system_routes.ui_router)
     app.include_router(docs_routes.ui_router)
     app.include_router(databases_routes.ui_router)

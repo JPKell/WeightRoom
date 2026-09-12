@@ -3,6 +3,31 @@
 
 {% macro folder_anchor(folder) %}docs-{{ folder.path | replace("/", "-") }}{% endmacro %}
 
+{# One level of a section's folders, and — on a document page — the branch that document sits
+   in, opened down to its own folder. A section page keeps the first level only: there the links
+   are in-page anchors into the listing below, and the listing already shows the whole hierarchy.
+   Recursion stops on its own: a folder that is not an ancestor of `current_path` is not opened. #}
+{% macro docs_folder_menu(folders, section_href, current_path=None, depth=1) %}
+<ul class="docs-nav-folders docs-nav-depth-{{ depth }}">
+  {% for folder in folders %}
+  {% set child_folders = folder.children | selectattr("is_dir") | list %}
+  {% set in_branch = current_path is not none and current_path.startswith(folder.path ~ "/") %}
+  {% set current_folder = in_branch and current_path.rsplit("/", 1)[0] == folder.path %}
+  <li class="docs-nav-folder{% if current_folder %} is-current{% elif in_branch %} is-ancestor{% endif %}">
+    {% if current_path is none %}
+    <a class="docs-nav-folder-link" href="#{{ folder_anchor(folder) }}">{{ folder.name }}</a>
+    {% else %}
+    <a class="docs-nav-folder-link" href="{{ section_href }}#{{ folder_anchor(folder) }}"
+       hx-boost="false"{% if current_folder %} aria-current="true"{% endif %}>{{ folder.name }}</a>
+    {% endif %}
+    {% if child_folders and in_branch %}
+    {{ docs_folder_menu(child_folders, section_href, current_path, depth + 1) }}
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
 {# The left menu: every section, the selected one expanded to its folders.
 
    Switching section swaps the side menu and the main pane together (htmx: the whole
@@ -22,15 +47,7 @@
       {% if selected %}
       {% set folders = section.node.children | selectattr("is_dir") | list %}
       {% if folders %}
-      <ul class="docs-nav-folders">
-        {% for folder in folders %}
-        {% if current_path is none %}
-        <li><a href="#{{ folder_anchor(folder) }}">{{ folder.name }}</a></li>
-        {% else %}
-        <li><a href="{{ section.href }}#{{ folder_anchor(folder) }}" hx-boost="false"{% if current_path.startswith(folder.path ~ "/") %} aria-current="true"{% endif %}>{{ folder.name }}</a></li>
-        {% endif %}
-        {% endfor %}
-      </ul>
+      {{ docs_folder_menu(folders, section.href, current_path) }}
       {% endif %}
       {% endif %}
     </li>

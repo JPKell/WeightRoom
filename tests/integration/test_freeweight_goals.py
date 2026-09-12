@@ -580,11 +580,20 @@ def test_a_stopped_page_that_reads_only_the_api_names_freeweight_by_its_label(
     assert "freeweight is not answering" not in text
 
 
+SHELL_CSS = (
+    Path(__file__).resolve().parents[2] / "src/weightroom/web/static/css/weightroom-shell.css"
+)
+"""The shell's stylesheet, external since row WX3."""
+
+
 def test_an_export_card_that_is_itself_the_form_lays_its_fields_out_as_a_grid(
     tmp_path: Path,
 ) -> None:
     console, _database = freeweight_console(tmp_path, state="inactive")
-    assert ".kit-form form, form.kit-form { display: grid;" in page(console, GOALS)
+    assert 'class="card kit-form"' in page(console, GOALS)
+    # The rule itself moved out of `_shell.html` into the shell's own stylesheet at row WX3.
+    css = SHELL_CSS.read_text(encoding="utf-8")
+    assert ".kit-form form, form.kit-form { display: grid;" in css
 
 
 def test_every_goal_request_goes_to_freeweights_api_only(tmp_path: Path) -> None:
