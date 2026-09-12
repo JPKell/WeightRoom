@@ -61,7 +61,6 @@ __all__ = [
 ]
 
 APP: Final = "ideapress"
-PAGE_ROWS: Final = 50
 LIST_CAP: Final = 200
 STAGE_HISTORY: Final = 50
 """IdeaPress's ``GET /projects/{id}`` lists its newest 50 stage runs; the stopped reader too."""
@@ -107,8 +106,12 @@ def projects_api(
     content_type: str | None,
     archived: bool,
     cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /projects``: one page, newest activity first, with IdeaPress's own cursor.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: IdeaPress refused (a cursor it did not issue is its ``VALIDATION_ERROR``).
@@ -117,7 +120,7 @@ def projects_api(
     body = call(
         client, settings, APP, "GET", "projects",
         params={
-            "status": status, "content_type": content_type, "cursor": cursor, "limit": PAGE_ROWS,
+            "status": status, "content_type": content_type, "cursor": cursor, "limit": page_rows,
             "include_archived": "true" if archived else None,
         },
     )  # fmt: skip
@@ -156,8 +159,12 @@ def projects_db(
     content_type: str | None,
     archived: bool,
     page: int,
+    page_rows: int,
 ) -> dict[str, Any]:
     """The ``projects`` table, newest activity first, one page by number.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         TableUnknown: The database has no ``projects`` table.
@@ -166,9 +173,9 @@ def projects_db(
     page = max(1, page)
     rows = rows_where(
         handle, "projects", equals={"status": status, "content_type": content_type},
-        order_by="updated_at", limit=PAGE_ROWS + 1, offset=(page - 1) * PAGE_ROWS,
+        order_by="updated_at", limit=page_rows + 1, offset=(page - 1) * page_rows,
     )  # fmt: skip
-    items = [_project_row(row) for row in rows[:PAGE_ROWS]]
+    items = [_project_row(row) for row in rows[:page_rows]]
     if not archived and not status:
         # ponytail: archived rows are dropped after the page is read, so a stopped page can come
         # back short; filter in SQL once the reader grows a not-equal condition.
@@ -176,7 +183,7 @@ def projects_db(
     return {
         "items": items,
         "next_cursor": None,
-        "next_page": page + 1 if len(rows) > PAGE_ROWS else None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
     }
 
 

@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
 {% from "_app_page.html" import page_source, refusal %}
 {% from "_ip.html" import state_badge, measure %}
 {% block title %}Units — IdeaPress — WeightRoom{% endblock %}
@@ -21,6 +21,7 @@ that version covers, and whether its last validation passed.</p>
     </select></div>
   <button type="submit">Show</button>
 </form>
+{{ pagination(next_href=next_href) }}
 {% endif %}
 {% if detail is none %}
 {{ empty_state("No project yet: units come from a project's plan.", "Create a project", "/apps/ideapress/projects") }}
