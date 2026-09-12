@@ -97,6 +97,9 @@ executing anything; LoadCoach keeps the decision, so it joins the history below.
 ]) %}
 {% endfor %}
 {{ table([{"label": "Decision"}, {"label": "Task profile"}, {"label": "Selected", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Flags"}, {"label": "Took", "numeric": true}, {"label": "Requested", "mono": true}, {"label": "Job"}], rows, caption="Every decision is persisted, not sampled; newest first", density="dense", complete=false, row_count=rows | length) }}
+{% if decisions_capped %}
+<p class="muted">First {{ rows | length }} of more: LoadCoach's own <code>GET /routing-decisions</code> takes no <code>limit</code>, so this is as far as the console can ask for.</p>
+{% endif %}
 {% else %}
 {{ empty_state("No routing decision has been made yet.") }}
 {% endif %}

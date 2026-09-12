@@ -43,7 +43,7 @@ def fixture(name: str) -> Any:  # noqa: ANN401 — a recorded JSON document
 
 
 def loadcoach_console(
-    tmp_path: Path, *, state: AppState, revision: str | None = None
+    tmp_path: Path, *, state: AppState, revision: str | None = None, extra_toml: str = ""
 ) -> tuple[Console, Path]:
     """A console with LoadCoach installed in ``state``, its database a copy of the fixture."""
     database = fixture_database(tmp_path, "loadcoach-0015")
@@ -57,7 +57,10 @@ def loadcoach_console(
     )
     console = build_console(
         tmp_path / "console",
-        extra_toml=f'[apps.loadcoach]\nexecutable = "{executable}"\nbase_url = "{LOADCOACH_URL}"\n',
+        extra_toml=(
+            f'[apps.loadcoach]\nexecutable = "{executable}"\nbase_url = "{LOADCOACH_URL}"\n'
+            + extra_toml
+        ),
         systemd=FakeSystemdController(states={"loadcoach.service": state}),
     )
     console.login()
@@ -172,6 +175,49 @@ def test_reliability_shows_each_value_with_its_samples_or_why_it_is_absent(tmp_p
     assert "3 sample(s); 5 needed" in text
     assert "not evaluated" in text
     assert routes["reliability"].calls.last.request.url.params["task"] == "tools.agent.local_fast"
+
+
+def test_routing_decisions_says_first_n_of_more_when_the_api_hands_back_its_own_cap(
+    tmp_path: Path,
+) -> None:
+    """Row WX5: ``GET /routing-decisions`` takes no ``limit``, so 50 back means "more, maybe"."""
+    console, _database = loadcoach_console(tmp_path, state="active")
+    decisions = fixture("routing-decisions")
+    assert len(decisions["decisions"]) == 50, "the fixture already is LoadCoach's own cap"
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"routing-decisions": decisions})
+        routing = page(console, f"{BASE}/routing")
+    assert "First 50 of more" in routing
+
+
+def test_reliability_pages_by_ui_page_rows_and_the_next_link_walks_every_pair(
+    tmp_path: Path,
+) -> None:
+    """Row WX5: ``[ui] page_rows`` bounds the reliability tables; ``Next`` reaches the rest."""
+    console, _database = loadcoach_console(
+        tmp_path, state="active", extra_toml="[ui]\npage_rows = 10\n"
+    )
+    reliability = fixture("reliability")
+    entries = reliability["reliability"]
+    assert len(entries) == 8
+    grown = []
+    for i in range(15):
+        clone = json.loads(json.dumps(entries[i % len(entries)]))
+        clone["model"]["canonical_id"] = f"ollama/clone-{i}@sha256:{i:064x}"
+        clone["model"]["subject_canonical_id"] = clone["model"]["canonical_id"]
+        grown.append(clone)
+    reliability["reliability"] = grown
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"reliability": reliability})
+        first = page(console, f"{BASE}/reliability")
+        assert 'rel="next"' in first
+        followed = page(console, f"{BASE}/reliability?page=2")
+    for i in range(10):
+        assert f"clone-{i}@" in first
+    for i in range(10, 15):
+        assert f"clone-{i}@" in followed
+    for i in range(10):
+        assert f"clone-{i}@" not in followed
 
 
 def test_stopped_pages_read_the_database_with_a_start_beside_them(tmp_path: Path) -> None:

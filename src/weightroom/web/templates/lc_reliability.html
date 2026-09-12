@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
 {% from "_app_page.html" import page_source, refusal %}
 {% from "_lc.html" import stat, num, measure, breaker_badge, profile_link %}
 {% block title %}Reliability — LoadCoach — WeightRoom{% endblock %}
@@ -51,7 +51,7 @@ in validated success against the model's own history, at z ≥ {{ minimums.get("
   breaker_badge(breaker.get("state"), breaker.get("reason"))
 ]) %}
 {% endfor %}
-{{ table([{"label": "Model", "mono": true}, {"label": "Task profile"}, {"label": "Attempts 7d / 30d / all", "numeric": true}, {"label": "Factor", "numeric": true}, {"label": "Answered", "numeric": true}, {"label": "Validated", "numeric": true}, {"label": "Accepted", "numeric": true}, {"label": "Quality", "numeric": true}, {"label": "p50", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Trend"}, {"label": "Breaker"}], rows, caption="The last seven days, per model and task profile", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Model", "mono": true}, {"label": "Task profile"}, {"label": "Attempts 7d / 30d / all", "numeric": true}, {"label": "Factor", "numeric": true}, {"label": "Answered", "numeric": true}, {"label": "Validated", "numeric": true}, {"label": "Accepted", "numeric": true}, {"label": "Quality", "numeric": true}, {"label": "p50", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Trend"}, {"label": "Breaker"}], rows, caption="The last seven days, per model and task profile", density="dense", complete=false, row_count=rows | length) }}
 
 <h3>Every window</h3>
 {% set rows = [] %}
@@ -69,7 +69,8 @@ in validated success against the model's own history, at z ≥ {{ minimums.get("
 ]) %}
 {% endfor %}
 {% endfor %}
-{{ table([{"label": "Model", "mono": true}, {"label": "Task profile", "mono": true}, {"label": "Window"}, {"label": "Attempts", "numeric": true}, {"label": "Answered", "numeric": true}, {"label": "Validated", "numeric": true}, {"label": "Errors", "numeric": true}, {"label": "Timeouts", "numeric": true}, {"label": "Cancelled", "numeric": true}, {"label": "Accepted", "numeric": true}, {"label": "Quality", "numeric": true}, {"label": "p50", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Tokens/s", "numeric": true}, {"label": "Output tokens", "numeric": true}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Model", "mono": true}, {"label": "Task profile", "mono": true}, {"label": "Window"}, {"label": "Attempts", "numeric": true}, {"label": "Answered", "numeric": true}, {"label": "Validated", "numeric": true}, {"label": "Errors", "numeric": true}, {"label": "Timeouts", "numeric": true}, {"label": "Cancelled", "numeric": true}, {"label": "Accepted", "numeric": true}, {"label": "Quality", "numeric": true}, {"label": "p50", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Tokens/s", "numeric": true}, {"label": "Output tokens", "numeric": true}], rows, density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=next_href) }}
 
 {% if data.get("regressions") %}
 <h3>Regressions</h3>
@@ -93,6 +94,7 @@ read only from its running API.</p>
 {% set _ = rows.append([one.get("canonical_id") or "—", one.get("adapter_key") or "—", one.get("task_profile_id") or "—", one.get("window") or "—", measure(one.get("attempts")), measure(one.get("successes")), measure(one.get("validation_passes")), measure(one.get("errors")), measure(one.get("timeouts")), measure(one.get("cancellations")), measure(one.get("p50_latency_ms"), "ms"), measure(one.get("p95_latency_ms"), "ms"), breaker_badge(one.get("circuit_state"), one.get("circuit_reason")), one.get("updated_at") or "—"]) %}
 {% endfor %}
 {{ table([{"label": "Model", "mono": true}, {"label": "Adapter", "mono": true}, {"label": "Task profile", "mono": true}, {"label": "Window"}, {"label": "Attempts", "numeric": true}, {"label": "Successes", "numeric": true}, {"label": "Validated", "numeric": true}, {"label": "Errors", "numeric": true}, {"label": "Timeouts", "numeric": true}, {"label": "Cancelled", "numeric": true}, {"label": "p50", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Breaker, as stored"}, {"label": "Updated", "mono": true}], rows, caption="reliability_stats, as LoadCoach last wrote it", density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=next_href) }}
 {% else %}
 {{ empty_state("No production evidence recorded.") }}
 {% endif %}

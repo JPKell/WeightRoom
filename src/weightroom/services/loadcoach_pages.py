@@ -69,7 +69,6 @@ __all__ = [
 ]
 
 APP: Final = "loadcoach"
-PAGE_ROWS: Final = 50
 LIST_CAP: Final = 200
 MODEL_CAP: Final = 500
 """A registry larger than this is read in part when stopped; ``GET /models`` has no cap."""
@@ -227,6 +226,10 @@ def model_db(handle: AppDatabase, model_ref: str) -> dict[str, Any]:
 def decisions_api(client: httpx.Client, settings: Settings) -> list[dict[str, Any]]:
     """``GET /routing-decisions``: the most recent decisions, newest first.
 
+    LoadCoach's own route takes no ``limit`` (``recent_decisions`` hardcodes 50) — the console
+    cannot ask it for a further page, so this listing is not paged by ``[ui] page_rows``; the
+    page marks it incomplete and says so whenever exactly the cap comes back (row WX5).
+
     Raises:
         AppRefused: LoadCoach refused.
         AppUnreachable: It did not answer.
@@ -234,15 +237,21 @@ def decisions_api(client: httpx.Client, settings: Settings) -> list[dict[str, An
     return _listed(call(client, settings, APP, "GET", "routing-decisions"), "decisions")
 
 
-def decisions_db(handle: AppDatabase) -> list[dict[str, Any]]:
+def decisions_db(handle: AppDatabase, *, page_rows: int) -> list[dict[str, Any]]:
     """The ``routing_decisions`` table, newest first, under the API's names.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request. Unlike the
+            API path, this read *could* go further with a numbered page, since it is this
+            console's own database; it stays a single bounded read so the two sources agree on
+            what "incomplete" means for this table, each against its own cap.
 
     Raises:
         TableUnknown: The database has no ``routing_decisions`` table.
         ReadFailed: The database refused or ran past the timeout.
     """
     decisions = []
-    for row in rows_where(handle, "routing_decisions", order_by="requested_at", limit=PAGE_ROWS):
+    for row in rows_where(handle, "routing_decisions", order_by="requested_at", limit=page_rows):
         explanation = _document(_loads(row.get("explanation_json")))
         selected = _document(explanation.get("selected"))
         decisions.append(
@@ -363,9 +372,21 @@ def task_profile_db(handle: AppDatabase, profile_id: str) -> dict[str, Any]:
 
 
 def reliability_api(
-    client: httpx.Client, settings: Settings, *, task: str | None, model: str | None
-) -> dict[str, Any]:
+    client: httpx.Client, settings: Settings, *, task: str | None, model: str | None, page: int,
+    page_rows: int,
+) -> dict[str, Any]:  # fmt: skip
     """``GET /reliability``: each pair's windows, factor, regression verdict and breaker.
+
+    LoadCoach's route answers every pair in one call; this reader pages the console's own view
+    of that list by ``page_rows`` (row WX5) rather than asking LoadCoach again, since the whole
+    document — including ``regressions``, which names every pair, not only this page's — is one
+    read. ``regressions`` is therefore never paged: it is a summary section of its own, and
+    slicing it to match the current page of the *other* table would silently drop a regression a
+    page happens not to show.
+
+    Args:
+        page: The pair-table's page number, one-based.
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: LoadCoach refused.
@@ -375,14 +396,25 @@ def reliability_api(
         client, settings, APP, "GET", "reliability", params={"task": task, "model": model},
         timeout_seconds=30.0,
     )  # fmt: skip
-    return _document(body)
+    document = dict(_document(body))
+    entries = document.get("reliability") or []
+    page = max(1, page)
+    start = (page - 1) * page_rows
+    document["reliability"] = entries[start : start + page_rows]
+    document["next_page"] = page + 1 if len(entries) > start + page_rows else None
+    return document
 
 
-def reliability_db(handle: AppDatabase, *, task: str | None, model: str | None) -> dict[str, Any]:
+def reliability_db(
+    handle: AppDatabase, *, task: str | None, model: str | None, page: int, page_rows: int
+) -> dict[str, Any]:
     """The persisted ``reliability_stats`` rows: counts per window, no factor and no verdict.
 
     The factor, the regression verdict and each rate's minimum are LoadCoach's arithmetic over these
     counts, so a stopped LoadCoach's page shows the counts and says the rest waits for the API.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         TableUnknown: A table this reader expects is absent.
@@ -418,7 +450,12 @@ def reliability_db(handle: AppDatabase, *, task: str | None, model: str | None) 
     ]
     if model:
         stats = [one for one in stats if one["canonical_id"] == model]
-    return {"stats": stats}
+    page = max(1, page)
+    start = (page - 1) * page_rows
+    return {
+        "stats": stats[start : start + page_rows],
+        "next_page": page + 1 if len(stats) > start + page_rows else None,
+    }
 
 
 # --- Queue and jobs -------------------------------------------------------------------------------
@@ -507,8 +544,12 @@ def jobs_api(  # noqa: PLR0913 — one keyword per filter GET /jobs takes
     task: str | None,
     source: str | None,
     cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /jobs``: one page, newest first, filtered as LoadCoach's own Jobs page filters.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: LoadCoach refused.
@@ -517,7 +558,7 @@ def jobs_api(  # noqa: PLR0913 — one keyword per filter GET /jobs takes
     body = call(
         client, settings, APP, "GET", "jobs",
         params={"state": state, "class": job_class, "task": task, "source": source,
-                "cursor": cursor, "limit": PAGE_ROWS},
+                "cursor": cursor, "limit": page_rows},
     )  # fmt: skip
     page = _document(_document(body).get("page"))
     return {
@@ -579,8 +620,12 @@ def jobs_db(  # noqa: PLR0913 — one keyword per filter
     task: str | None,
     source: str | None,
     page: int,
+    page_rows: int,
 ) -> dict[str, Any]:
     """The ``jobs`` table, newest first, one page by number.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         TableUnknown: The database has no ``jobs`` table.
@@ -591,12 +636,12 @@ def jobs_db(  # noqa: PLR0913 — one keyword per filter
     rows = rows_where(
         handle, "jobs",
         equals={"state": state, "class": job_class, "task_profile_id": task, "source": source},
-        order_by="created_at", limit=PAGE_ROWS + 1, offset=(page - 1) * PAGE_ROWS,
+        order_by="created_at", limit=page_rows + 1, offset=(page - 1) * page_rows,
     )  # fmt: skip
     return {
-        "items": [_job_row(row, canonical) for row in rows[:PAGE_ROWS]],
+        "items": [_job_row(row, canonical) for row in rows[:page_rows]],
         "next_cursor": None,
-        "next_page": page + 1 if len(rows) > PAGE_ROWS else None,
+        "next_page": page + 1 if len(rows) > page_rows else None,
     }
 
 
@@ -826,26 +871,37 @@ def evidence_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
     ``match_state`` is LoadCoach's, so each state is read by its own filter and the record labelled
     with it. The ``summary`` is the store overview the API attaches to every page.
 
+    Not paged by ``[ui] page_rows`` (row WX5): the API's own ``limit``/``cursor`` page one
+    ``match_state`` at a time, and this reader already merges three states into one table before
+    the console ever sees it, so a console-side page number would not agree with any one of the
+    three cursors it would have to track. ``capped`` says whether any state's own read landed
+    exactly on ``EVIDENCE_PAGE``, which is this reader's signal that state has more the merged
+    list does not show.
+
     Raises:
         AppRefused: LoadCoach refused.
         AppUnreachable: It did not answer.
     """
     records: list[dict[str, Any]] = []
     summary: dict[str, Any] | None = None
+    capped = False
     for state in MATCH_STATES:
         body = call(
             client, settings, APP, "GET", "evidence",
             params={"match_state": state, "limit": EVIDENCE_PAGE},
         )  # fmt: skip
         summary = _document(_document(body).get("summary")) or summary
+        items = _listed(body, "items")
+        capped = capped or len(items) >= EVIDENCE_PAGE
         records.extend(
             {**_evidence_record(_document(item.get("payload"))), "match_state": state}
-            for item in _listed(body, "items")
+            for item in items
         )
     sources = _document(call(client, settings, APP, "GET", "evidence/sources"))
     return {
         "summary": summary,
         "records": records,
+        "capped": capped,
         "sources": _listed(sources, "sources"),
         "configured_url": sources.get("configured_url"),
     }
@@ -884,6 +940,7 @@ def evidence_db(handle: AppDatabase) -> dict[str, Any]:
     return {
         "summary": None,
         "records": records,
+        "capped": len(records) >= LIST_CAP,
         "sources": [
             {
                 "source_id": row.get("source_key"),
