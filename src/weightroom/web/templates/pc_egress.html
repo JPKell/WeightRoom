@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
 {% from "_app_page.html" import page_source, refusal %}
 {% from "_pc.html" import short, trajectory_link, verdict_badge %}
 {% block title %}Egress decisions — PromptCadence — WeightRoom{% endblock %}
@@ -25,12 +25,14 @@ alike. A declined call is as auditable as an approved one, so both are on one pa
 
 {{ refusal(sourced.error) }}
 {% if sourced.data is not none %}
-{% if sourced.data %}
+{% set found = sourced.data["items"] %}
+{% if found %}
 {% set rows = [] %}
-{% for one in sourced.data %}
+{% for one in found %}
 {% set _ = rows.append([short(one.get("decision_id")), verdict_badge(one.get("verdict")), trajectory_link(one.get("trajectory_id")), one.get("target") or "—", one.get("classification") or "—", one.get("policy") or "—", one.get("reason") or "—", one.get("decided_at") or "—"]) %}
 {% endfor %}
 {{ table([{"label": "Decision"}, {"label": "Verdict"}, {"label": "Trajectory"}, {"label": "Target", "mono": true}, {"label": "Classification"}, {"label": "Policy"}, {"label": "Reason"}, {"label": "When", "mono": true}], rows, caption="Recorded egress decisions, newest first", density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=next_href) }}
 {% else %}
 {{ empty_state("No egress decisions match this filter.", "Every decision", "/apps/promptcadence/egress") }}
 {% endif %}

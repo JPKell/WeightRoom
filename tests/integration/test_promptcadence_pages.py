@@ -138,6 +138,24 @@ def test_running_pages_read_promptcadences_api(tmp_path: Path) -> None:
     assert "tier:local_fast" in ledger
 
 
+def test_the_ledger_pages_cursor_reaches_the_api_and_the_next_link(tmp_path: Path) -> None:
+    """Row WX5: ``GET /ledger/entries`` gains a cursor, and the console's pager follows it."""
+    console, _database = _console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        routes = _mock_api(router)
+        ledger = _page(console, f"{BASE}/ledger")
+        first_call = routes["ledger/entries"].calls.last.request.url.params
+        assert "cursor" not in first_call
+        entries = _fixture("ledger-entries")
+        next_cursor = entries["page"]["next_cursor"]
+        assert next_cursor  # the fixture was vendored with a real cursor at row WX5
+        assert f"cursor={next_cursor}" in ledger
+        followed = _page(console, f"{BASE}/ledger?cursor={next_cursor}")
+        second_call = routes["ledger/entries"].calls.last.request.url.params
+    assert second_call["cursor"] == next_cursor
+    assert "at most 20 USD" in followed
+
+
 def test_the_approval_history_and_egress_read_the_api_while_promptcadence_runs(
     tmp_path: Path,
 ) -> None:
@@ -160,20 +178,41 @@ def test_the_approval_history_and_egress_read_the_api_while_promptcadence_runs(
             "age_seconds": 60.0,
         }
     ]
+    history["page"] = {
+        "limit": 50,
+        "next_cursor": "history-cursor-1",
+        "has_more": True,
+        "total": None,
+    }
     egress = _fixture("egress-newest")
+    egress["page"]["next_cursor"] = "egress-cursor-1"
+    egress["page"]["has_more"] = True
     with respx.mock(assert_all_called=False) as router:
-        routes = _mock_api(router, **{"approvals-all": history})
+        routes = _mock_api(router, **{"approvals-all": history, "egress-decisions": egress})
         approvals = _page(console, f"{BASE}/approvals")
         page = _page(console, f"{BASE}/egress?verdict=approved")
+        followed_history = _page(console, f"{BASE}/approvals?cursor=history-cursor-1")
+        followed_egress = _page(console, f"{BASE}/egress?verdict=approved&cursor=egress-cursor-1")
+        # Row WX5: the console asks PromptCadence for every cursor it was handed back.
+        history_calls = [
+            call for call in router.calls if call.request.url.path == "/api/v1/approvals"
+        ]
+        history_cursor_sent = history_calls[-1].request.url.params["cursor"]
     assert "01REQU" in approvals and "granted" in approvals
     assert "From the database" not in approvals
-    sent = routes["egress-decisions"].calls.last.request.url.params
-    assert (sent["sort"], sent["verdict"], sent["limit"]) == ("-decided_at", "approved", "200")
+    assert "cursor=history-cursor-1" in approvals
+    assert history_cursor_sent == "history-cursor-1"
+    sent = routes["egress-decisions"].calls[0].request.url.params
+    # 50 is [ui] page_rows's default (row WX5); the console no longer asks for the LIST_CAP.
+    assert (sent["sort"], sent["verdict"], sent["limit"]) == ("-decided_at", "approved", "50")
+    assert "cursor=egress-cursor-1" in page
+    assert routes["egress-decisions"].calls.last.request.url.params["cursor"] == "egress-cursor-1"
     first = egress["items"][0]
     assert first["decision_id"][:6] in page
     assert first["request"]["target"]["name"] in page
     assert "From the API" in page
     assert "From the database" not in page
+    assert followed_history and followed_egress  # both cursor-continued requests answered 200
 
 
 def test_stopped_egress_is_read_newest_first_from_the_database(tmp_path: Path) -> None:

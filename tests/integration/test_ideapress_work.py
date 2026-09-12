@@ -364,6 +364,26 @@ def test_units_lists_a_projects_units_running_and_stopped(tmp_path: Path) -> Non
     assert "From the database at revision 0011" in page
 
 
+def test_units_project_picker_follows_a_cursor_past_its_first_page(tmp_path: Path) -> None:
+    """Row WX5: before this row the picker read only ``cursor=None`` and could reach no further."""
+    console, _database = ideapress_console(tmp_path, state="active")
+    projects = ideapress_fixture("projects")
+    projects["page"] = {
+        "has_more": True,
+        "limit": 50,
+        "next_cursor": "more-projects",
+        "total": None,
+    }
+    with respx.mock(assert_all_called=False) as router:
+        routes = _mock(router, projects=projects)
+        first = _page(console, f"{BASE}/units")
+        assert "cursor=more-projects" in first
+        followed = _page(console, f"{BASE}/units?cursor=more-projects")
+        sent = routes["projects"].calls.last.request.url.params
+    assert sent["cursor"] == "more-projects"
+    assert followed  # the second page still answers 200 with no project chosen from it
+
+
 def test_a_unit_shows_sanitised_content_provenance_history_and_offers_revise(
     tmp_path: Path,
 ) -> None:

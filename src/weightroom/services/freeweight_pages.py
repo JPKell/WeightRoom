@@ -80,6 +80,9 @@ __all__ = [
 
 APP: Final = "freeweight"
 PAGE_ROWS: Final = 50
+"""Unused in this module since row WX5 (every reader here takes ``page_rows`` from the caller,
+read from ``settings.ui.page_rows``); kept for :mod:`~weightroom.services.freeweight_goals`,
+which is not a page reader and does not have a request's settings to read."""
 LIST_CAP: Final = 500
 """A table larger than this is read in part when FreeWeight is stopped; its API pages everything."""
 
@@ -311,11 +314,15 @@ def model_api(
     suite: str | None,
     runtime_profile: str | None,
     cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /models/{ref}``, a page of its ``/results`` and its ``GET /evidence?model=``.
 
     The evidence is read separately and a refusal of it leaves ``None``, so the identity and the
     results still render.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: ``MODEL_NOT_FOUND``, an ambiguous prefix, or a refused results filter.
@@ -327,7 +334,7 @@ def model_api(
         call(
             client, settings, APP, "GET", f"{path}/results",
             params={"suite": suite, "runtime_profile_hash": runtime_profile, "cursor": cursor,
-                    "limit": PAGE_ROWS},
+                    "limit": page_rows},
             timeout_seconds=30.0,
         )
     )  # fmt: skip
@@ -424,9 +431,16 @@ def benchmarks_api(client: httpx.Client, settings: Settings) -> list[dict[str, A
 
 
 def runs_api(
-    client: httpx.Client, settings: Settings, filters: Mapping[str, str | None], cursor: str | None
+    client: httpx.Client,
+    settings: Settings,
+    filters: Mapping[str, str | None],
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /runs``: one page, newest first, filtered as api.md §4 allows.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: A refused filter (``MODEL_NOT_FOUND``, a malformed instant, a forged cursor).
@@ -435,7 +449,7 @@ def runs_api(
     params = {key: filters.get(key) or None for key in RUN_FILTERS}
     body = call(
         client, settings, APP, "GET", "runs",
-        params={**params, "cursor": cursor, "limit": PAGE_ROWS}, timeout_seconds=30.0,
+        params={**params, "cursor": cursor, "limit": page_rows}, timeout_seconds=30.0,
     )  # fmt: skip
     page = _document(_document(body).get("page"))
     return {
@@ -469,12 +483,17 @@ def _run_row(row: Mapping[str, Any], names: Mapping[str, Mapping[Any, Any]]) -> 
     }
 
 
-def runs_db(handle: AppDatabase, filters: Mapping[str, str | None], page: int) -> dict[str, Any]:
+def runs_db(
+    handle: AppDatabase, filters: Mapping[str, str | None], page: int, page_rows: int
+) -> dict[str, Any]:
     """The ``runs`` table, newest first, one numbered page.
 
     ``status`` and ``label`` filter in the query; ``model`` (by canonical ID), ``suite``,
     ``machine`` and ``adapter`` filter the rows read; ``since`` and ``until`` apply only while
     FreeWeight answers, since the stored timestamp's text is not RFC 3339 and is never parsed here.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         TableUnknown: A table this reader expects is absent.
@@ -497,11 +516,11 @@ def runs_db(handle: AppDatabase, filters: Mapping[str, str | None], page: int) -
         }
         if all(not value or found[key] == value for key, value in wanted.items()):
             runs.append(run)
-    start = (page - 1) * PAGE_ROWS
+    start = (page - 1) * page_rows
     return {
-        "items": runs[start : start + PAGE_ROWS],
+        "items": runs[start : start + page_rows],
         "next_cursor": None,
-        "next_page": page + 1 if len(runs) > start + PAGE_ROWS else None,
+        "next_page": page + 1 if len(runs) > start + page_rows else None,
     }
 
 
@@ -748,9 +767,17 @@ def _test_of(run: Mapping[str, Any], run_test_id: str) -> dict[str, Any] | None:
 
 
 def samples_api(
-    client: httpx.Client, settings: Settings, run_id: str, run_test_id: str, cursor: str | None
+    client: httpx.Client,
+    settings: Settings,
+    run_id: str,
+    run_test_id: str,
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """The run, its test, and one page of ``GET /runs/{id}/tests/{test}/samples``.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: ``RUN_NOT_FOUND`` for a run or a test that is not the run's, or a forged cursor.
@@ -761,7 +788,7 @@ def samples_api(
         call(
             client, settings, APP, "GET",
             f"runs/{segment(run_id)}/tests/{segment(run_test_id)}/samples",
-            params={"limit": PAGE_ROWS, "cursor": cursor}, timeout_seconds=30.0,
+            params={"limit": page_rows, "cursor": cursor}, timeout_seconds=30.0,
         )
     )  # fmt: skip
     page = _document(body.get("page"))
@@ -791,8 +818,13 @@ def _sample_row(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def samples_db(handle: AppDatabase, run_id: str, run_test_id: str, page: int) -> dict[str, Any]:
+def samples_db(
+    handle: AppDatabase, run_id: str, run_test_id: str, page: int, page_rows: int
+) -> dict[str, Any]:
     """The run, its test, and one numbered page of the test's samples in declaration order.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         NotRecorded: No such run, or the test is not one of its tests.
@@ -811,13 +843,13 @@ def samples_db(handle: AppDatabase, run_id: str, run_test_id: str, page: int) ->
         rows_where(handle, "samples", equals={"run_test_id": run_test_id}, limit=LIST_CAP * 4),
         key=lambda one: (one.get("ordinal") or 0, one.get("repetition") or 0, str(one.get("id"))),
     )
-    start = (page - 1) * PAGE_ROWS
+    start = (page - 1) * page_rows
     return {
         "run": run,
         "test": test,
-        "items": [_sample_row(one) for one in rows[start : start + PAGE_ROWS]],
+        "items": [_sample_row(one) for one in rows[start : start + page_rows]],
         "next_cursor": None,
-        "next_page": page + 1 if len(rows) > start + PAGE_ROWS else None,
+        "next_page": page + 1 if len(rows) > start + page_rows else None,
     }
 
 
@@ -950,9 +982,16 @@ DASHBOARD_FILTERS: Final[tuple[str, ...]] = ("suite", "model", "machine", "since
 
 
 def results_api(
-    client: httpx.Client, settings: Settings, filters: Mapping[str, str | None], cursor: str | None
+    client: httpx.Client,
+    settings: Settings,
+    filters: Mapping[str, str | None],
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /results``: one page of stored metrics, newest run first.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: A refused filter — ``MODEL_NOT_FOUND``, a malformed instant, a forged cursor.
@@ -961,7 +1000,7 @@ def results_api(
     params = {key: filters.get(key) or None for key in RESULT_FILTERS}
     body = call(
         client, settings, APP, "GET", "results",
-        params={**params, "cursor": cursor, "limit": PAGE_ROWS}, timeout_seconds=30.0,
+        params={**params, "cursor": cursor, "limit": page_rows}, timeout_seconds=30.0,
     )  # fmt: skip
     page = _document(_document(body).get("page"))
     return {"items": _listed(body, "items"), "next_cursor": page.get("next_cursor")}
@@ -1002,9 +1041,16 @@ def export_params(form: Mapping[str, str]) -> dict[str, str]:
 
 
 def evidence_api(
-    client: httpx.Client, settings: Settings, filters: Mapping[str, str | None], cursor: str | None
+    client: httpx.Client,
+    settings: Settings,
+    filters: Mapping[str, str | None],
+    cursor: str | None,
+    page_rows: int,
 ) -> dict[str, Any]:
     """``GET /evidence``: one page of current records, each lifted by :func:`evidence_record`.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         AppRefused: A refused filter (``MODEL_NOT_FOUND``, a minimum confidence out of range).
@@ -1013,7 +1059,7 @@ def evidence_api(
     params = {key: filters.get(key) or None for key in EVIDENCE_FILTERS}
     body = call(
         client, settings, APP, "GET", "evidence",
-        params={**params, "cursor": cursor, "limit": PAGE_ROWS}, timeout_seconds=30.0,
+        params={**params, "cursor": cursor, "limit": page_rows}, timeout_seconds=30.0,
     )  # fmt: skip
     page = _document(_document(body).get("page"))
     items = [evidence_record(item) for item in _listed(body, "items")]
@@ -1156,8 +1202,13 @@ def _named(catalog: Mapping[str, Any], adapter: str) -> list[dict[str, Any]]:
     return found
 
 
-def adapter_api(client: httpx.Client, settings: Settings, adapter: str) -> dict[str, Any]:
+def adapter_api(
+    client: httpx.Client, settings: Settings, adapter: str, *, page_rows: int
+) -> dict[str, Any]:
     """One adapter from ``GET /adapters``, with ``GET /runs`` and ``GET /results`` under it.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         NotRecorded: FreeWeight knows no adapter by that name or digest.
@@ -1165,13 +1216,16 @@ def adapter_api(client: httpx.Client, settings: Settings, adapter: str) -> dict[
         AppUnreachable: It did not answer.
     """
     found = _named(adapters_api(client, settings), adapter)
-    runs = runs_api(client, settings, {"adapter": adapter}, None)
-    results = results_api(client, settings, {"adapter": adapter, "status": "any"}, None)
+    runs = runs_api(client, settings, {"adapter": adapter}, None, page_rows)
+    results = results_api(client, settings, {"adapter": adapter, "status": "any"}, None, page_rows)
     return {"adapters": found, "runs": runs["items"], "results": results["items"]}
 
 
-def adapter_db(handle: AppDatabase, adapter: str) -> dict[str, Any]:
+def adapter_db(handle: AppDatabase, adapter: str, *, page_rows: int) -> dict[str, Any]:
     """One adapter's row and the runs created under it; its results are FreeWeight's query.
+
+    Args:
+        page_rows: The page size — ``[ui] page_rows`` (row WX5), read per request.
 
     Raises:
         NotRecorded: The table holds no adapter by that name or digest.
@@ -1180,7 +1234,9 @@ def adapter_db(handle: AppDatabase, adapter: str) -> dict[str, Any]:
     """
     found = _named(adapters_db(handle), adapter)
     names = {str(one.get("name")) for one in found}
-    runs = [run for run in runs_db(handle, {}, 1)["items"] if run.get("adapter") in names]
+    runs = [
+        run for run in runs_db(handle, {}, 1, page_rows)["items"] if run.get("adapter") in names
+    ]
     return {"adapters": found, "runs": runs, "results": None}
 
 

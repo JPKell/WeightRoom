@@ -3781,7 +3781,7 @@
         ]
       },
       "put": {
-        "description": "The console's own six runtime keys; a config-only key is refused by name.\n\nRaises:\n    SettingConfigOnly: The key is config-only (``403``); the settings page writes the file.\n    SettingUnknown: The key is not a setting at all (``400``).\n    ValidationError: The value is the wrong type or outside its bounds.",
+        "description": "The console's own runtime keys (``RUNTIME_SETTINGS``); a config-only key is refused by name.\n\nRaises:\n    SettingConfigOnly: The key is config-only (``403``); the settings page writes the file.\n    SettingUnknown: The key is not a setting at all (``400``).\n    ValidationError: The value is the wrong type or outside its bounds.",
         "operationId": "put_own_settings_api_v1_settings_put",
         "requestBody": {
           "content": {

@@ -509,7 +509,7 @@ def get_own_settings(request: Request, principal: CurrentOperator) -> JSONRespon
 def put_own_settings(
     request: Request, principal: CurrentOperator, body: Annotated[dict[str, Any], Body()]
 ) -> JSONResponse:
-    """The console's own six runtime keys; a config-only key is refused by name.
+    """The console's own runtime keys (``RUNTIME_SETTINGS``); a config-only key is refused by name.
 
     Raises:
         SettingConfigOnly: The key is config-only (``403``); the settings page writes the file.

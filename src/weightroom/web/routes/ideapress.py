@@ -104,15 +104,17 @@ def _projects(  # noqa: PLR0913 — the list's filters, and what the last action
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     sourced = read_app_page(
         request,
         view,
         api=lambda: ip.projects_api(
             client, settings, status=project_status, content_type=content_type,
-            archived=archived, cursor=cursor,
+            archived=archived, cursor=cursor, page_rows=page_rows,
         ),
         database=lambda handle: ip.projects_db(
-            handle, status=project_status, content_type=content_type, archived=archived, page=page
+            handle, status=project_status, content_type=content_type, archived=archived, page=page,
+            page_rows=page_rows,
         ),
     )  # fmt: skip
     data = sourced.data or {}
@@ -719,23 +721,40 @@ def cancel_from_page(
 
 @ui_router.get(f"{BASE}/units", summary="Units", response_class=HTMLResponse)
 def units_page(
-    request: Request, principal: CurrentOperator, project: str | None = None
+    request: Request,
+    principal: CurrentOperator,
+    project: str | None = None,
+    cursor: str | None = None,
+    page: int = 1,
 ) -> HTMLResponse:
-    """One project's units — the newest project's until another is chosen — with their states."""
+    """One project's units — the newest project's until another is chosen — with their states.
+
+    The project picker itself is paged (row WX5): before this row it always showed only the
+    first page of projects (``cursor=None``), so a project past ``[ui] page_rows`` could not be
+    chosen here at all.
+    """
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     projects = read_app_page(
         request,
         view,
         api=lambda: ip.projects_api(
-            client, settings, status=None, content_type=None, archived=False, cursor=None
+            client, settings, status=None, content_type=None, archived=False, cursor=cursor,
+            page_rows=page_rows,
         ),
         database=lambda handle: ip.projects_db(
-            handle, status=None, content_type=None, archived=False, page=1
+            handle, status=None, content_type=None, archived=False, page=page, page_rows=page_rows
         ),
-    )
-    listed = (projects.data or {}).get("items") or []
+    )  # fmt: skip
+    data = projects.data or {}
+    listed = data.get("items") or []
     chosen = project or (str(listed[0].get("id")) if listed else None)
+    next_href = None
+    if data.get("next_cursor"):
+        next_href = _href(f"{BASE}/units", project=chosen, cursor=data["next_cursor"])
+    elif data.get("next_page"):
+        next_href = _href(f"{BASE}/units", project=chosen, page=data["next_page"])
     detail = (
         read_app_page(
             request,
@@ -748,7 +767,7 @@ def units_page(
     )
     return render_app_page(
         request, principal, APP, "ip_units.html", selected="Units", view=view, sourced=projects,
-        detail=detail, chosen=chosen,
+        detail=detail, chosen=chosen, next_href=next_href,
     )  # fmt: skip
 
 

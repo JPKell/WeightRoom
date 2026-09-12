@@ -57,7 +57,7 @@ def test_config_verbs(tmp_path: Path) -> None:
     code, out, _ = _run("config", "schema", "--config", str(file), "--json")
     assert code == 0 and json.loads(out)["application"] == "weightroom"
     code, out, _ = _run("config", "schema", "--config", str(file))
-    assert "runtime_changeable (6)" in out
+    assert "runtime_changeable (7)" in out  # row WX5 added ui.page_rows
     code, out, _ = _run("config", "reference")
     assert code == 0 and "## `[apps.loadcoach]`" in out
     target = tmp_path / "ref.md"

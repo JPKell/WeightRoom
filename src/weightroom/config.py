@@ -51,6 +51,7 @@ __all__ = [
     "TelemetrySettings",
     "TlsMissingError",
     "TlsSettings",
+    "UiSettings",
     "config_dir",
     "data_dir",
     "env_var_for",
@@ -507,6 +508,20 @@ class AlertsSettings(BaseModel):
     )
 
 
+class UiSettings(BaseModel):
+    """The console's own display defaults (row WX5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    page_rows: int = Field(
+        default=50,
+        ge=10,
+        le=500,
+        description="Rows per page on every table the owning API can page. Runtime-changeable.",
+        examples=[50],
+    )
+
+
 class LoggingSettings(BaseModel):
     """Log level and content policy."""
 
@@ -548,6 +563,7 @@ class Settings(BaseModel):
     docs: DocsSettings = Field(default_factory=DocsSettings)
     jobs: JobsSettings = Field(default_factory=JobsSettings)
     alerts: AlertsSettings = Field(default_factory=AlertsSettings)
+    ui: UiSettings = Field(default_factory=UiSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
 
 
@@ -973,6 +989,9 @@ output_cap_bytes = 1048576
 [alerts]
 interval_seconds = 30        # runtime-changeable
 gpu_temperature_c = 85       # runtime-changeable
+
+[ui]
+page_rows = 50                # runtime-changeable; rows per page, 10-500
 
 [logging]
 level = "INFO"

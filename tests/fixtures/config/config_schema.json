@@ -561,6 +561,25 @@
         },
         "title": "TlsSettings",
         "type": "object"
+      },
+      "UiSettings": {
+        "additionalProperties": false,
+        "description": "The console's own display defaults (row WX5).",
+        "properties": {
+          "page_rows": {
+            "default": 50,
+            "description": "Rows per page on every table the owning API can page. Runtime-changeable.",
+            "examples": [
+              50
+            ],
+            "maximum": 500,
+            "minimum": 10,
+            "title": "Page Rows",
+            "type": "integer"
+          }
+        },
+        "title": "UiSettings",
+        "type": "object"
       }
     },
     "additionalProperties": false,
@@ -601,6 +620,9 @@
       },
       "tls": {
         "$ref": "#/$defs/TlsSettings"
+      },
+      "ui": {
+        "$ref": "#/$defs/UiSettings"
       }
     },
     "title": "Settings",
@@ -649,6 +671,13 @@
       "kind": "str",
       "maximum": null,
       "minimum": null
+    },
+    {
+      "description": "Rows per page on every table the owning API can page.",
+      "key": "ui.page_rows",
+      "kind": "int",
+      "maximum": 500,
+      "minimum": 10
     }
   ],
   "schema_version": "1.0",
@@ -737,7 +766,8 @@
     "tls.ca_years": "default",
     "tls.directory": "default",
     "tls.leaf_days": "default",
-    "tls.renew_before_days": "default"
+    "tls.renew_before_days": "default",
+    "ui.page_rows": "default"
   },
   "version": "<version>"
 }

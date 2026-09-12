@@ -227,9 +227,20 @@ def _routing(
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     decisions = read_app_page(
-        request, view, api=lambda: lc.decisions_api(client, settings), database=lc.decisions_db
+        request,
+        view,
+        api=lambda: lc.decisions_api(client, settings),
+        database=lambda handle: lc.decisions_db(handle, page_rows=page_rows),
     )
+    # `GET /routing-decisions` hardcodes its own cap (50) with no `limit` the console can raise
+    # (row WX5); the stopped path's cap is `page_rows`. Each source is "possibly more" only
+    # against its own ceiling — a fixed 50 on the API path would be the wrong number to compare
+    # a `page_rows=200` database read against.
+    decisions_cap = 50 if decisions.live else page_rows
+    decisions_rows = decisions.data or []
+    decisions_capped = bool(decisions_rows) and len(decisions_rows) >= decisions_cap
     profiles = read_app_page(
         request,
         view,
@@ -247,6 +258,7 @@ def _routing(
         selected="Routing",
         view=view,
         decisions=decisions,
+        decisions_capped=decisions_capped,
         profiles=profiles,
         models=models.data or [],
         explained=explained,
@@ -402,16 +414,28 @@ def reliability_page(
     principal: CurrentOperator,
     task: str | None = None,
     model: str | None = None,
+    page: int = 1,
 ) -> HTMLResponse:
     """Production evidence per model and task profile: windows, factor, regression, breaker."""
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     wanted_task, wanted_model = task or None, model or None
     sourced = read_app_page(
         request,
         view,
-        api=lambda: lc.reliability_api(client, settings, task=wanted_task, model=wanted_model),
-        database=lambda handle: lc.reliability_db(handle, task=wanted_task, model=wanted_model),
+        api=lambda: lc.reliability_api(
+            client, settings, task=wanted_task, model=wanted_model, page=page, page_rows=page_rows
+        ),
+        database=lambda handle: lc.reliability_db(
+            handle, task=wanted_task, model=wanted_model, page=page, page_rows=page_rows
+        ),
+    )
+    next_page = (sourced.data or {}).get("next_page")
+    next_href = (
+        _href(f"{BASE}/reliability", task=wanted_task, model=wanted_model, page=next_page)
+        if next_page
+        else None
     )
     return render_app_page(
         request,
@@ -423,6 +447,7 @@ def reliability_page(
         sourced=sourced,
         task=wanted_task or "",
         model=wanted_model or "",
+        next_href=next_href,
     )
 
 
@@ -453,6 +478,7 @@ def _queue(  # noqa: PLR0913 — the filters, and what a failed action leaves on
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     wanted = {key: (filters or {}).get(key) or None for key in ("state", "class", "task", "source")}
     report = read_app_page(request, view, api=lambda: lc.queue_api(client, settings), database=None)
     jobs = read_app_page(
@@ -460,11 +486,11 @@ def _queue(  # noqa: PLR0913 — the filters, and what a failed action leaves on
         view,
         api=lambda: lc.jobs_api(
             client, settings, state=wanted["state"], job_class=wanted["class"],
-            task=wanted["task"], source=wanted["source"], cursor=cursor,
+            task=wanted["task"], source=wanted["source"], cursor=cursor, page_rows=page_rows,
         ),
         database=lambda handle: lc.jobs_db(
             handle, state=wanted["state"], job_class=wanted["class"], task=wanted["task"],
-            source=wanted["source"], page=page,
+            source=wanted["source"], page=page, page_rows=page_rows,
         ),
     )  # fmt: skip
     data = jobs.data or {}

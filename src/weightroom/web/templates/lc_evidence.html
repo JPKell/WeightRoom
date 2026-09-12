@@ -71,6 +71,10 @@ Confidence is FreeWeight's, applied here and never recomputed.</p>
 ]) %}
 {% endfor %}
 {{ table([{"label": "Subject", "mono": true}, {"label": "Adapter", "mono": true}, {"label": "Capability", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile", "mono": true}, {"label": "Machine", "mono": true}, {"label": "State"}, {"label": "Source", "mono": true}], rows, caption="Age is measured from measured_at, never from the import", density="dense", complete=false, row_count=rows | length) }}
+{% if data.get("capped") %}
+<p class="muted">First {{ rows | length }} of more: one match state's own read filled its page, and this
+table merges three states into one, so the console cannot page it as a single list (row WX5).</p>
+{% endif %}
 {% else %}
 {{ empty_state("Nothing imported yet.") }}
 {% endif %}
