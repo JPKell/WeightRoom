@@ -211,6 +211,7 @@ def model_page(  # noqa: PLR0913 — the results filters FreeWeight takes
         api=lambda: fw.model_api(
             client, settings, model_ref, suite=wanted["suite"],
             runtime_profile=wanted["runtime_hash"], cursor=cursor or None,
+            page_rows=settings.ui.page_rows,
         ),
         database=lambda handle: fw.model_db(handle, model_ref),
     )  # fmt: skip
@@ -267,12 +268,13 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     wanted = {key: filters.get(key) or None for key in fw.RUN_FILTERS}
     runs = read_app_page(
         request,
         view,
-        api=lambda: fw.runs_api(client, settings, wanted, cursor),
-        database=lambda handle: fw.runs_db(handle, wanted, page),
+        api=lambda: fw.runs_api(client, settings, wanted, cursor, page_rows),
+        database=lambda handle: fw.runs_db(handle, wanted, page, page_rows),
     )
     data = runs.data or {}
     next_href = None
@@ -547,11 +549,14 @@ def samples_page(  # noqa: PLR0913 — the two pagers, FreeWeight's cursor and t
     """One test's raw samples, paged: the rows every headline number drills to."""
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     sourced = read_app_page(
         request,
         view,
-        api=lambda: fw.samples_api(client, settings, run_id, run_test_id, cursor or None),
-        database=lambda handle: fw.samples_db(handle, run_id, run_test_id, page),
+        api=lambda: fw.samples_api(
+            client, settings, run_id, run_test_id, cursor or None, page_rows
+        ),
+        database=lambda handle: fw.samples_db(handle, run_id, run_test_id, page, page_rows),
     )
     data = sourced.data or {}
     base = f"{BASE}/runs/{fw.segment(run_id)}/tests/{fw.segment(run_test_id)}"
@@ -662,7 +667,10 @@ def _results(
     client, settings = _clients(request)
     wanted = {key: filters.get(key) or None for key in fw.RESULT_FILTERS}
     sourced = read_app_page(
-        request, view, api=lambda: fw.results_api(client, settings, wanted, cursor), database=None
+        request,
+        view,
+        api=lambda: fw.results_api(client, settings, wanted, cursor, settings.ui.page_rows),
+        database=None,
     )
     following = (sourced.data or {}).get("next_cursor")
     return render_app_page(
@@ -799,7 +807,10 @@ def _evidence(
     client, settings = _clients(request)
     wanted = {key: filters.get(key) or None for key in fw.EVIDENCE_FILTERS}
     sourced = read_app_page(
-        request, view, api=lambda: fw.evidence_api(client, settings, wanted, cursor), database=None
+        request,
+        view,
+        api=lambda: fw.evidence_api(client, settings, wanted, cursor, settings.ui.page_rows),
+        database=None,
     )
     following = (sourced.data or {}).get("next_cursor")
     return render_app_page(
@@ -916,8 +927,8 @@ def machine_page(request: Request, principal: CurrentOperator, machine_id: str) 
         read_app_page(
             request,
             view,
-            api=lambda: fw.runs_api(client, settings, filters, None),
-            database=lambda handle: fw.runs_db(handle, filters, 1),
+            api=lambda: fw.runs_api(client, settings, filters, None, settings.ui.page_rows),
+            database=lambda handle: fw.runs_db(handle, filters, 1, settings.ui.page_rows),
         )
         if filters["machine"]
         else None
@@ -957,11 +968,12 @@ def adapter_page(request: Request, principal: CurrentOperator, adapter: str) -> 
     measured with it beside the bare base's."""
     view = app_view(request, APP)
     client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
     sourced = read_app_page(
         request,
         view,
-        api=lambda: fw.adapter_api(client, settings, adapter),
-        database=lambda handle: fw.adapter_db(handle, adapter),
+        api=lambda: fw.adapter_api(client, settings, adapter, page_rows=page_rows),
+        database=lambda handle: fw.adapter_db(handle, adapter, page_rows=page_rows),
     )
     return render_app_page(
         request,
