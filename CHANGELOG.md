@@ -7,6 +7,34 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **`[ui] page_rows`, and pagination follows it** (row WX5). A new runtime-changeable setting
+  (int, 10-500, default 50) governs the page size of every table the owning API can page;
+  `config.py`'s `UiSettings` and `services/settings.py`'s `RUNTIME_SETTINGS` registry are the two
+  places it is declared, and the settings page picks it up with no template change (the registry
+  generates the row). The four `services/*_pages.py` `PAGE_ROWS` module constants are gone —
+  `freeweight_pages.py`, `loadcoach_pages.py`, `ideapress_pages.py` and `promptcadence_pages.py`
+  now read the page size from the request's settings — and several tables that used to silently
+  cap out gained a real pager or, where their owning API cannot page at all, an honest "First N of
+  more" sentence instead of truncating without saying so:
+  - **PromptCadence's `GET /ledger/entries` gains a cursor** (this row's own first commit, in
+    PromptCadence), and the Ledger, Approvals-history and Egress pages follow it with a `Next`
+    link, replacing a single request capped at 200 with no way to see further.
+  - **The audit trail (`/audit`)** defaults its page size to `page_rows` and threads a `cursor`
+    through to `list_audit`'s existing `before_id` parameter, which the UI never used; a `Next`
+    link now reaches every row, not only the first page.
+  - **LoadCoach's Reliability page** is genuinely paginated (LoadCoach answers the whole list in
+    one call; the console pages its own view with `page_rows` and a `Next` link). **Routing**'s
+    decision history and **Evidence**'s records table cannot be paged at all — `GET
+    /routing-decisions` hardcodes its own 50-row cap with no `limit` parameter, and Evidence
+    merges three independently-capped `GET /evidence` reads (one per `match_state`) into one
+    table — so both stay `complete=false` and now say "First N of more" when the cap was
+    plausibly hit, instead of the previous silent truncation.
+  - **IdeaPress's Units page** — its project picker read only `cursor=None` (the first page of
+    projects) with no way to reach a project past it; it now follows a cursor like every other
+    paged listing.
+  - FreeWeight's Models, Runs, Samples, Results, Evidence and Adapter pages already had a real
+    cursor or numbered pager; only their page size becomes configurable (mechanical, no new UI).
+
 - **IdeaPress's attempts tables name the transport call** (row WPF12). A stage run's *Attempts*
   table and a unit's *Provenance* table now fold `transport_call` (IdeaPress migration `0012`, row
   WPF7) into the attempt cell — `attempt N · round R · call C` — so two rows of one attempt are
