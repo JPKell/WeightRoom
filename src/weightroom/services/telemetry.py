@@ -263,11 +263,10 @@ _SPARKLINE_PAD: Final = 8
 def sparkline_svg(rows: Sequence[tuple[datetime, float | int | None]]) -> str | None:
     """A server-rendered SVG polyline over ``rows`` — no chart library (ADR-0020 rule 5).
 
-    MirrorWall 0.3 does not vendor ECharts (design brief §5's seven components are the tokens,
-    the strip's meters, the tables, the log pane and the two navs — no chart container); building
-    that vendoring is not this row's job, so the history page's "clicking a figure opens its
-    history" (Phase 3 acceptance criterion 1) is a plain inline SVG line instead of the design
-    brief's eventual ECharts rendering, which a later row can replace behind the same URL.
+    Row WX6 vendored ECharts into MirrorWall (ADR-0142) and the history page now draws one
+    alongside this SVG (:func:`echarts_line_option`); this function stays as that chart's
+    accessible alternative (UI standards §5, §7), rendered whether or not the reader's browser
+    ever draws the chart.
 
     Args:
         rows: ``(at, value)`` pairs, ascending; a ``None`` value is a gap in the line, never
@@ -297,6 +296,41 @@ def sparkline_svg(rows: Sequence[tuple[datetime, float | int | None]]) -> str | 
         f'<polyline points="{polyline}" fill="none" stroke="currentColor" stroke-width="2"/>'
         f"</svg>"
     )
+
+
+def echarts_line_option(
+    rows: Sequence[tuple[datetime, float | int | None]], *, figure: str
+) -> dict[str, Any] | None:
+    """The ECharts option :func:`~weightroom.web.rendering.render`'s ``chart_container`` draws.
+
+    Row WX6 (ADR-0142): the same data :func:`sparkline_svg` plots, reshaped for ECharts instead of
+    drawn as SVG here. Colour is never in this dict — ``charts.js`` themes it from tokens at draw
+    time (ADR-0020), so this function stays server-side and library-agnostic in what it returns.
+
+    Args:
+        rows: ``(at, value)`` pairs, ascending; a ``None`` value is a gap, dropped rather than
+            plotted at zero (ADR-0016) — the same rule :func:`sparkline_svg` follows.
+        figure: the figure's own name, used as the series label only.
+
+    Returns:
+        An ECharts option dict, or ``None`` when there is nothing to plot — the caller falls back
+        to the accessible alternative alone, same as an absent SVG.
+    """
+    plottable = [(at, float(value)) for at, value in rows if value is not None]
+    if not plottable:
+        return None
+    return {
+        "xAxis": {"type": "time"},
+        "yAxis": {"type": "value"},
+        "series": [
+            {
+                "name": figure,
+                "type": "line",
+                "showSymbol": False,
+                "data": [[at.isoformat(), value] for at, value in plottable],
+            }
+        ],
+    }
 
 
 def downsample_and_retain(

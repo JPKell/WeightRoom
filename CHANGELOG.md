@@ -6,6 +6,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX6)
+- **The telemetry history page draws an ECharts line chart** beside its existing accessible SVG
+  (`GET /telemetry/history`), the console's first use of MirrorWall's newly vendored ECharts
+  (ADR-0142, `mirrorwall 0.3.1`): `services/telemetry.echarts_line_option` reshapes the same rows
+  `sparkline_svg` already draws, dropping a `None` value rather than plotting it at zero
+  (ADR-0016), and the route opts this one page in (`mirrorwall={"htmx": True, "echarts": True}`)
+  — every other page's `mirrorwall.echarts` stays the new `web/rendering.py` default, `False`,
+  so nothing else changes. `tests/performance/test_budgets.py` gains
+  `test_echarts_is_named_and_budgeted_by_name`: ECharts is printed and asserted under its own
+  1 150 000-byte cap, and stays excluded from the 120 KB total row `test_javascript_per_page_…`
+  asserts (ADR-0139's rule, unchanged for every other page).
+
 ### Added
 - **IdeaPress's attempts tables name the transport call** (row WPF12). A stage run's *Attempts*
   table and a unit's *Provenance* table now fold `transport_call` (IdeaPress migration `0012`, row

@@ -1,6 +1,9 @@
 # ADR-0139 — The per-page JavaScript budget is a total of 120 KB
 
 **Status:** Accepted (2026-09-10) — supersedes [ADR-0138](0138-the-per-page-javascript-budget-excludes-the-vendored-libraries-and-names-them.md)
+**Superseded-by:** [ADR-0142](0142-echarts-is-vendored-and-budgeted-by-name.md), for ECharts by
+name only (2026-09-12) — ECharts is vendored, named, and budgeted by name (excluded from this
+record's total, capped on its own); every other page's total-JS-budget rule below stands.
 **Relates to:** [ADR-0128](0128-weightroom-adopts-htmx-through-mirrorwall-0-3.md), [ADR-0020](0020-server-rendered-html-with-progressive-enhancement.md).
 **Source:** The operator's review of ADR-0138 at row W10, the same day.
 

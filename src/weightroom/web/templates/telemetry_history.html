@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import empty_state %}
+{% from "mirrorwall/components.html" import empty_state, chart_container %}
 {% block title %}Telemetry history — WeightRoom{% endblock %}
 {% block page_content %}
 <h2>Telemetry history</h2>
@@ -17,8 +17,10 @@ past the first hour (spec §7.7). <a href="/api/v1/system/telemetry/history?figu
   <button type="submit">Show</button>
 </form>
 {% if svg %}
+{% call chart_container("telemetry-history-chart", figure, hours ~ "h, " ~ row_count ~ " sample" ~ ("" if row_count == 1 else "s"), option=chart_option) %}
 {{ svg | safe }}
 <p class="muted">{{ row_count }} sample{{ "" if row_count == 1 else "s" }}.</p>
+{% endcall %}
 {% else %}
 {{ empty_state("No samples yet for " ~ figure ~ ".") }}
 {% endif %}

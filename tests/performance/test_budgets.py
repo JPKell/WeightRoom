@@ -374,3 +374,42 @@ def test_javascript_per_page_stays_under_the_total_budget(console: Console) -> N
     print(f"\n  {htmx_pair / 1024:6.1f} KB  htmx + its SSE extension together")  # noqa: T201
     _report(f"JS in total on the heaviest page ({worst_path})", worst / 1024, 120, unit="KB")
     assert worst <= _TOTAL_BUDGET_BYTES, totals
+
+
+# --- ECharts, named and budgeted by name, excluded from the 120 KB total above (ADR-0142) -------
+
+_ECHARTS_BUDGET_BYTES = 1_150_000
+"""Headroom over the 1 121 883 bytes ECharts 6.1.0 measures — a MirrorWall pin bump re-measures."""
+
+
+def test_echarts_is_named_and_budgeted_by_name(console: Console) -> None:
+    page = console.client.get("/telemetry/history", headers={"Accept": "text/html"})
+    assert page.status_code == 200
+    srcs = _SCRIPT_SRC.findall(page.text)
+    (echarts_src,) = (src for src in srcs if "vendor/echarts/" in src)
+    asset = console.client.get(echarts_src)
+    assert asset.status_code == 200
+    echarts_bytes = len(asset.content)
+
+    console_only = sum(len(script) for script in _INLINE_SCRIPT.findall(page.text))
+    for src in srcs:
+        if "vendor/echarts/" in src:
+            continue
+        console_only += len(console.client.get(src).content)
+
+    print(f"\n  {echarts_bytes / 1024:6.1f} KB  vendor/echarts/echarts.min.js")  # noqa: T201
+    _report(
+        "ECharts, on the one page that loads it",
+        echarts_bytes / 1024,
+        unit="KB",
+        budget=_ECHARTS_BUDGET_BYTES / 1024,
+    )
+    assert echarts_bytes <= _ECHARTS_BUDGET_BYTES
+    # Reported beside the part (ADR-0138 rule 3, revived here for this one library): the total a
+    # phone actually downloads on this page, not only the console-JS figure the 120 KB row governs.
+    _report(
+        "same page, console JS + ECharts (not asserted; ADR-0139's total excludes ECharts)",
+        (console_only + echarts_bytes) / 1024,
+        unit="KB",
+        budget=120,
+    )

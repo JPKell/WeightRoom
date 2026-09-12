@@ -320,7 +320,7 @@ def templates() -> Environment:
             # ADR-0128: every fragment swap and SSE region in the shell is htmx, vendored by
             # MirrorWall 0.3 and opt-in per page — WeightRoomGym opts every page in at once
             # (design brief §4), since the log pane and the guard dialog both want it.
-            "mirrorwall": {"htmx": True},
+            "mirrorwall": {"htmx": True, "echarts": False},
         },
     )
     environment.filters["pill_tone"] = pill_tone
