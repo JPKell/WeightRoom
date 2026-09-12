@@ -8,7 +8,8 @@ row WM)** — the WeightRoomGym design brief's dense-console tokens and seven ge
 and by PromptCadence from its first web layer.
 **Decision records:** [ADR-0020](../../adr/0020-ui-rendering-strategy.md), [ADR-0004](../../adr/0004-sse-vs-websockets.md),
 [ADR-0128](../../adr/0128-mirrorwall-vendors-htmx-and-applications-may-adopt-it.md) (0.3: vendors
-htmx and its SSE extension, opt-in per page).
+htmx and its SSE extension, opt-in per page), [ADR-0142](../../adr/0142-echarts-is-vendored-and-budgeted-by-name.md)
+(vendors ECharts the same way, opt-in per page; supersedes ADR-0139 for this one library by name).
 
 ---
 
@@ -214,7 +215,7 @@ queue size, asset cache policy.
 | Memory per idle SSE subscriber | ≤ 64 KiB |
 | Concurrent SSE subscribers per process | ≥ 200 |
 | JS shipped per page (excluding charting vendor) | ≤ 60 KB uncompressed |
-| Charting vendor (vendored, cached) | ≤ 1 MB |
+| Charting vendor (vendored, cached) | ≤ 1 MB; ECharts 6.1.0 measures 1 121 883 bytes (1.07 MiB) at row WX6 — ADR-0142 records the overage rather than trimming to a build that lacks the heatmap a later row wants |
 | Table sort, 1 000 rows × 20 columns | ≤ 150 ms |
 
 ## 16. Cross-platform
@@ -270,8 +271,9 @@ Coverage floor: **95 %** for Python; JS modules covered by the DOM harness with 
 
 ## 21. Future extensions
 
-* A small chart-spec wrapper so applications declare charts in Python and MirrorWall emits the
-  vendor-specific configuration.
+* ~~A small chart-spec wrapper so applications declare charts in Python and MirrorWall emits the
+  vendor-specific configuration.~~ Delivered at row WX6: `chart_container(option=...)` takes the
+  ECharts option as a plain Python dict; the application never touches ECharts' JS API directly.
 * Printable/report stylesheet.
 * Additional vendored icon set entries as applications need them.
 * A component gallery page (`mirrorwall.gallery`) served by any application in development mode.
