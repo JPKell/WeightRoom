@@ -13,6 +13,12 @@ from tests.support import Console, build_console
 from weightroom.__about__ import __version__
 from weightroom.services.processes import FakeSystemdController
 
+SHELL_CSS = (
+    Path(__file__).resolve().parents[2] / "src/weightroom/web/static/css/weightroom-shell.css"
+)
+"""The shell's stylesheet, external since row WX3: a rule the shell's structure depends on is
+asserted against the file, not against a `<style>` block in the page."""
+
 
 def _console(tmp_path: Path, **kwargs: object) -> Console:
     return build_console(tmp_path, **kwargs)  # type: ignore[arg-type]
@@ -74,7 +80,8 @@ def test_the_strip_loads_the_modules_that_move_it(tmp_path: Path) -> None:
     # controls, and the remembered choice is applied in <head>, before first paint, so telemetry.js
     # never finds a rendered bar to connect.
     assert 'class="icon-button telemetry-toggle" aria-controls="mw-telemetry-bar"' in page
-    assert ':root[data-telemetry="off"] #mw-telemetry-bar { display: none; }' in page
+    css = SHELL_CSS.read_text(encoding="utf-8")
+    assert ':root[data-telemetry="off"] #mw-telemetry-bar { display: none; }' in css
     assert page.index('localStorage.getItem("weightroom-telemetry")') < page.index("<body")
     # The artboard's inline meters, opted into by name; MirrorWall renders no track without them.
     for group in ("cpu", "ram", "gpu", "vram"):
@@ -97,28 +104,61 @@ def test_the_console_overview_lists_the_applications_as_a_dense_table(tmp_path: 
         assert f'<a href="/apps/{name}">{label}</a>' in page, name
 
 
-def test_the_top_bar_collapses_in_two_steps_and_the_brand_goes_home(tmp_path: Path) -> None:
-    """Console pages fold into Menu first, then the applications (operator, 2026-09-10).
+def test_the_top_bar_keeps_four_things_and_overflows_only_the_tabs(tmp_path: Path) -> None:
+    """Row WX3: brand, the four application tabs, the alerts count, the operator menu.
 
-    Each group is rendered inline and again inside Menu; the stylesheet shows one copy per width.
-    What this proves is the structure the breakpoints rely on — the widths themselves were swept
-    in headless Chrome from 1400 px down to 350 px.
+    The console's own pages used to sit here too and to fold into *Menu* below 1080 px, which made
+    *which pages exist* a function of the window's width; they are a left-menu section now, so the
+    one collapse left is the tabs at 860 px. The widths themselves were swept in headless Chrome.
     """
     console = _console(tmp_path)
     console.login()
     page = console.client.get("/apps/loadcoach", headers={"Accept": "text/html"}).text
-    assert '<h1><a class="brand" href="/">WeightRoom</a></h1>' in page
+    masthead = page[page.index("<header") : page.index("</header>")]
+    assert '<h1><a class="brand" href="/">WeightRoom</a></h1>' in masthead
     assert 'class="version"' not in page  # no version in the header
     assert f"WeightRoom {__version__}" in page[page.index('class="dropdown user-menu"') :]
     assert page.count('class="app-tab"') == 4  # the inline tabs; Menu's copies are plain links
+    assert 'class="console-alerts" href="/alerts"' in masthead
+    assert 'class="dropdown user-menu"' in masthead
     assert 'class="dropdown-group nav-more-apps"' in page
-    assert 'class="dropdown-group nav-more-console"' in page
+    # The tools are gone from the top bar — and from Menu, which now overflows the tabs alone.
+    assert 'class="console-pages"' not in page
+    assert "nav-more-console" not in page
+    assert '<a href="/docs">Docs</a>' not in masthead
     assert re.search(r'<a href="/apps/loadcoach" aria-current="page">.*?LoadCoach</a>', page, re.S)
     # One theme control, inside the operator menu, so theme.js has exactly one select to bind.
     assert page.count("data-theme-select") == 1
     assert page.index("data-theme-select") > page.index('class="dropdown user-menu"')
-    assert "@media (max-width: 1080px)" in page
-    assert "@media (max-width: 860px)" in page
+    css = SHELL_CSS.read_text(encoding="utf-8")
+    assert "@media (max-width: 860px) {" in css
+    assert "@media (max-width: 1080px) {" in css
+
+
+def test_every_page_reaches_the_console_pages_and_the_tools_from_the_left_menu(
+    tmp_path: Path,
+) -> None:
+    """Row WX3: Console and Tools are appended to whatever menu a page already has.
+
+    An application's tab, a console page and the docs viewer each have their own left menu; the
+    two console sections go under all three, so no page in the console is a dead end.
+    """
+    console = _console(tmp_path)
+    console.login()
+    for path in ("/", "/apps/loadcoach", "/docs", "/docs/adrs", "/llamacpp"):
+        page = console.client.get(path, headers={"Accept": "text/html"}).text
+        side = page[page.index('class="shell-side"') : page.index('class="shell-main"')]
+        assert '<p class="side-nav-title">Console</p>' in side, path
+        assert '<p class="side-nav-title">Tools</p>' in side, path
+        for href, label in (
+            ("/ollama", "Ollama"),
+            ("/llamacpp", "llama.cpp"),
+            ("/doctor", "Doctor"),
+            ("/docs", "Docs"),
+            ("/jobs", "Jobs"),
+            ("/backups", "Backups"),
+        ):
+            assert f'<a href="{href}">{label}</a>' in side, (path, href)
 
 
 def test_an_applications_side_nav_names_its_built_pages_and_the_unbuilt_ones(
@@ -188,5 +228,8 @@ def test_only_the_page_header_is_sticky(tmp_path: Path) -> None:
     console = _console(tmp_path)
     console.login()
     page = console.client.get("/", headers={"Accept": "text/html"}).text
-    assert "body > header { position: sticky" in page
-    assert not re.search(r"(?m)^\s*header \{ position: sticky", page)
+    assert '<link rel="stylesheet" href="/app-static/css/weightroom-shell.css">' in page
+    assert console.client.get("/app-static/css/weightroom-shell.css").status_code == 200
+    css = SHELL_CSS.read_text(encoding="utf-8")
+    assert "body > header { position: sticky" in css
+    assert not re.search(r"(?m)^\s*header \{ position: sticky", css)

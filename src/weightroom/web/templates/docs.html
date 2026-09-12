@@ -1,8 +1,9 @@
 {% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import side_nav %}
 {% from "_docs_tree.html" import docs_side_menu, section_listing, search_form %}
 {% from "mirrorwall/components.html" import empty_state %}
 {% block title %}{{ section.label if section else "Docs" }} — WeightRoom{% endblock %}
-{% block side_menu %}{{ docs_side_menu(docs_sections, docs_current_key) }}{% endblock %}
+{% block side_menu %}{{ docs_side_menu(docs_sections, docs_current_key) }}{{ side_nav(console_nav_sections, label="Console") }}{% endblock %}
 {% block page_content %}
 {{ search_form() }}
 {% if section %}

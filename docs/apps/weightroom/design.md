@@ -76,15 +76,20 @@ vocabulary for runs and jobs is unchanged and sits beside it.
 ```
 
 * **Top bar:** brand at 14 px/600; app tabs are `[dot][name]` with the selected tab on
-  `--mw-surface-alt` and a 2 px accent underline (`box-shadow: inset 0 -2px`); console pages
-  (Chat, Docs, Database, Jobs) are icon+label ghosts; the alerts entry turns amber with a count;
-  the operator chip is a 24 px initials circle on `--mw-accent-soft`.
+  `--mw-surface-alt` and a 2 px accent underline (`box-shadow: inset 0 -2px`); the alerts entry
+  turns amber with a count; the operator chip is a 24 px initials circle on `--mw-accent-soft`.
+  The console's own pages (Chat, Docs, Database, Jobs, …) were ghosts here until row WX3, which
+  moved them into the left menu as two sections (*Console*, *Tools*) appended under whatever menu
+  a page already has: in the top bar they folded into a *Menu* dropdown below 1080 px, so which
+  pages existed depended on the window's width. The top bar now collapses once, at 860 px, and
+  only the application tabs move.
 * **Telemetry strip:** mono 12 px, label in `--mw-text-subtle`, meter (§5) then value in
   `--mw-text`; the resident model and queue as text; the interval at the right edge. Values
   update in place without layout movement (UI/UX §3).
 * **Left menu:** section title in the label style, 7 px/10 px items with a 6 px radius, the
   selected item on `--mw-accent-soft`, a 1 px rule between the application's pages and its
-  administrative pages, the version/port footer.
+  administrative pages, then the console's own *Console* and *Tools* sections (row WX3), the
+  version/port footer.
 * **Main pane:** 20 px/24 px padding, 16 px gaps, an `h1` at 18 px/600 with the status pill and a
   right-aligned action group (ghost, ghost, primary).
 
