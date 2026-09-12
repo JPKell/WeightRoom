@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
+{% from "mirrorwall/components.html" import badge, empty_state, pagination %}
 {% from "_app_page.html" import refusal, level_badge %}
 {% block title %}Logs — {{ view.name | app_label }} — WeightRoom{% endblock %}
 {% block page_content %}
@@ -27,17 +27,16 @@
 {{ refusal(error) }}
 {% if journal is not none %}
 {% if journal.lines %}
-{% set columns = [{"label": "Time", "mono": true}, {"label": "Level"}, {"label": "Process", "mono": true}, {"label": "Message"}] %}
-{% set rows = [] %}
-{% for line in journal.lines %}
-{% set _ = rows.append([
-  line.at.isoformat(timespec="seconds"),
-  level_badge(line.level),
-  (line.identifier or "—") ~ ("[" ~ line.pid ~ "]" if line.pid else ""),
-  line.text or line.message
-]) %}
-{% endfor %}
-{{ table(columns, rows, caption="Journal history, newest first", density="dense", complete=journal.next_cursor is none, row_count=rows | length) }}
+<p class="muted">Journal history, newest first.</p>
+<ol class="log-rows">
+  {% for line in journal.lines %}
+  <li class="log-row" data-level="{{ line.level }}">
+    <p class="log-row-1">{{ level_badge(line.level) }} <span class="mono">{{ line.at.astimezone().strftime("%Y-%m-%d %H:%M:%S") }}</span></p>
+    <p class="log-row-2 mono">{{ line.app }} {{ line.version or "—" }}{{ (" [" ~ line.pid ~ "]") if line.pid else "" }}</p>
+    <p class="log-row-3">{{ line.text or line.message }} <span class="muted">· {{ line.logger or "—" }} · {{ line.request_id or "—" }}</span></p>
+  </li>
+  {% endfor %}
+</ol>
 {{ pagination(next_href=next_href, summary=("capped at " ~ cap ~ " rows" if journal.capped else none)) }}
 {% else %}
 {{ empty_state("No journal lines match this filter.", "Every line", "/apps/" ~ view.name ~ "/logs") }}

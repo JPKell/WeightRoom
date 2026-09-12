@@ -41,8 +41,10 @@
 
 {# A section's contents: its own files, then each folder under a heading of its own name, nested
    folders a heading level down. Documents open as full pages — they carry their own scripts
-   (mermaid) and outline. #}
-{% macro section_listing(node, level=3) %}
+   (mermaid) and outline. `blurbs` is `services.docs.APP_BLURBS`, keyed by folder name: a folder
+   with an entry gets one sentence under its heading, from its own `spec.md` §1; a folder with none
+   (a future component, or one docs has not covered) gets no invented substitute. #}
+{% macro section_listing(node, level=3, blurbs={}) %}
 {% set files = node.children | rejectattr("is_dir") | list %}
 {% if files %}
 <ul class="docs-files">
@@ -54,7 +56,8 @@
 {% for folder in node.children | selectattr("is_dir") %}
 <section class="docs-folder">
   <h{{ level }} class="docs-folder-title" id="{{ folder_anchor(folder) }}">{{ folder.name }}</h{{ level }}>
-  {{ section_listing(folder, level + 1 if level < 6 else 6) }}
+  {% if blurbs.get(folder.name) %}<p class="muted">{{ blurbs[folder.name] }}</p>{% endif %}
+  {{ section_listing(folder, level + 1 if level < 6 else 6, blurbs) }}
 </section>
 {% endfor %}
 {% endmacro %}

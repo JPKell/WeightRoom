@@ -11,7 +11,7 @@
     <label class="log-pane-follow"><input type="checkbox" data-log-follow checked> Follow</label>
     <button type="button" data-log-clear data-variant="quiet">Clear</button>
   </div>
-  <ol class="log-lines" data-log-stream="{{ stream_url }}" data-log-max="{{ max_lines | default(500) }}" tabindex="0"></ol>
+  <ol class="log-rows" data-log-stream="{{ stream_url }}" data-log-max="{{ max_lines | default(500) }}" tabindex="0"></ol>
 </section>
 <style>
   /* Its own toolbar class, not MirrorWall's `.field`: that is a form field — a stacked label over a
@@ -27,22 +27,32 @@
   .log-pane-follow { display: inline-flex; align-items: center; gap: var(--mw-space-1, 4px); margin: 0; }
   .log-pane-follow input { width: auto; height: auto; margin: 0; }
   .log-pane-bar button { width: auto; }
-  .log-pane .log-lines {
-    list-style: none; margin: 0; padding: var(--space-2, .5rem);
-    max-height: 24rem; overflow-y: auto;
+  /* Shared by every page that shows a log: the history list (`app_logs.html`, three stacked lines
+     because a level, an app/version/pid line and a message/logger/request_id line do not fit the
+     `table()` macro's one-row-one-record contract) and this live pane, wherever it is included. */
+  .log-rows { list-style: none; margin: 0; padding: 0; }
+  .log-rows .log-row { padding: 4px 0; border-bottom: 1px solid var(--mw-border); }
+  .log-rows .log-row:last-child { border-bottom: none; }
+  .log-rows .log-row p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .log-rows .log-row-1 { display: flex; align-items: center; gap: .5rem; }
+  .log-rows .log-row-2 {
+    opacity: .65; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: .8125rem;
+  }
+  .log-pane .log-rows {
+    max-height: 24rem; overflow-y: auto; padding: var(--space-2, .5rem);
     background: var(--color-surface-sunken, #11151a); color: var(--color-text, #dde3ea);
     font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     font-size: .8125rem; line-height: 1.45; border-radius: var(--radius-md, 6px);
   }
-  .log-pane .log-lines li { display: flex; gap: .75rem; white-space: pre-wrap; word-break: break-word; }
-  .log-pane .log-lines li .at { opacity: .55; flex: 0 0 auto; }
-  .log-pane .log-lines li .who { opacity: .8; flex: 0 0 auto; }
-  .log-pane .log-lines li[data-level="err"],
-  .log-pane .log-lines li[data-level="crit"],
-  .log-pane .log-lines li[data-level="alert"],
-  .log-pane .log-lines li[data-level="emerg"] { color: var(--color-danger, #ff8080); }
-  .log-pane .log-lines li[data-level="warning"] { color: var(--color-warning, #ffc76b); }
-  .log-pane .log-lines li.notice-line { opacity: .75; font-style: italic; }
+  .log-pane .log-rows .log-row { border-bottom-color: rgba(255, 255, 255, .08); }
+  .log-pane .log-rows .log-row-2 { opacity: .55; }
+  .log-rows .log-row[data-level="err"],
+  .log-rows .log-row[data-level="crit"],
+  .log-rows .log-row[data-level="alert"],
+  .log-rows .log-row[data-level="emerg"] { color: var(--color-danger, #ff8080); }
+  .log-rows .log-row[data-level="warning"] { color: var(--color-warning, #ffc76b); }
+  .log-rows .log-row.notice-line { opacity: .75; font-style: italic; }
 </style>
 <script>
 // A classic script, not a module: `document.currentScript` is null inside a module script, and
@@ -56,36 +66,68 @@
   const maximum = Number(pane.dataset.logMax || 500);
   clear.addEventListener("click", () => { pane.replaceChildren(); });
 
-  const append = (line, level, notice) => {
+  // "%Y-%m-%d %H:%M:%S", local, no offset — the same shape the server-rendered history uses
+  // (`app_logs.html`, via `line.at.astimezone().strftime(...)`); `Date`'s getters are already
+  // local, so no timezone conversion is needed here.
+  const stampOf = (iso) => {
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) { return iso; }
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} `
+      + `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+  };
+
+  const row = (lines) => {
     const item = document.createElement("li");
-    if (level) { item.dataset.level = level; }
-    if (notice) { item.classList.add("notice-line"); }
-    for (const [cls, text] of line) {
-      const span = document.createElement("span");
-      span.className = cls;
-      span.textContent = text;
-      item.appendChild(span);
+    item.className = "log-row";
+    for (const [cls, text] of lines) {
+      const p = document.createElement("p");
+      p.className = cls;
+      p.textContent = text;
+      item.appendChild(p);
     }
+    return item;
+  };
+
+  const append = (item) => {
     pane.appendChild(item);
     while (pane.childElementCount > maximum) { pane.removeChild(pane.firstElementChild); }
     if (follow.checked) { pane.scrollTop = pane.scrollHeight; }
+  };
+
+  // Three stacked lines, the same shape the history page renders (row WX2's kickoff): level and
+  // timestamp; app, version and pid; the message with its logger and request id.
+  const appendLog = (payload) => {
+    const item = row([
+      ["log-row-1", `${(payload.level || "info").toUpperCase()} ${stampOf(payload.at)}`],
+      ["log-row-2", `${payload.app || payload.unit || "—"} ${payload.version || "—"}`
+        + (payload.pid ? ` [${payload.pid}]` : "")],
+      ["log-row-3", `${payload.message} · ${payload.logger || "—"} · ${payload.request_id || "—"}`],
+    ]);
+    if (payload.level) { item.dataset.level = payload.level; }
+    append(item);
+  };
+
+  const appendNotice = (text, level) => {
+    const item = row([["log-row-3", text]]);
+    item.classList.add("notice-line");
+    if (level) { item.dataset.level = level; }
+    append(item);
   };
 
   const source = new EventSource(pane.dataset.logStream);
   source.addEventListener("open", () => { status.textContent = "live"; });
   source.addEventListener("error", () => { status.textContent = "reconnecting…"; });
   source.addEventListener("log", (event) => {
-    const payload = JSON.parse(event.data).payload;
-    const at = new Date(payload.at).toLocaleTimeString();
-    append([["at", at], ["who", payload.app || payload.unit], ["msg", payload.message]], payload.level, false);
+    appendLog(JSON.parse(event.data).payload);
   });
   source.addEventListener("log.dropped", (event) => {
     const payload = JSON.parse(event.data).payload;
-    append([["msg", `— dropped ${payload.dropped} lines (this pane fell behind) —`]], null, true);
+    appendNotice(`— dropped ${payload.dropped} lines (this pane fell behind) —`);
   });
   source.addEventListener("log.closed", () => {
     status.textContent = "reader ended";
-    append([["msg", "— the journal reader ended —"]], null, true);
+    appendNotice("— the journal reader ended —");
     // An EventSource cannot tell a stream the server ended from one that dropped, so it retries
     // both — and this one ends the same way every time. Closing here is what stops the page
     // requesting the stream for as long as it is open.
@@ -95,7 +137,7 @@
     if (event.data) {
       const payload = JSON.parse(event.data).payload;
       status.textContent = payload.code;
-      append([["msg", `— ${payload.code}: ${payload.message} —`]], "err", true);
+      appendNotice(`— ${payload.code}: ${payload.message} —`, "err");
     }
   });
   window.addEventListener("beforeunload", () => source.close());

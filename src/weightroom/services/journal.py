@@ -153,7 +153,30 @@ _SUITE_LEVELS: Final[dict[str, str]] = {
 }
 
 
-def unwrap_suite_log(message: str) -> tuple[str, str | None, str | None]:
+def _version_of(record: dict[str, Any]) -> str | None:
+    """The record's own version, however its logger spelled the key.
+
+    FreeWeight writes a top-level ``version``; LoadCoach writes ``loadcoach_version``; IdeaPress
+    and PromptCadence write neither yet. Rather than hardcode four key names — which would need a
+    new one for every future logger — the first key ending in ``_version`` is read too, so a
+    logger this was never updated for still shows a number instead of silently showing none.
+    """
+    version = record.get("version")
+    if isinstance(version, str):
+        return version
+    return next(
+        (
+            value
+            for key, value in record.items()
+            if key.endswith("_version") and isinstance(value, str)
+        ),
+        None,
+    )
+
+
+def unwrap_suite_log(
+    message: str,
+) -> tuple[str, str | None, str | None, str | None, str | None]:
     """Unwrap a suite JSON log record, if that is what this line is.
 
     Every application in the suite logs one JSON object per line to stdout, so the journal holds
@@ -166,24 +189,40 @@ def unwrap_suite_log(message: str) -> tuple[str, str | None, str | None]:
         message: The journal's message text.
 
     Returns:
-        ``(text, level, logger)`` — the record's own message, its own level as one of
-        :data:`PRIORITY_NAMES`, and the logger name; ``(message, None, None)`` for a line that is
-        not one of ours, which is left exactly as the journal holds it.
+        ``(text, level, logger, request_id, version)`` — the record's own message, its own level
+        as one of :data:`PRIORITY_NAMES`, the logger name, the correlation id bound for the
+        request that produced it, and the application's own version (see :func:`_version_of`);
+        ``(message, None, None, None, None)`` for a line that is not one of ours, which is left
+        exactly as the journal holds it.
+
+        The message itself is read from ``message`` first, then ``event`` — FreeWeight's own
+        formatter (``freeweight.observability.logging.JsonFormatter``) writes ``event`` where
+        LoadCoach, IdeaPress and PromptCadence all write ``message``, and a record checked against
+        one spelling only was never unwrapped for the fourth of the suite's four loggers (found
+        live against the operator's own ``freeweight.service`` journal, row WX2).
     """
-    if not message.startswith("{") or '"message"' not in message:
-        return message, None, None
+    if not message.startswith("{") or ('"message"' not in message and '"event"' not in message):
+        return message, None, None, None, None
     try:
         record = json.loads(message)
     except json.JSONDecodeError:
-        return message, None, None
-    if not isinstance(record, dict) or not isinstance(record.get("message"), str):
-        return message, None, None
+        return message, None, None, None, None
+    if not isinstance(record, dict):
+        return message, None, None, None, None
+    text = record.get("message")
+    if not isinstance(text, str):
+        text = record.get("event")
+    if not isinstance(text, str):
+        return message, None, None, None, None
     level = _SUITE_LEVELS.get(str(record.get("level", "")).upper())
     logger_name = record.get("logger")
+    request_id = record.get("request_id")
     return (
-        record["message"],
+        text,
         level,
         str(logger_name) if isinstance(logger_name, str) else None,
+        str(request_id) if isinstance(request_id, str) else None,
+        _version_of(record),
     )
 
 
@@ -203,6 +242,8 @@ class JournalLine:
         text: What a pane shows: the record's own message for a suite log line, else ``message``.
         record_level: The record's own severity, where it has one; see :func:`unwrap_suite_log`.
         logger: The record's own logger name, where it has one.
+        request_id: The correlation id bound for the request that produced it, where it has one.
+        version: The application's own version, where its logger names one.
     """
 
     cursor: str
@@ -215,6 +256,8 @@ class JournalLine:
     text: str = ""
     record_level: str | None = None
     logger: str | None = None
+    request_id: str | None = None
+    version: str | None = None
 
     @property
     def level(self) -> str:
@@ -243,6 +286,8 @@ class JournalLine:
             "message": self.text or self.message,
             "raw": self.message if self.text != self.message else None,
             "logger": self.logger,
+            "request_id": self.request_id,
+            "version": self.version,
             "pid": self.pid,
             "identifier": self.identifier,
         }
@@ -271,7 +316,7 @@ def parse_entry(raw: Mapping[str, Any]) -> JournalLine | None:
     # per-application pane would label every one of those lines `init.scope`. The non-underscored
     # fields are the ones journalctl itself matches `-u` against. Found live at row W2.
     message = _message_text(raw.get("MESSAGE"))
-    text, record_level, logger_name = unwrap_suite_log(message)
+    text, record_level, logger_name, request_id, version = unwrap_suite_log(message)
     unit = (
         raw.get("USER_UNIT")
         or raw.get("UNIT")
@@ -290,6 +335,8 @@ def parse_entry(raw: Mapping[str, Any]) -> JournalLine | None:
         text=text,
         record_level=record_level,
         logger=logger_name,
+        request_id=request_id,
+        version=version,
     )
 
 

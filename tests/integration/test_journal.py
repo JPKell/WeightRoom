@@ -306,6 +306,7 @@ def test_a_suite_json_log_line_is_unwrapped_and_keeps_its_own_severity() -> None
                     "logger": "uvicorn.error",
                     "message": "[Errno 98] address already in use",
                     "loadcoach_version": "1.3.1",
+                    "request_id": "01REQ",
                 }
             ),
         }
@@ -315,9 +316,71 @@ def test_a_suite_json_log_line_is_unwrapped_and_keeps_its_own_severity() -> None
     assert entry.level == "err"  # the record's own severity, not the transport's
     assert entry.priority == 6  # the journal's, unchanged and still reported
     assert entry.logger == "uvicorn.error"
+    assert entry.request_id == "01REQ"
+    assert entry.version == "1.3.1"  # lifted from `loadcoach_version`, not a literal "version" key
     body = entry.as_json()
     assert body["message"] == "[Errno 98] address already in use"
     assert body["raw"] is not None and body["raw"].startswith("{")
+    assert body["request_id"] == "01REQ"
+    assert body["version"] == "1.3.1"
+
+
+def test_freeweights_own_event_key_is_unwrapped_same_as_everyone_elses_message() -> None:
+    """FreeWeight's `JsonFormatter` writes `event`, not `message` (found live, row WX2) — the
+    other three loggers' shape must keep working unchanged."""
+    entry = parse_entry(
+        {
+            "__CURSOR": "s=1;i=1",
+            "__REALTIME_TIMESTAMP": "1789000000000000",
+            "_SYSTEMD_USER_UNIT": "freeweight.service",
+            "MESSAGE": json.dumps(
+                {
+                    "ts": "2026-09-12T23:02:18.969Z",
+                    "level": "INFO",
+                    "event": '127.0.0.1:1 - "GET /api/v1/version HTTP/1.1" 200',
+                    "logger": "uvicorn.access",
+                    "app": "freeweight",
+                    "version": "1.2.1",
+                    "pid": 1820162,
+                    "request_id": "01M2BXPZ2RKG4S48ZCVK85B599",
+                }
+            ),
+        }
+    )
+    assert entry is not None
+    assert entry.text == '127.0.0.1:1 - "GET /api/v1/version HTTP/1.1" 200'
+    assert entry.logger == "uvicorn.access"
+    assert entry.request_id == "01M2BXPZ2RKG4S48ZCVK85B599"
+    assert entry.version == "1.2.1"
+
+
+def test_a_top_level_version_key_wins_over_an_app_prefixed_one() -> None:
+    """FreeWeight's formatter writes a plain `version`; a record carrying both is unambiguous."""
+    entry = parse_entry(
+        {
+            "__CURSOR": "s=1;i=1",
+            "__REALTIME_TIMESTAMP": "1789000000000000",
+            "MESSAGE": json.dumps(
+                {"level": "INFO", "logger": "x", "message": "m", "version": "1.2.1"}
+            ),
+        }
+    )
+    assert entry is not None
+    assert entry.version == "1.2.1"
+
+
+def test_a_record_with_neither_shape_of_version_reports_none() -> None:
+    """IdeaPress and PromptCadence do not (yet) log a version at all — this stays a page."""
+    entry = parse_entry(
+        {
+            "__CURSOR": "s=1;i=1",
+            "__REALTIME_TIMESTAMP": "1789000000000000",
+            "MESSAGE": json.dumps({"level": "INFO", "logger": "x", "message": "m"}),
+        }
+    )
+    assert entry is not None
+    assert entry.version is None
+    assert entry.request_id is None
 
 
 def test_a_line_that_is_not_ours_is_left_exactly_as_the_journal_holds_it() -> None:

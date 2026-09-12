@@ -14,6 +14,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from weightroom.services.docs import (
+    APP_BLURBS,
     build_tree,
     docs_sections,
     parse_adr_index,
@@ -136,6 +137,7 @@ def docs_home(
         current_key=chosen.key if chosen is not None else None,
         tree=tree,
         section=chosen,
+        app_blurbs=APP_BLURBS,
     )
 
 

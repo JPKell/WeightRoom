@@ -589,9 +589,16 @@ def databases_page(request: Request, principal: CurrentOperator) -> HTMLResponse
     summary="An application's tables, its own operations and the console",
     response_class=HTMLResponse,
 )
-def database_page(request: Request, principal: CurrentOperator, app: str) -> HTMLResponse:
-    """The tables with counts and locks, the application's own ``db`` verbs, the SQL console."""
-    return _database_page(request, principal, require_app(app))
+def database_page(
+    request: Request, principal: CurrentOperator, app: str, sql: str = Query(default="")
+) -> HTMLResponse:
+    """The tables with counts and locks, the application's own ``db`` verbs, the SQL console.
+
+    ``sql`` seeds the console's textarea without running it — a table's own link on this page
+    (``…?sql=SELECT * FROM <t> LIMIT 100#db-query``) so one click both fills in and jumps to the
+    statement, leaving *Run* to the operator.
+    """
+    return _database_page(request, principal, require_app(app), sql=sql)
 
 
 @ui_router.post("/apps/{app}/database/query", summary="Run the console from the page")

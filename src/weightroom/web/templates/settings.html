@@ -16,6 +16,15 @@
   <a href="/api/v1/apps/{{ app }}/settings">JSON</a> ·
   <a href="/api/v1/apps/{{ app }}/settings/schema">schema</a></p>
 
+{% if app == "freeweight" %}
+<div class="notice">
+  <p><strong>Create a token.</strong> FreeWeight has no minting command: <code>auth.tokens</code>
+  below is a plain list of bearer strings, not a database table. Generate one yourself — for
+  example <code>openssl rand -hex 32</code> — and add it to <code>auth.tokens</code> in the
+  <code>[auth]</code> section below, behind your password (it is a security key).</p>
+</div>
+{% endif %}
+
 {% if error %}<p class="notice" role="alert"><strong>Refused.</strong> {{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}.
   {%- if result and result.backup %} Previous file kept as <code>{{ result.backup }}</code>.{% endif %}</p>{% endif %}
