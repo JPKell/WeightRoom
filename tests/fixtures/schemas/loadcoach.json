@@ -2,6 +2,7 @@
   "application": "loadcoach",
   "config_only": [
     "adapters.directory",
+    "console.url",
     "evidence.accept_schema_majors",
     "evidence.import_interval_hours",
     "execution.attempt_backoff_seconds",
@@ -65,6 +66,23 @@
           }
         },
         "title": "AdaptersSettings",
+        "type": "object"
+      },
+      "ConsoleSettings": {
+        "additionalProperties": false,
+        "description": "Where WeightRoomGym is, when one fronts this application (row WM2).\n\nSet, the top bar gains the suite's tab strip: WeightRoomGym itself and the peer applications\nthrough it (``<url>/apps/<name>``). Unset \u2014 the default \u2014 nothing is rendered: an\napplication knows only its own port, and a strip of loopback links another machine cannot\nreach would be a strip of dead links.",
+        "properties": {
+          "url": {
+            "default": "",
+            "description": "WeightRoomGym's base URL (https://<host>:8769); empty renders no application tab strip.",
+            "examples": [
+              "https://jordan-main.local:8769"
+            ],
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "ConsoleSettings",
         "type": "object"
       },
       "EvidenceSettings": {
@@ -324,6 +342,15 @@
             "title": "Base Url",
             "type": "string"
           },
+          "enabled": {
+            "default": true,
+            "description": "Whether this registration is registered at all. A disabled registration keeps its block in the file \u2014 nothing about it is lost or has to be retyped \u2014 and is skipped by the registry: no handle is built for it, discovery never lists it, routing cannot reach it, and the models it last served answer `unavailable_reason = 'provider_disabled'`. Disabling every registration is refused: an application with no provider registers nothing and serves nothing.",
+            "examples": [
+              true
+            ],
+            "title": "Enabled",
+            "type": "boolean"
+          },
           "fake": {
             "$ref": "#/$defs/FakeProviderSettings",
             "description": "For kind='fake' only; see ProviderSettings.fake."
@@ -474,7 +501,9 @@
         "type": "object"
       },
       "ProvidersSettings": {
-        "additionalProperties": true,
+        "additionalProperties": {
+          "$ref": "#/$defs/ProviderRegistrationSettings"
+        },
         "description": "Cross-provider policy, plus the ``[providers.<name>]`` registrations themselves.\n\n``allow_remote`` is policy \u2014 may *any* remote provider be routed to at all \u2014 and it is\nevaluated above a registration's own ``remote`` flag: a remote registration in a deployment\nthat disallows remote is configured, visible and never routed to (ADR-0077 rule 4).\n\nEvery other key under ``[providers]`` is a registration, so this model allows extras and\nvalidates them itself rather than forbidding them: ``[providers.local]`` and\n``[providers] allow_remote`` share one TOML table, and pydantic sees both in one mapping.",
         "properties": {
           "allow_remote": {
@@ -1087,6 +1116,9 @@
       "adapters": {
         "$ref": "#/$defs/AdaptersSettings"
       },
+      "console": {
+        "$ref": "#/$defs/ConsoleSettings"
+      },
       "evidence": {
         "$ref": "#/$defs/EvidenceSettings"
       },
@@ -1200,6 +1232,7 @@
   ],
   "sources": {
     "adapters.directory": "default",
+    "console.url": "default",
     "evidence.accept_schema_majors": "default",
     "evidence.allowed_source_hosts": "default",
     "evidence.freeweight_api_key_env": "default",
@@ -1265,5 +1298,5 @@
     "telemetry.interval_ms": "default",
     "telemetry.vram_headroom_bytes": "default"
   },
-  "version": "1.3.1"
+  "version": "1.5.0"
 }
