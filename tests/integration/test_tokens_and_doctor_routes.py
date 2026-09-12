@@ -101,6 +101,47 @@ def test_a_new_tokens_secret_is_shown_once_and_stored_nowhere(tmp_path: Path) ->
     assert "lc_secret_value" not in again
 
 
+def test_the_scope_field_is_a_select_of_the_applications_own_vocabulary(tmp_path: Path) -> None:
+    """LoadCoach's single value versus PromptCadence's several, several apart (row WX2)."""
+    lc_executable = _token_cli(tmp_path / "lc", "loadcoach", records=[])
+    lc = _console(tmp_path / "lc", "loadcoach", lc_executable)
+    lc.login()
+    lc_page = lc.client.get("/apps/loadcoach/tokens", headers={"Accept": "text/html"}).text
+    assert '<select id="token-scope" name="scope">' in lc_page  # not `multiple`
+    assert '<option value="read" selected>read</option>' in lc_page
+    assert '<option value="admin">admin</option>' in lc_page
+
+    pc_executable = _token_cli(tmp_path / "pc", "promptcadence", records=[])
+    pc = _console(tmp_path / "pc", "promptcadence", pc_executable)
+    pc.login()
+    pc_page = pc.client.get("/apps/promptcadence/tokens", headers={"Accept": "text/html"}).text
+    assert 'name="scope" multiple size="4"' in pc_page
+    assert '<option value="approve">approve</option>' in pc_page
+
+
+def test_several_chosen_scopes_are_joined_with_a_comma(tmp_path: Path) -> None:
+    """PromptCadence reads `--scope` as a comma list (ADR-0049 rule 2); the select joins it."""
+    directory = tmp_path / "promptcadence"
+    directory.mkdir(parents=True)
+    argv_log = directory / "argv.log"
+    executable = directory / "promptcadence"
+    executable.write_text(
+        "#!/bin/sh\n"
+        f'echo "$@" >> {argv_log}\n'
+        'if [ "$2" = "create" ]; then\n'
+        '  printf \'{"name": "%s", "scope": "%s", "token": "pc_secret"}\' "$3" "$5"\n'
+        "fi\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    console = _console(tmp_path, "promptcadence", executable)
+    console.login()
+    payload: dict[str, Any] = {"name": "ci", "scope": ["read", "write", "approve"]}
+    page = console.post_form("/apps/promptcadence/tokens", payload)
+    assert "pc_secret" in page.text
+    assert "read,write,approve" in argv_log.read_text(encoding="utf-8")
+
+
 def test_a_revocation_the_application_refuses_is_reported_in_its_own_words(
     tmp_path: Path,
 ) -> None:

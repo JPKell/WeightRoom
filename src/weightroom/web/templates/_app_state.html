@@ -5,6 +5,8 @@
     only while the application is not running, so a stopped application's page carries a working
     Start beside its disabled actions. The form posts `next`, and the control route sends the
     operator back to the page they pressed it on (it accepts only a path under this application). -#}
+{% from "_app_page.html" import docs_link %}
+<p class="muted app-docs-link">{{ docs_link(view.name) }}</p>
 {% if view.unit_state == "unsupported" %}
 <p class="notice">Process control is <strong>unsupported on this host</strong>: there is no
 <code>systemctl</code> on <code>PATH</code>. Every other page works (ADR-0125 rule 7).</p>

@@ -17,6 +17,13 @@
 {{ badge(level, tone=("danger" if level in ("emerg", "alert", "crit", "err", "error", "critical") else ("warning" if level in ("warning", "warn") else "neutral"))) }}
 {%- endmacro %}
 
+{% macro docs_link(app) -%}
+{#- Every application page links back to its own entry in the docs tree (row WX2); the anchor is
+    `folder_anchor` in `_docs_tree.html` for `apps/<app>`, so a docs root missing that folder is
+    still a page that opens — the anchor just matches nothing on it, never a 500. -#}
+<a href="/docs?section=apps#docs-apps-{{ app }}" class="muted">Docs</a>
+{%- endmacro %}
+
 {% macro rows_table(rows, columns, caption) -%}
 {#- Rows a database read returned (`app_pages.rows_where`) as a dense table. `columns` is
     `[(label, key), …]`, or `(label, key, limit)` for a column whose text should run longer than

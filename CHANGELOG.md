@@ -36,6 +36,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   their own row under it, spanning the table; a long description clamps to one line in a native
   `<details><summary>` (no JavaScript) and expands on click, while the range and default stay
   visible either way.
+- **Five generic-surface fixes from the operator's console-UX request list** (row WX2). **Logs**:
+  a journal line renders as three stacked lines — timestamp; app, version and pid; message with its
+  logger and request id — rather than a `table()` row that could not hold them (`app_logs.html`'s
+  history and `_log_pane.html`'s live tail share the shape and its CSS); `journal.unwrap_suite_log`
+  now lifts `request_id` and a version wherever a logger names one (`version`, or the first
+  `*_version` key — FreeWeight and LoadCoach spell it differently, and IdeaPress and PromptCadence
+  spell it not at all yet). **Database**: a Tables / Query / Admin nav over the existing anchors; a
+  table's own name now seeds `?sql=SELECT * FROM <t> LIMIT 100#db-query`, leaving *Browse rows* as
+  the one remaining path to the guarded row browser and its raw writes. **Tokens**: LoadCoach's and
+  PromptCadence's scope field is a `<select>` from each application's own vocabulary
+  (`services.tokens.SCOPES_BY_APP`) — a single choice for LoadCoach's cumulative scopes, several
+  for PromptCadence's independent ones (ADR-0049 rule 2), joined with a comma the way its `--scope`
+  reads a list. FreeWeight's **Tokens** menu entry is gone (`rendering.py`, one tuple line); its
+  Settings page explains, correctly this time, that there is no minting command at all — the
+  kickoff's `freeweight token create --scope …` does not exist, `auth.tokens` is a plain list a
+  security key already lets an operator edit, so the page says to generate one (`openssl rand -hex
+  32`) and paste it in. **Docs**: `services.docs.APP_BLURBS`, one sentence per application and
+  package from its own `spec.md` §1, renders under a folder's heading in the docs tree; every
+  application page links to its own entry (`/docs?section=apps#docs-apps-<name>`, via a new
+  `_app_page.html` macro used from `_app_state.html` and, where a page has none, added directly).
 
 - **IdeaPress's attempts tables name the transport call** (row WPF12). A stage run's *Attempts*
   table and a unit's *Provenance* table now fold `transport_call` (IdeaPress migration `0012`, row

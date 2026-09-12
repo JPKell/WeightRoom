@@ -141,6 +141,32 @@ def test_the_pages_list_tables_page_rows_and_show_a_query_or_its_refusal(tmp_pat
     assert index.status_code == 200 and "0009" in index.text and "not installed" in index.text
 
 
+def test_a_tables_name_seeds_the_query_and_the_page_has_a_three_anchor_nav(
+    tmp_path: Path,
+) -> None:
+    """Row WX2: Tables / Query / Admin, and a table's own name is the seeded-query link — the
+    guarded row browser stays a separate ``Browse rows`` link beside it (api.md §3's only path
+    to a raw write)."""
+    console, path = _console(tmp_path)
+    _three_samples(path)
+    page = console.client.get("/apps/freeweight/database", headers=HTML).text
+    assert '<a href="#db-tables">Tables</a>' in page
+    assert '<a href="#db-query">Query</a>' in page
+    assert '<a href="#db-admin">Admin</a>' in page
+    assert 'id="db-tables"' in page and 'id="db-query"' in page and 'id="db-admin"' in page
+    assert (
+        'href="/apps/freeweight/database?sql=SELECT%20%2A%20FROM%20samples%20LIMIT%20100'
+        '#db-query"' in page
+    )
+    assert 'href="/apps/freeweight/database/samples">Browse rows</a>' in page
+
+    seeded = console.client.get(
+        "/apps/freeweight/database?sql=SELECT+%2A+FROM+samples+LIMIT+100", headers=HTML
+    ).text
+    assert '<textarea id="db-sql" name="sql"' in seeded
+    assert "SELECT * FROM samples LIMIT 100</textarea>" in seeded
+
+
 def test_an_unknown_revision_degrades_the_pages_by_name_and_refuses_in_json(
     tmp_path: Path,
 ) -> None:

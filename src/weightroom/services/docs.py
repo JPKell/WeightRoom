@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from weightroom.config import Settings
 
 __all__ = [
+    "APP_BLURBS",
     "MARKDOWN_PLUGINS",
     "AdrRow",
     "DocPage",
@@ -65,6 +66,45 @@ _SLUG_NONWORD_RE = re.compile(r"[^\w\s-]", re.UNICODE)
 _SLUG_WS_RE = re.compile(r"[\s_-]+")
 _FRAGMENT_RE = re.compile(r"#.*$")
 _ADR_ROW_RE = re.compile(r"^\|\s*\[(\d+)\]\(([^)]+)\)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*$")
+
+APP_BLURBS: Final[dict[str, str]] = {
+    # Applications — `docs/apps/<name>/spec.md` §1, one sentence each.
+    "freeweight": "Measures how well a model performs on this machine, for a given capability, "
+    "under given settings, with evidence a user can inspect and reproduce.",
+    "loadcoach": "Decides which installed model should do a task, and how, from the hardware's "
+    "live state and whatever measured evidence exists.",
+    "ideapress": "Turns an idea into finished content through configurable workflows in which "
+    "Python owns the control flow and models perform bounded tasks.",
+    "promptcadence": "Runs a multi-turn, tool-using agent loop over LoadCoach in which every "
+    "step is planned and approved against governance policy and budget before it executes.",
+    "weightroom": "The host operator's one console over the four applications: what the machine "
+    "is doing, starting and stopping units, editing configuration, and the machine's databases.",
+    # Packages — `docs/packages/<name>/spec.md` §1, one sentence each.
+    "baseaicore": "The smallest stable set of domain types every component of the suite agrees "
+    "on: model identity, machine identity, an unsupported measurement, and the rest.",
+    "setspec": "Owns every data contract that crosses an application boundary, versioned so a "
+    "reader and a writer on different releases still agree on the payload's shape.",
+    "modelrack": "The suite's only model client: one normalized, provider-neutral implementation "
+    "of talking to a local inference runtime, so no application writes its own.",
+    "sweatmeter": "Reports what the machine is doing and what it is — CPU, RAM, GPU, VRAM, "
+    "temperatures, power, clocks, disks — accurately and without ever inventing a number.",
+    "weightsdb": "Gives every application the same database plumbing — engine, sessions, "
+    "migrations, backup and health — without giving them a shared schema.",
+    "mirrorwall": "Lets the four applications look and behave like one product family without "
+    "sharing a single page: tokens, layout, components, streaming and JSON conventions.",
+    "loadledger": "Accumulates cost and usage across a multi-step run and enforces ceilings "
+    "against it, over BaseAiCore's own money and token-usage primitives.",
+    "cutctx": "The suite's one answer to a transcript that has outgrown its window: decides, "
+    "deterministically and explicably, what to keep without touching a model.",
+    "toolyard": "The one place in the suite that executes a real, side-effecting tool call on a "
+    "model's behalf, and so the one place that risk and discipline concentrate.",
+    "commissioner": "Turns the suite's egress behaviour into an egress record: one decision "
+    "ledger for every case an application already lets a call reach the outside world.",
+}
+"""One sentence per application and package, from each's own ``spec.md`` §1 — the docs viewer's
+section listing and the *apps*/*packages* section pages use it to say what a folder is before a
+reader opens anything in it. A folder with no entry here (a future component, or one docs has not
+covered) renders with no blurb rather than an invented one."""
 
 
 class DocsRootMissing(SuiteError):

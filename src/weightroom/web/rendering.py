@@ -78,7 +78,6 @@ _APP_PAGES: dict[str, tuple[str, ...]] = {
         "System",
         "Settings",
         "Provider",
-        "Tokens",
         "Logs",
         "Database",
     ),

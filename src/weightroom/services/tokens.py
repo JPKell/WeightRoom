@@ -35,7 +35,9 @@ if TYPE_CHECKING:
 
 __all__ = [
     "CONFIG_TOKEN_APPS",
+    "MULTI_SCOPE_APPS",
     "NO_TOKEN_APPS",
+    "SCOPES_BY_APP",
     "TOKEN_APPS",
     "TOKEN_TIMEOUT_SECONDS",
     "TokenRecord",
@@ -48,6 +50,20 @@ __all__ = [
 
 TOKEN_APPS: Final[frozenset[str]] = frozenset({"loadcoach", "promptcadence"})
 """The applications with a ``token`` CLI verb — the only ones this page can drive."""
+
+SCOPES_BY_APP: Final[dict[str, tuple[str, ...]]] = {
+    "loadcoach": ("read", "write", "admin"),
+    "promptcadence": ("read", "write", "approve", "admin"),
+}
+"""Each app's own scope vocabulary (its ``token create --help``), for the page's ``<select>``.
+
+LoadCoach's is cumulative (``--scope`` takes one value; ``admin`` already carries ``write`` and
+``read``) — a single-select. PromptCadence's four are independent (ADR-0049 rule 2 deliberately
+keeps ``approve`` out of ``write``, and ``admin`` "contains the rest") — a multi-select, joined
+with commas the way its own ``--scope`` reads a comma list."""
+
+MULTI_SCOPE_APPS: Final[frozenset[str]] = frozenset({"promptcadence"})
+"""Which apps in :data:`SCOPES_BY_APP` take several scopes at once, comma-separated."""
 
 CONFIG_TOKEN_APPS: Final[frozenset[str]] = frozenset({"freeweight"})
 """FreeWeight's tokens are ``auth.tokens`` in its own file, edited on its settings page."""

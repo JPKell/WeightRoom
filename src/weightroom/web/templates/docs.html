@@ -7,7 +7,7 @@
 {{ search_form() }}
 {% if section %}
 <h2 class="docs-section-title">{{ section.label }}</h2>
-{{ section_listing(section.node) }}
+{{ section_listing(section.node, blurbs=app_blurbs) }}
 {% else %}
 {{ empty_state("The documentation root has no markdown files.") }}
 {% endif %}

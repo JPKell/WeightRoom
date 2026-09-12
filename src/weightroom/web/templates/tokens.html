@@ -1,12 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
+{% from "_app_page.html" import docs_link %}
 {% block title %}{{ app | app_label }} tokens — WeightRoom{% endblock %}
 {% block page_content %}
 <h2>Tokens</h2>
 <p class="muted">{{ app | app_label }}'s API tokens, through its own
 <code>{{ app }} token list|create|revoke</code> — a token is minted in <em>local</em> mode against
 the application's own database, so there is no HTTP surface for the console to call.
-<a href="/api/v1/apps/{{ app }}/tokens">JSON</a></p>
+<a href="/api/v1/apps/{{ app }}/tokens">JSON</a> · {{ docs_link(app) }}</p>
 
 {% if error %}<p class="notice" role="alert"><strong>Refused.</strong> {{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
@@ -71,9 +72,16 @@ on <a href="/apps/{{ app }}/settings">its settings page</a>, behind the operator
     <input id="token-name" name="name" required>
   </div>
   <div class="field">
-    <label for="token-scope">Scope <span class="field-hint">{{ app | app_label }}'s own vocabulary, passed
-    through unread — it refuses one it does not know, in its own words.</span></label>
+    <label for="token-scope">Scope <span class="field-hint">{{ app | app_label }}'s own vocabulary
+    {%- if multi_scope %}; several may be chosen{% endif %} — passed through unread, refused
+    otherwise in its own words.</span></label>
+    {% if scope_options %}
+    <select id="token-scope" name="scope"{% if multi_scope %} multiple size="{{ scope_options | length }}"{% endif %}>
+      {% for one in scope_options %}<option value="{{ one }}"{{ ' selected' if one == "read" and not multi_scope else '' }}>{{ one }}</option>{% endfor %}
+    </select>
+    {% else %}
     <input id="token-scope" name="scope" value="read">
+    {% endif %}
   </div>
   <div class="field">
     <label for="token-expiry">Expires in (days) <span class="field-hint">Optional.</span></label>

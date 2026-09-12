@@ -19,6 +19,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from weightroom.services.apps import require_app
 from weightroom.services.audit import record
 from weightroom.services.tokens import (
+    MULTI_SCOPE_APPS,
+    SCOPES_BY_APP,
     TokensUnsupported,
     create_token,
     list_tokens,
@@ -75,6 +77,8 @@ def _render(
         notice=notice,
         error=error,
         active_app=app,
+        scope_options=SCOPES_BY_APP.get(app, ()),
+        multi_scope=app in MULTI_SCOPE_APPS,
         nav_sections=app_side_nav(app, selected="Tokens"),
         side_nav_stubs=app_side_nav_stubs(app),
     )
@@ -107,14 +111,22 @@ def create_from_page(
     principal: CurrentOperator,
     app: str,
     name: Annotated[str, Form()] = "",
-    scope: Annotated[str, Form()] = "read",
+    scope: Annotated[list[str] | None, Form()] = None,
     expires_days: Annotated[str, Form()] = "",
 ) -> HTMLResponse:
-    """Mint one and show its secret **once**; the row that records it never carries the secret."""
+    """Mint one and show its secret **once**; the row that records it never carries the secret.
+
+    ``scope`` is one or more values from the application's own vocabulary
+    (:data:`~weightroom.services.tokens.SCOPES_BY_APP`) — several only for the applications in
+    :data:`~weightroom.services.tokens.MULTI_SCOPE_APPS`, joined with a comma the way each
+    application's own ``--scope`` reads a list; unread and unvalidated here either way, so an
+    application refuses one it does not know in its own words.
+    """
     from baseaicore import SuiteError
 
     target = require_app(app)
     state = request.app.state
+    scope_text = ",".join(one.strip() for one in (scope or ()) if one.strip()) or "read"
     secret = ""
     error = ""
     notice = ""
@@ -123,7 +135,7 @@ def create_from_page(
             state.settings,
             target,
             name.strip(),
-            scope=scope.strip() or "read",
+            scope=scope_text,
             expires_days=int(expires_days) if expires_days.strip() else None,
         )
         notice = f"{record_row.name} created. The secret below is shown once."
@@ -140,7 +152,7 @@ def create_from_page(
         operator_id=principal.operator_id,
         app=target,
         target=name.strip(),
-        params={"scope": scope, "expires_days": expires_days},
+        params={"scope": scope_text, "expires_days": expires_days},
         message=error or None,
         security=True,
         request_id=getattr(request.state, "request_id", None),
