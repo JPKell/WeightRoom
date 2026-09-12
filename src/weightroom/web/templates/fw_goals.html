@@ -36,7 +36,7 @@ An import never overwrites a goal: import under another slug, or delete that goa
   badge("unforked", tone="warning", title="unedited starter content: a voice measured on someone else's prompts is not yours") if goal.get("unforked") else "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Goal"}, {"label": "goal_hash"}, {"label": "Capability", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Score method mix"}, {"label": "Calibration"}, {"label": "Calibrated", "mono": true}, {"label": "Badge"}], rows, caption="Installed goals", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Goal"}, {"label": "goal_hash"}, {"label": "Capability", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Score method mix"}, {"label": "Calibration"}, {"label": "Calibrated", "mono": true}, {"label": "Badge"}], rows, caption="Installed goals", density="dense", row_count=rows | length, table_id="fw-goals-1", sortable=true) }}
 {% else %}
 {{ empty_state("No goal yet. Define one, fork a starter, create one from a pack, or import a bundle.") }}
 {% endif %}
@@ -57,7 +57,7 @@ An import never overwrites a goal: import under another slug, or delete that goa
   link("/apps/freeweight/goals/" ~ (draft.get("saved_slug") | urlencode), draft.get("saved_slug")) if draft.get("saved_slug") else "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Draft"}, {"label": "From starter", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Tasks", "numeric": true}, {"label": "Changed", "mono": true}, {"label": "Expires", "mono": true}, {"label": "Written as"}], rows, caption="FreeWeight's own drafts", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Draft"}, {"label": "From starter", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Tasks", "numeric": true}, {"label": "Changed", "mono": true}, {"label": "Expires", "mono": true}, {"label": "Written as"}], rows, caption="FreeWeight's own drafts", density="dense", row_count=rows | length, table_id="fw-goals-2", sortable=true) }}
 <p class="muted">A draft is FreeWeight's row: a reload or a console restart loses nothing, and it expires after 30 days untouched.</p>
 {% else %}
 <p class="muted">No draft in progress.</p>

@@ -55,7 +55,7 @@
 {% for one in goal.get("criteria") %}
 {% set _ = rows.append([one.get("name") or "—", one.get("key") or "—", one.get("rung") or "—", percent(one.get("weight")), yes_no(one.get("gate")), one.get("rule_type") or "—", one.get("scale_points") or "—", yes_no(one.get("has_scale_descriptors")) if one.get("rung") in ("judge", "human") else "—"]) %}
 {% endfor %}
-{{ table([{"label": "Criterion"}, {"label": "Key", "mono": true}, {"label": "Rung"}, {"label": "Weight", "numeric": true}, {"label": "Gate"}, {"label": "Rule", "mono": true}, {"label": "Scale", "numeric": true}, {"label": "Described"}], rows, caption="What the goal measures, and at which rung", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Criterion"}, {"label": "Key", "mono": true}, {"label": "Rung"}, {"label": "Weight", "numeric": true}, {"label": "Gate"}, {"label": "Rule", "mono": true}, {"label": "Scale", "numeric": true}, {"label": "Described"}], rows, caption="What the goal measures, and at which rung", density="dense", row_count=rows | length, table_id="fw-goal-1", sortable=true) }}
 {% else %}
 {{ empty_state("No criteria recorded.") }}
 {% endif %}
@@ -66,7 +66,7 @@
 {% for one in goal.get("tasks") %}
 {% set _ = rows.append([one.get("name") or "—", one.get("key") or "—", (one.get("prompt_id") or "—") ~ " " ~ (one.get("prompt_version") or ""), short(one.get("rendered_prompt_hash")), badge("starter", tone="warning") if one.get("is_starter") else "yours", yes_no(one.get("has_source"))]) %}
 {% endfor %}
-{{ table([{"label": "Task"}, {"label": "Key", "mono": true}, {"label": "Prompt", "mono": true}, {"label": "Rendered hash"}, {"label": "Whose"}, {"label": "Annotated source"}], rows, caption="What a model answers", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Task"}, {"label": "Key", "mono": true}, {"label": "Prompt", "mono": true}, {"label": "Rendered hash"}, {"label": "Whose"}, {"label": "Annotated source"}], rows, caption="What a model answers", density="dense", row_count=rows | length, table_id="fw-goal-2", sortable=true) }}
 {% else %}
 {{ empty_state("No tasks recorded.") }}
 {% endif %}
@@ -77,7 +77,7 @@
 {% for one in goal.get("findings") %}
 {% set _ = rows.append([badge(one.get("severity") or "—", tone=({"error": "danger", "warning": "warning"}).get(one.get("severity"), "neutral")), one.get("code") or "—", one.get("message") or "—", one.get("criterion") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Severity"}, {"label": "Code", "mono": true}, {"label": "Finding"}, {"label": "Criterion", "mono": true}], rows, caption="FreeWeight's lint; a finding never blocks the goal", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Severity"}, {"label": "Code", "mono": true}, {"label": "Finding"}, {"label": "Criterion", "mono": true}], rows, caption="FreeWeight's lint; a finding never blocks the goal", density="dense", row_count=rows | length, table_id="fw-goal-3", sortable=true) }}
 {% else %}
 <p class="muted">No finding.</p>
 {% endif %}
@@ -112,7 +112,7 @@ block and its rule's rung, and the edit is previewed like any other. In a draft,
 {% for one in data.get("results") %}
 {% set _ = rows.append([run_link(one.get("run_id")), one.get("model") or "—", one.get("metric_key") or "—", value(one.get("value"), one.get("unavailable_reason")), one.get("created_at") or "—", one.get("label") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Run"}, {"label": "Model", "mono": true}, {"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Run created", "mono": true}, {"label": "Label"}], rows, caption="The newest results of goal." ~ (goal.get("slug") or slug), density="dense", row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Model", "mono": true}, {"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Run created", "mono": true}, {"label": "Label"}], rows, caption="The newest results of goal." ~ (goal.get("slug") or slug), density="dense", row_count=rows | length, table_id="fw-goal-4", sortable=true) }}
 <p><a href="/apps/freeweight/results?suite=goal.{{ (goal.get('slug') or slug) | urlencode }}">Every result</a></p>
 {% else %}
 {{ empty_state("No run of this goal has completed.", "Start a run", "/apps/freeweight/runs") }}

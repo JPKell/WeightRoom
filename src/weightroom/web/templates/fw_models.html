@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_fw.html" import model_link, value, yes_no, model_switch with context %}
+{% from "_app_page.html" import page_source, refusal, params_b, context_k %}
+{% from "_fw.html" import model_link, yes_no, model_switch with context %}
 {% block title %}Models — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 <div class="page-head">
@@ -54,15 +54,15 @@ under it, and refuses a new run that names it (ADR-0118); a refresh never undoes
   model.get("provider_model_name") or "—",
   model.get("family") or "—",
   model.get("quantization") or "—",
-  value(model.get("parameter_count"), fmt="%d"),
-  value(model.get("max_context"), fmt="%d"),
+  params_b(model.get("parameter_count")),
+  context_k(model.get("max_context")),
   model.get("identity_confidence") or "—",
   yes_no(model.get("has_results")),
   model.get("last_seen_at") or "—",
   (badge("enabled", tone="success") if model.get("enabled") else badge("disabled", tone="danger")) ~ (model_switch(model, current_path) if sourced.live and model.get("id") else "")
 ]) %}
 {% endfor %}
-{{ table([{"label": "Canonical ID"}, {"label": "Provider"}, {"label": "Name", "mono": true}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Confidence"}, {"label": "Results"}, {"label": "Last seen", "mono": true}, {"label": "Use"}], rows, caption="Every model identity recorded, with its latest descriptor", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Canonical ID"}, {"label": "Provider"}, {"label": "Name", "mono": true}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Confidence"}, {"label": "Results"}, {"label": "Last seen", "mono": true}, {"label": "Use"}], rows, caption="Every model identity recorded, with its latest descriptor", density="dense", row_count=rows | length, table_id="fw-models", sortable=true) }}
 {% else %}
 {{ empty_state("No model has been discovered yet. Refresh from the provider once it answers.", "Provider", "/apps/freeweight/provider") }}
 {% endif %}

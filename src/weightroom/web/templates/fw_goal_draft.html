@@ -118,7 +118,7 @@ say how far the jury agrees with you about them.</p>
 {% for one in draft.get("tasks") %}
 {% set _ = rows.append([one.get("name") or "—", one.get("key") or "—", one.get("prompt_text") or "—", badge("starter — replace it", tone="warning") if one.get("is_starter") else "yours"]) %}
 {% endfor %}
-{{ table([{"label": "Task"}, {"label": "Key", "mono": true}, {"label": "Prompt"}, {"label": "Whose"}], rows, caption="A voice measured on someone else's prompts is not your voice", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Task"}, {"label": "Key", "mono": true}, {"label": "Prompt"}, {"label": "Whose"}], rows, caption="A voice measured on someone else's prompts is not your voice", density="dense", row_count=rows | length, table_id="fw-goal-draft", sortable=true) }}
 {% else %}
 <p class="muted">No tasks yet: a goal with no task has nothing for a model to answer.</p>
 {% endif %}

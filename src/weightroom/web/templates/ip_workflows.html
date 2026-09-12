@@ -33,7 +33,7 @@ reads only its API.</p>
   {{ table([
     {"label": "#", "mono": true}, {"label": "Stage", "mono": true}, {"label": "Done by"},
     {"label": "Gate"}, {"label": "Bound model", "mono": true}
-  ], rows, caption="Stages, in the order they run", density="dense", complete=true, row_count=rows | length) }}
+  ], rows, caption="Stages, in the order they run", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-1", sortable=true) }}
 </section>
 {% else %}
 {{ empty_state("IdeaPress ships no workflow.") }}
@@ -50,7 +50,7 @@ reads only its API.</p>
 {{ table([
   {"label": "Setting", "mono": true}, {"label": "Effective value", "mono": true}, {"label": "From"},
   {"label": "Applies"}
-], rows, caption="Workflow limits, as IdeaPress resolves them now", density="dense", complete=true, row_count=rows | length) }}
+], rows, caption="Workflow limits, as IdeaPress resolves them now", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-2", sortable=true) }}
 <p class="muted">A value stored on the Settings page applies as the next stage starts; a stage run can
 override <code>max_revision_rounds</code> and the model for that run alone.</p>
 {% else %}

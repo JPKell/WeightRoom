@@ -36,3 +36,28 @@
 {{ empty_state("No " ~ (caption | lower) ~ " recorded.") }}
 {% endif %}
 {%- endmacro %}
+
+{% macro params_b(n) -%}
+{#- Row WX1: a parameter count in billions (1B = 1e9), one decimal place — `7.6B`.
+    `active_parameter_count` is formatted the same way; it is just a different count of the same
+    unit, not a different unit. ADR-0016: an unsupported measurement is `—`, never `0` — this
+    accepts either the numeric-or-`None` convention (FreeWeight) or the `"unsupported"` sentinel
+    string (LoadCoach), matching `_fw.html`'s and `_lc.html`'s own `value`/`measure` macros. -#}
+{%- if n is number and n is not sameas true and n is not sameas false -%}
+{{ "%.1f" | format(n / 1000000000) }}B
+{%- else -%}
+<span class="muted" title="not reported; not the same as zero">—</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro context_k(n) -%}
+{#- Row WX1: a context window in thousands of tokens — `32768` renders `32k`; a value that is not
+    an exact multiple keeps one decimal place (`97.7k`) rather than rounding a real number to a
+    round-looking one. Same unsupported convention as `params_b`. -#}
+{%- if n is number and n is not sameas true and n is not sameas false -%}
+{%- set k = n / 1024 -%}
+{%- if k == (k | round(0)) -%}{{ k | round(0) | int }}k{%- else -%}{{ "%.1f" | format(k) }}k{%- endif -%}
+{%- else -%}
+<span class="muted" title="not reported; not the same as zero">—</span>
+{%- endif -%}
+{%- endmacro %}

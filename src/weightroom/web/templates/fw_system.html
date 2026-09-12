@@ -25,7 +25,7 @@ them, read from its running API.</p>
 {% for component in data.get("components") or [] %}
 {% set _ = rows.append([component.get("name") or "—", status_dot({"ok": "ok", "degraded": "degraded", "unavailable": "stopped"}.get(component.get("status"), "unknown"), label=component.get("status") or "unknown"), component.get("detail") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Component"}, {"label": "Status"}, {"label": "Detail"}], rows, caption="Ten components: database, provider, gpu_telemetry, machine, evidence, prompts, sandbox, external_benchmarks, goals, judges", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Component"}, {"label": "Status"}, {"label": "Detail"}], rows, caption="Ten components: database, provider, gpu_telemetry, machine, evidence, prompts, sandbox, external_benchmarks, goals, judges", density="dense", complete=true, row_count=rows | length, table_id="fw-system", sortable=true) }}
 <p class="muted">A degraded component is not a failure to serve.</p>
 {% endif %}
 {{ page_source(sourced) }}

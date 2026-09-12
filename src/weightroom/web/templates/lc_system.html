@@ -33,7 +33,7 @@ does not repeat them.</p>
 {% for component in health.get("components") or [] %}
 {% set _ = rows.append([component.get("name") or "—", status_dot({"ok": "ok", "degraded": "degraded", "unavailable": "stopped"}.get(component.get("status"), "unknown"), label=component.get("status") or "unknown"), component.get("detail") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Component"}, {"label": "Status"}, {"label": "Detail"}], rows, caption="LoadCoach's own health components", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Component"}, {"label": "Status"}, {"label": "Detail"}], rows, caption="LoadCoach's own health components", density="dense", complete=true, row_count=rows | length, table_id="lc-system", sortable=true) }}
 <p class="muted">A degraded component is not a failure to serve.</p>
 {% endif %}
 {% endif %}

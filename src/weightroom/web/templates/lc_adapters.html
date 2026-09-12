@@ -39,7 +39,7 @@ them.</p>
   chosen | length ~ " selected · " ~ refused | length ~ " refused"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Adapter", "mono": true}, {"label": "Base · digest · confidence"}, {"label": "Classification"}, {"label": "Declared"}, {"label": "Availability"}, {"label": "Held by"}, {"label": "Resident"}, {"label": "Recent routes"}], rows, caption="Every adapter, with what holds, loads and routes it", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Adapter", "mono": true}, {"label": "Base · digest · confidence"}, {"label": "Classification"}, {"label": "Declared"}, {"label": "Availability"}, {"label": "Held by"}, {"label": "Resident"}, {"label": "Recent routes"}], rows, caption="Every adapter, with what holds, loads and routes it", density="dense", row_count=rows | length, table_id="lc-adapters-1", sortable=true) }}
 
 {% for one in adapters %}
 {% set routes = one.get("routes") or [] %}
@@ -53,7 +53,7 @@ them.</p>
   job_link(route.get("job_id"))
 ]) %}
 {% endfor %}
-{{ table([{"label": "Decision"}, {"label": "Task profile", "mono": true}, {"label": "Requested", "mono": true}, {"label": "Outcome"}, {"label": "Job"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Decision"}, {"label": "Task profile", "mono": true}, {"label": "Requested", "mono": true}, {"label": "Outcome"}, {"label": "Job"}], rows, density="dense", row_count=rows | length, table_id="lc-adapters-2", sortable=true) }}
 {% else %}
 <p class="muted">No routing decision has named it.</p>
 {% endif %}

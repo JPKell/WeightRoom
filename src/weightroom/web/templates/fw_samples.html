@@ -34,7 +34,7 @@
   link("/apps/freeweight/samples/" ~ ((sample.get("id") or "") | urlencode), "inspect")
 ]) %}
 {% endfor %}
-{{ table([{"label": "Case", "mono": true}, {"label": "Rep", "numeric": true}, {"label": "Status"}, {"label": "Prompt", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Method"}, {"label": "Output tokens", "numeric": true}, {"label": "Output chars", "numeric": true}, {"label": "TTFT ms", "numeric": true}, {"label": "Wall ms", "numeric": true}, {"label": "Finish"}, {"label": "Error", "mono": true}, {"label": "Inspect"}], rows, caption="A sample that could not be scored shows — and keeps its row: excluded from the aggregate, not from the count", density="dense", complete=next_href is none, row_count=rows | length) }}
+{{ table([{"label": "Case", "mono": true}, {"label": "Rep", "numeric": true}, {"label": "Status"}, {"label": "Prompt", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Method"}, {"label": "Output tokens", "numeric": true}, {"label": "Output chars", "numeric": true}, {"label": "TTFT ms", "numeric": true}, {"label": "Wall ms", "numeric": true}, {"label": "Finish"}, {"label": "Error", "mono": true}, {"label": "Inspect"}], rows, caption="A sample that could not be scored shows — and keeps its row: excluded from the aggregate, not from the count", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-samples", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 {% else %}
 {{ empty_state("This test has not produced a sample.") }}

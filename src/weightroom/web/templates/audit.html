@@ -47,7 +47,7 @@ before a row is written. <a href="/api/v1/audit">JSON</a></p>
   (row.params | json_pretty) if row.params else "—"
 ]) %}
 {% endfor %}
-{{ table(columns, table_rows, caption="Newest first; the API pages further back.", table_id="audit", complete=not has_more, row_count=rows | length) }}
+{{ table(columns, table_rows, caption="Newest first; the API pages further back.", table_id="audit", complete=not has_more, row_count=rows | length, sortable=true) }}
 {% else %}
 {{ empty_state("No rows match these filters." if (selected.app or selected.action or selected.since)
                 else "Nothing has been recorded yet. The first login writes the first row.",

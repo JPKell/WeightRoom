@@ -36,7 +36,7 @@
 {% if declared %}
 {% set rows = [] %}
 {% for name, value in declared | dictsort %}{% set _ = rows.append([name, value]) %}{% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Declared", "numeric": true}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Declared", "numeric": true}], rows, density="dense", row_count=rows | length, table_id="lc-model-1", sortable=true) }}
 {% else %}
 <p class="muted">None declared: routing ranks it on priors and whatever evidence is imported.</p>
 {% endif %}
@@ -54,7 +54,7 @@
   one.get("measured_at") or "—", one.get("runtime_profile_hash") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Source"}, {"label": "Match"}, {"label": "Age"}, {"label": "Measured", "mono": true}, {"label": "Runtime profile", "mono": true}], rows, caption="Imported benchmark evidence; confidence is FreeWeight's, applied here and never recomputed", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Source"}, {"label": "Match"}, {"label": "Age"}, {"label": "Measured", "mono": true}, {"label": "Runtime profile", "mono": true}], rows, caption="Imported benchmark evidence; confidence is FreeWeight's, applied here and never recomputed", density="dense", row_count=rows | length, table_id="lc-model-2", sortable=true) }}
 {% else %}
 {{ empty_state("No evidence imported for this model.", "Evidence", "/apps/loadcoach/evidence") }}
 {% endif %}
@@ -77,7 +77,7 @@ only from its running API.</p>
   breaker_badge(breaker.get("state"), breaker.get("reason"))
 ]) %}
 {% endfor %}
-{{ table([{"label": "Task profile"}, {"label": "Factor", "numeric": true}, {"label": "Trend"}, {"label": "Breaker"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Task profile"}, {"label": "Factor", "numeric": true}, {"label": "Trend"}, {"label": "Breaker"}], rows, density="dense", row_count=rows | length, table_id="lc-model-3", sortable=true) }}
 {% else %}
 <p class="muted">No production evidence yet.</p>
 {% endif %}
@@ -91,7 +91,7 @@ only from its running API.</p>
 {% for adapter in model.get("adapters") %}
 {% set _ = rows.append([adapter.get("subject_canonical_id") or adapter.get("name") or "—", adapter.get("data_classification") or "—", adapter.get("base_confidence") or "—", badge("available", tone="success") if adapter.get("available") else badge("unavailable", tone="danger", title=adapter.get("unavailable_reason"))]) %}
 {% endfor %}
-{{ table([{"label": "Subject", "mono": true}, {"label": "Classification"}, {"label": "Base"}, {"label": "Availability"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Subject", "mono": true}, {"label": "Classification"}, {"label": "Base"}, {"label": "Availability"}], rows, density="dense", row_count=rows | length, table_id="lc-model-4", sortable=true) }}
 {% endif %}
 {% if model.get("descriptor") %}{{ json_viewer(model.get("descriptor"), label="Descriptor, as discovered") }}{% endif %}
 {% endif %}

@@ -45,7 +45,7 @@ page to measure them.</p>
   adapter.get("last_run_at") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Adapter"}, {"label": "Base · proven by"}, {"label": "Declares"}, {"label": "Classification"}, {"label": "Availability"}, {"label": "In the directory"}, {"label": "Measured"}, {"label": "Runs", "numeric": true}, {"label": "Last run", "mono": true}], rows, caption="Each adapter by its artifact digest; one measured and since removed from the directory stays listed", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Adapter"}, {"label": "Base · proven by"}, {"label": "Declares"}, {"label": "Classification"}, {"label": "Availability"}, {"label": "In the directory"}, {"label": "Measured"}, {"label": "Runs", "numeric": true}, {"label": "Last run", "mono": true}], rows, caption="Each adapter by its artifact digest; one measured and since removed from the directory stays listed", density="dense", row_count=rows | length, table_id="fw-adapters-1", sortable=true) }}
 {% else %}
 {{ empty_state("No adapter in the directory, and none measured under.") }}
 {% endif %}
@@ -54,7 +54,7 @@ page to measure them.</p>
 <h3>Manifests FreeWeight could not read</h3>
 {% set rows = [] %}
 {% for one in data.get("invalid") %}{% set _ = rows.append([one.get("path") or "—", one.get("problem") or "—"]) %}{% endfor %}
-{{ table([{"label": "Manifest", "mono": true}, {"label": "Problem"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Manifest", "mono": true}, {"label": "Problem"}], rows, density="dense", row_count=rows | length, table_id="fw-adapters-2", sortable=true) }}
 {% endif %}
 {% if data.get("drafts") %}
 <h3>Drafts</h3>

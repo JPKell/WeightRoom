@@ -178,6 +178,13 @@
 {{ json_viewer(e, label="The complete explanation, as LoadCoach stored it") }}
 {%- endmacro %}
 
+{% macro capability_badges(names) -%}
+{#- Row WX1: declared capabilities as badges, one per key — a comma-joined string reads as prose,
+    a capability name is an identifier. `names` is any iterable of capability-id strings (a dict's
+    `.keys()`, or a list already of names); empty renders the caller's own fallback text instead. -#}
+{%- for name in names -%}{{ badge(name, tone="neutral") }} {% endfor -%}
+{%- endmacro %}
+
 {% macro mapping_list(values) -%}
 {%- if values is mapping and values -%}
 {% set items = [] %}

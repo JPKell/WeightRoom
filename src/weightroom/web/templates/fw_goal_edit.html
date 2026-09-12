@@ -23,7 +23,7 @@
   {% if preview.get("findings") %}
   {% set rows = [] %}
   {% for one in preview.get("findings") %}{% set _ = rows.append([one.get("severity") or "—", one.get("code") or "—", one.get("message") or "—"]) %}{% endfor %}
-  {{ table([{"label": "Severity"}, {"label": "Code", "mono": true}, {"label": "Finding"}], rows, caption="The edited pack's lint", density="dense", row_count=rows | length) }}
+  {{ table([{"label": "Severity"}, {"label": "Code", "mono": true}, {"label": "Finding"}], rows, caption="The edited pack's lint", density="dense", row_count=rows | length, table_id="fw-goal-edit", sortable=true) }}
   {% endif %}
   <form method="post" action="{{ here }}/edit" class="kit-actions">
     {{ csrf() }}

@@ -76,7 +76,7 @@ time per project, so revising and resuming wait for it.</p>
 {% for c in u.get("coverage") %}
 {% set _ = rows.append([c.get("requirement_key") or "—", state_badge("passed" if c.get("satisfied") else "failed"), (c.get("satisfied_by") or "—") ~ (" " ~ badge("model review, not a deterministic check", tone="warning") if c.get("satisfied_by") == "audit" else ""), (c.get("detail") or "—") | cell_text]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Requirement", "mono": true}, {"label": "Satisfied"}, {"label": "Decided by"}, {"label": "Detail"}], rows, caption="What settled each requirement, and how", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Requirement", "mono": true}, {"label": "Satisfied"}, {"label": "Decided by"}, {"label": "Detail"}], rows, caption="What settled each requirement, and how", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-1", sortable=true) }}
 {% else %}{{ empty_state("No coverage recorded.") }}{% endif %}
 {% endif %}
 
@@ -89,7 +89,7 @@ time per project, so revising and resuming wait for it.</p>
 {% for v in failed %}
 {% set _ = rows.append([v.get("kind") or "—", v.get("key") or "—", badge("blocking", tone="danger") if v.get("blocking") else badge("advisory", tone="warning"), (v.get("detail") or "—") | cell_text]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Family"}, {"label": "Check", "mono": true}, {"label": "Class"}, {"label": "Detail"}], rows, caption="The checks that did not pass", density="dense", complete=true, row_count=rows | length) }}{% endif %}
+{% if rows %}{{ table([{"label": "Family"}, {"label": "Check", "mono": true}, {"label": "Class"}, {"label": "Detail"}], rows, caption="The checks that did not pass", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-2", sortable=true) }}{% endif %}
 {% endif %}
 
 <h3>Findings</h3>
@@ -99,7 +99,7 @@ time per project, so revising and resuming wait for it.</p>
 {% for f in u.get("findings") %}
 {% set _ = rows.append([f.get("round"), (f.get("stage") or "—") ~ (" " ~ badge("escalated", tone="warning") if f.get("escalated") else ""), badge(f.get("severity") or "—", tone="danger" if f.get("severity") in ("critical", "major") else "neutral"), f.get("category") or "—", (f.get("problem") or "—") | cell_text(limit=400), (f.get("evidence") or "—") | cell_text(limit=400), (f.get("fix") or "—") | cell_text(limit=400)]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Round"}, {"label": "Stage"}, {"label": "Severity"}, {"label": "Category"}, {"label": "Problem"}, {"label": "Evidence"}, {"label": "Would resolve it"}], rows, caption="What the reviews found", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Round"}, {"label": "Stage"}, {"label": "Severity"}, {"label": "Category"}, {"label": "Problem"}, {"label": "Evidence"}, {"label": "Would resolve it"}], rows, caption="What the reviews found", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-3", sortable=true) }}
 {% else %}{{ empty_state("No findings.") }}{% endif %}
 {% endif %}
 
@@ -110,7 +110,7 @@ time per project, so revising and resuming wait for it.</p>
 {% for c in u.get("critiques") %}
 {% set _ = rows.append([c.get("round"), badge(c.get("verdict") or "—", tone="warning" if c.get("verdict") == "materially_deficient" else "success"), ("%.0f%%" | format(c.get("improvement_delta") * 100)) if c.get("improvement_delta") is not none else measure(none), c.get("stop_reason") or "—", (c.get("rationale") or "—") | cell_text(limit=400)]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Round"}, {"label": "Verdict"}, {"label": "Improvement"}, {"label": "Stopped by"}, {"label": "Rationale"}], rows, caption="Each round's verdict, and which rule stopped the loop", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Round"}, {"label": "Verdict"}, {"label": "Improvement"}, {"label": "Stopped by"}, {"label": "Rationale"}], rows, caption="Each round's verdict, and which rule stopped the loop", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-4", sortable=true) }}
 {% else %}{{ empty_state("No critique recorded.") }}{% endif %}
 {% endif %}
 
@@ -134,7 +134,7 @@ away, not a second failed attempt; the same attempt's call 0 is the retry whose 
   ((a.get("degradations") or []) | join("; ")) or "—"
 ]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Stage"}, {"label": "Attempt"}, {"label": "Outcome"}, {"label": "Backend"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Tokens in / out"}, {"label": "Egress"}, {"label": "Degradations"}], rows, caption="Every attempt that worked on this unit", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Stage"}, {"label": "Attempt"}, {"label": "Outcome"}, {"label": "Backend"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Tokens in / out"}, {"label": "Egress"}, {"label": "Degradations"}], rows, caption="Every attempt that worked on this unit", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-5", sortable=true) }}
 {% else %}{{ empty_state("No attempts recorded.") }}{% endif %}
 
 <h3>History</h3>
@@ -154,7 +154,7 @@ away, not a second failed attempt; the same attempt's call 0 is the retry whose 
   ((v.get("findings") | length | string) ~ " finding(s)") if v.get("findings") is not none else measure(none)
 ]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "Version"}, {"label": "Kind"}, {"label": "Committed", "mono": true}, {"label": "Words"}, {"label": "Hash", "mono": true}, {"label": "Coverage"}, {"label": "Produced by"}, {"label": "Checks"}, {"label": "Critique"}, {"label": "Audits"}], rows, caption="Every version, newest first, with the run that produced it", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "Version"}, {"label": "Kind"}, {"label": "Committed", "mono": true}, {"label": "Words"}, {"label": "Hash", "mono": true}, {"label": "Coverage"}, {"label": "Produced by"}, {"label": "Checks"}, {"label": "Critique"}, {"label": "Audits"}], rows, caption="Every version, newest first, with the run that produced it", density="dense", complete=true, row_count=rows | length, table_id="ip-unit-6", sortable=true) }}
 {% else %}{{ empty_state("No versions yet.") }}{% endif %}
 <p class="muted">Research for the whole project, with every call and its egress decision, is on <a href="{{ proj }}/plan">the plan</a>.</p>
 {% endif %}

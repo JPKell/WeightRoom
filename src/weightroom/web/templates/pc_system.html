@@ -26,7 +26,7 @@ concurrency — as PromptCadence's own System page shows them, read from its run
 {% for one in health.get("components") or [] %}
 {% set _ = rows.append([one.get("name") or "—", status_dot({"ok": "ok", "degraded": "degraded", "unavailable": "stopped"}.get(one.get("status"), "unknown"), label=one.get("status") or "unknown"), one.get("detail") or "—", one.get("checked_at") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Component", "mono": true}, {"label": "Status"}, {"label": "Detail"}, {"label": "Checked", "mono": true}], rows, caption="Health components", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Component", "mono": true}, {"label": "Status"}, {"label": "Detail"}, {"label": "Checked", "mono": true}], rows, caption="Health components", density="dense", row_count=rows | length, table_id="pc-system-1", sortable=true) }}
 <p class="muted">A degraded component is not a failure to serve: an unreachable LoadCoach degrades the tiers
 that need it and the API keeps answering.</p>
 {% endif %}
@@ -38,7 +38,7 @@ that need it and the API keeps answering.</p>
 {% for one in active %}
 {% set _ = rows.append([trajectory_link(one.get("trajectory_id")), state_badge(one.get("state")), short(one.get("lease_owner")), one.get("created_at") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Trajectory"}, {"label": "State"}, {"label": "Lease"}, {"label": "Created", "mono": true}], rows, caption="Planning and executing", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Trajectory"}, {"label": "State"}, {"label": "Lease"}, {"label": "Created", "mono": true}], rows, caption="Planning and executing", density="dense", row_count=rows | length, table_id="pc-system-2", sortable=true) }}
 {% else %}
 {{ empty_state("Nothing is planning or executing.", "Trajectories", "/apps/promptcadence/trajectories") }}
 {% endif %}
@@ -50,7 +50,7 @@ that need it and the API keeps answering.</p>
 {% for one in pending %}
 {% set _ = rows.append([short(one.get("request_id")), trajectory_link(one.get("trajectory_id")), one.get("kind") or "—", one.get("reason") or "—", ((one.get("age_seconds") | round(0) | int) ~ " s") if one.get("age_seconds") is number else "—", one.get("expires_at") or "—"]) %}
 {% endfor %}
-{{ table([{"label": "Request"}, {"label": "Trajectory"}, {"label": "Kind"}, {"label": "Reason"}, {"label": "Waiting", "numeric": true}, {"label": "Expires", "mono": true}], rows, caption="Oldest first; grant or deny them on the Approvals page", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Request"}, {"label": "Trajectory"}, {"label": "Kind"}, {"label": "Reason"}, {"label": "Waiting", "numeric": true}, {"label": "Expires", "mono": true}], rows, caption="Oldest first; grant or deny them on the Approvals page", density="dense", row_count=rows | length, table_id="pc-system-3", sortable=true) }}
 {% else %}
 {{ empty_state("Nothing is waiting for a person.") }}
 {% endif %}
@@ -67,7 +67,7 @@ that need it and the API keeps answering.</p>
 {% if ledger.get("projects") %}
 {% set rows = [] %}
 {% for one in ledger.get("projects") %}{% set _ = rows.append([one.get("project"), one.get("tokens_remaining_display") or "—", one.get("money_remaining_display") or "—", badge("binding", tone="warning") if one.get("binds") else "no"]) %}{% endfor %}
-{{ table([{"label": "Project"}, {"label": "Tokens left"}, {"label": "Money left"}, {"label": "Binds"}], rows, caption="Configured project ceilings", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Project"}, {"label": "Tokens left"}, {"label": "Money left"}, {"label": "Binds"}], rows, caption="Configured project ceilings", density="dense", row_count=rows | length, table_id="pc-system-4", sortable=true) }}
 {% endif %}
 <p class="muted">Per-tier spend and the debits behind it are on the <a href="/apps/promptcadence/ledger">Ledger</a>.</p>
 {% else %}

@@ -53,7 +53,7 @@ that stopped halfway measured a different set of cases than the row beside it.</
   link("/apps/freeweight/runs/" ~ ((row.get("run_id") or "") | urlencode) ~ ("/tests/" ~ (row.get("run_test_id") | urlencode) if row.get("run_test_id") else ""), (row.get("run_id") or "—")[:8])
 ]) %}
 {% endfor %}
-{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Stddev", "numeric": true}, {"label": "CV", "numeric": true}, {"label": "Model", "mono": true}, {"label": "Suite"}, {"label": "Test"}, {"label": "Machine"}, {"label": "Runtime profile"}, {"label": "Run status"}, {"label": "Created", "mono": true}, {"label": "Raw source"}], rows, caption="Stored metrics; an unsupported measurement shows —, never 0", density="dense", complete=next_href is none, row_count=rows | length) }}
+{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Stddev", "numeric": true}, {"label": "CV", "numeric": true}, {"label": "Model", "mono": true}, {"label": "Suite"}, {"label": "Test"}, {"label": "Machine"}, {"label": "Runtime profile"}, {"label": "Run status"}, {"label": "Created", "mono": true}, {"label": "Raw source"}], rows, caption="Stored metrics; an unsupported measurement shows —, never 0", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-results", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 {% else %}
 {{ empty_state("Nothing measured under these filters.", "Start a run", "/apps/freeweight/runs") }}

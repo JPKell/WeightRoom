@@ -23,7 +23,7 @@
 {% set weights = profile.get("weights") or {} %}
 {% set rows = [] %}
 {% for name, weight in weights | dictsort %}{% set _ = rows.append([name, num(weight, "%.2f")]) %}{% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Weight", "numeric": true}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Weight", "numeric": true}], rows, density="dense", row_count=rows | length, table_id="lc-task-profile", sortable=true) }}
 <h3>Constraints</h3>
 {{ mapping_list(profile.get("constraints")) }}
 <h3>Execution</h3>

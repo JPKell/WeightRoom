@@ -29,7 +29,7 @@
 {% if blockers %}
 {% set rows = [] %}
 {% for one in blockers %}{% set _ = rows.append([one.get("field") or one.get("path") or "—", one.get("recorded") | string if one.get("recorded") is not none else "—", one.get("observed") | string if one.get("observed") is not none else "—", one.get("explanation") or one.get("reason") or "—"]) %}{% endfor %}
-{{ table([{"label": "Field", "mono": true}, {"label": "Recorded"}, {"label": "Here now"}, {"label": "Why it matters"}], rows, caption="What moved since the original run; Repeat with force proceeds and records it on the new run", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Field", "mono": true}, {"label": "Recorded"}, {"label": "Here now"}, {"label": "Why it matters"}], rows, caption="What moved since the original run; Repeat with force proceeds and records it on the new run", density="dense", row_count=rows | length, table_id="fw-run-1", sortable=true) }}
 {% endif %}
 {{ refusal(sourced.error) }}
 {% if run %}
@@ -73,7 +73,7 @@
 <p class="muted">Conditions this run was measured under that are worth knowing about — a forced repeat's divergence among them.</p>
 {% set rows = [] %}
 {% for one in run.get("degradations") %}{% set _ = rows.append([one.get("kind") or "—", json_viewer(one, label="Detail")]) %}{% endfor %}
-{{ table([{"label": "Kind", "mono": true}, {"label": "Detail"}], rows, density="dense", row_count=rows | length) }}
+{{ table([{"label": "Kind", "mono": true}, {"label": "Detail"}], rows, density="dense", row_count=rows | length, table_id="fw-run-2", sortable=true) }}
 {% endif %}
 
 <h3 id="tests">Tests</h3>
@@ -89,7 +89,7 @@
   (test.get("error") or {}).get("code") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Test"}, {"label": "Status"}, {"label": "Cases", "numeric": true}, {"label": "Repetitions", "numeric": true}, {"label": "Skip reason"}, {"label": "Error", "mono": true}], rows, caption="Each test links to its raw samples", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Test"}, {"label": "Status"}, {"label": "Cases", "numeric": true}, {"label": "Repetitions", "numeric": true}, {"label": "Skip reason"}, {"label": "Error", "mono": true}], rows, caption="Each test links to its raw samples", density="dense", row_count=rows | length, table_id="fw-run-3", sortable=true) }}
 {% else %}
 {{ empty_state("No tests enumerated yet.") }}
 {% endif %}
@@ -111,7 +111,7 @@
   link("/apps/freeweight/runs/" ~ ((run.get("id") or run_id) | urlencode) ~ "/tests/" ~ (metric.get("run_test_id") | urlencode), "samples") if metric.get("run_test_id") else link("#tests", "every test")
 ]) %}
 {% endfor %}
-{{ table([{"label": "Metric", "mono": true}, {"label": "Scope"}, {"label": "GPU", "numeric": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "Aggregation"}, {"label": "Spread (stddev)", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Raw source"}], rows, caption="An unsupported measurement shows —, never 0", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Metric", "mono": true}, {"label": "Scope"}, {"label": "GPU", "numeric": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "Aggregation"}, {"label": "Spread (stddev)", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Raw source"}], rows, caption="An unsupported measurement shows —, never 0", density="dense", row_count=rows | length, table_id="fw-run-4", sortable=true) }}
 {% else %}
 {{ empty_state("No aggregates yet: they are written once every sample is durable.") }}
 {% endif %}
@@ -151,7 +151,7 @@ nothing is summed or averaged across GPUs, and a reading this machine could not 
 {% elif data.get("events") %}
 {% set rows = [] %}
 {% for one in data.get("events") %}{% set _ = rows.append([one.get("sequence"), one.get("timestamp") or "—", one.get("type") or "—", one.get("message") or ""]) %}{% endfor %}
-{{ table([{"label": "#", "numeric": true}, {"label": "At", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The events FreeWeight stored, in order", density="dense", row_count=rows | length) }}
+{{ table([{"label": "#", "numeric": true}, {"label": "At", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The events FreeWeight stored, in order", density="dense", row_count=rows | length, table_id="fw-run-5", sortable=true) }}
 {% else %}
 <p class="muted">No events recorded.</p>
 {% endif %}

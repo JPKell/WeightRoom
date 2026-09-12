@@ -49,7 +49,7 @@
   ["Good", "0.60 to 0.75", "Usable; expect the occasional sample you would score differently."],
   ["Fair", "0.40 to 0.60", "Evidence is emitted, but confidence is reduced substantially."],
   ["Not measurable yet", "below 0.40", "Results run and are inspectable; no evidence is emitted."],
-], caption="The coefficient is beside the words, never instead of them", density="dense", row_count=4) }}
+], caption="The coefficient is beside the words, never instead of them", density="dense", row_count=4, table_id="fw-goal-report-1", sortable=true) }}
 
 <h3>Per criterion</h3>
 {% set rows = [] %}
@@ -68,7 +68,7 @@
   one.get("lint") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Criterion", "mono": true}, {"label": "Weight", "numeric": true}, {"label": "κw", "numeric": true}, {"label": "ρ", "numeric": true}, {"label": "MAE", "numeric": true}, {"label": "Bias", "numeric": true}, {"label": "α", "numeric": true}, {"label": "n holdout", "numeric": true}, {"label": "Validity", "numeric": true}, {"label": "Band"}, {"label": "The lint's read"}], rows, caption="Every coefficient with its n: a κw without its n is a number pretending to be a fact", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Criterion", "mono": true}, {"label": "Weight", "numeric": true}, {"label": "κw", "numeric": true}, {"label": "ρ", "numeric": true}, {"label": "MAE", "numeric": true}, {"label": "Bias", "numeric": true}, {"label": "α", "numeric": true}, {"label": "n holdout", "numeric": true}, {"label": "Validity", "numeric": true}, {"label": "Band"}, {"label": "The lint's read"}], rows, caption="Every coefficient with its n: a κw without its n is a number pretending to be a fact", density="dense", row_count=rows | length, table_id="fw-goal-report-2", sortable=true) }}
 
 {% for one in report.get("criteria") or [] %}
 {% if one.get("disagreements") %}
@@ -77,7 +77,7 @@
 {{ table([{"label": ""}, {"label": "Grade", "numeric": true}, {"label": "Why"}], [
   ["You", disagreement.get("author_grade"), disagreement.get("author_note") or "—"],
   ["The jury", figure(disagreement.get("jury_grade"), "not recorded", "%g"), disagreement.get("jury_rationale") or "—"],
-], density="dense", row_count=2) }}
+], density="dense", row_count=2, table_id="fw-goal-report-3", sortable=true) }}
 <details class="kit-details"><summary>The sample</summary><pre class="kit-output">{{ disagreement.get("excerpt") or "—" }}</pre></details>
 {% endfor %}
 {% endif %}

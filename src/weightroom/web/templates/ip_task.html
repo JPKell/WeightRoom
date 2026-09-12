@@ -66,7 +66,7 @@ away, not a second failed attempt; the same attempt's call 0 is the retry whose 
 ]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Stage"}, {"label": "Unit", "mono": true}, {"label": "Attempt"}, {"label": "Outcome"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Tokens in / out"}, {"label": "Provider"}, {"label": "Degradations"}, {"label": "Error", "mono": true}], rows, caption="Every attempt this run recorded", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Stage"}, {"label": "Unit", "mono": true}, {"label": "Attempt"}, {"label": "Outcome"}, {"label": "Model", "mono": true}, {"label": "Prompt"}, {"label": "Tokens in / out"}, {"label": "Provider"}, {"label": "Degradations"}, {"label": "Error", "mono": true}], rows, caption="Every attempt this run recorded", density="dense", complete=true, row_count=rows | length, table_id="ip-task-1", sortable=true) }}
 {% else %}{{ empty_state("No attempt recorded yet.") }}{% endif %}
 
 {% if sourced.data.get("events") is not none %}
@@ -75,7 +75,7 @@ away, not a second failed attempt; the same attempt's call 0 is the retry whose 
 {% for e in sourced.data.get("events") %}
 {% set _ = rows.append([e.get("sequence"), e.get("at") or "—", e.get("event") or "—", (e.get("message") or "—") | cell_text(limit=400)]) %}
 {% endfor %}
-{% if rows %}{{ table([{"label": "#", "mono": true}, {"label": "At", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The run's persisted events, in sequence", density="dense", complete=true, row_count=rows | length) }}
+{% if rows %}{{ table([{"label": "#", "mono": true}, {"label": "At", "mono": true}, {"label": "Event", "mono": true}, {"label": "Message"}], rows, caption="The run's persisted events, in sequence", density="dense", complete=true, row_count=rows | length, table_id="ip-task-2", sortable=true) }}
 {% else %}{{ empty_state("No event recorded.") }}{% endif %}
 {% endif %}
 {% endif %}

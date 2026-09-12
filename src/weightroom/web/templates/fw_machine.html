@@ -31,7 +31,7 @@
 {% if items %}
 {% set rows = [] %}
 {% for run in items %}{% set _ = rows.append([run_link(run.get("id")), status_badge(run.get("status")), ((run.get("suite") or {}).get("key") or "—"), run.get("model") or "—", run.get("label") or "—", run.get("created_at") or "—"]) %}{% endfor %}
-{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Model", "mono": true}, {"label": "Label"}, {"label": "Created", "mono": true}], rows, caption="Newest first; the first page", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Model", "mono": true}, {"label": "Label"}, {"label": "Created", "mono": true}], rows, caption="Newest first; the first page", density="dense", row_count=rows | length, table_id="fw-machine", sortable=true) }}
 <p><a href="/apps/freeweight/runs?machine={{ (machine.get('machine_fingerprint') or '') | urlencode }}">Every run on it</a></p>
 {% else %}
 {{ empty_state("No run recorded on this machine.") }}

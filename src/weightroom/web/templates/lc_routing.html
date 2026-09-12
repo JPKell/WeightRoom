@@ -111,7 +111,7 @@ executing anything; LoadCoach keeps the decision, so it joins the history below.
 {% for one in profiles.data %}
 {% set _ = rows.append([profile_link(one.get("profile_id")), one.get("version") or "—", one.get("description") or "—", (one.get("weights") or {}).keys() | join(", ") or "—", badge("enabled", tone="success") if one.get("enabled") else badge("disabled", tone="neutral")]) %}
 {% endfor %}
-{{ table([{"label": "Profile"}, {"label": "Version", "mono": true}, {"label": "Description"}, {"label": "Weighted capabilities"}, {"label": "Enabled"}], rows, caption="Routing intent, not prompts", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Profile"}, {"label": "Version", "mono": true}, {"label": "Description"}, {"label": "Weighted capabilities"}, {"label": "Enabled"}], rows, caption="Routing intent, not prompts", density="dense", row_count=rows | length, table_id="lc-routing", sortable=true) }}
 {% else %}
 {{ empty_state("No task profile is loaded.") }}
 {% endif %}

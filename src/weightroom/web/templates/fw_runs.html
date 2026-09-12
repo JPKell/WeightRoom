@@ -91,7 +91,7 @@
   run.get("completed_at") or "—"
 ]) %}
 {% endfor %}
-{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Model", "mono": true}, {"label": "Adapter"}, {"label": "Label"}, {"label": "Machine"}, {"label": "Created", "mono": true}, {"label": "Completed", "mono": true}], rows, caption="Runs, newest first", density="dense", complete=next_href is none, row_count=rows | length) }}
+{{ table([{"label": "Run"}, {"label": "Status"}, {"label": "Suite"}, {"label": "Model", "mono": true}, {"label": "Adapter"}, {"label": "Label"}, {"label": "Machine"}, {"label": "Created", "mono": true}, {"label": "Completed", "mono": true}], rows, caption="Runs, newest first", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-runs", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 {% else %}
 {{ empty_state("No run matches. A run measures one model against one suite; native.echo is the self-test that exercises the whole engine in under a minute.") }}

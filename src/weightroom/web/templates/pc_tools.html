@@ -44,7 +44,7 @@ reason rather than executing unisolated.</p>
 ]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Tool", "mono": true}, {"label": "Registered"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation required"}, {"label": "Args redacted"}, {"label": "Cause"}, {"label": "Description"}], rows, caption="Configured tools", density="dense", row_count=rows | length) }}
+{{ table([{"label": "Tool", "mono": true}, {"label": "Registered"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation required"}, {"label": "Args redacted"}, {"label": "Cause"}, {"label": "Description"}], rows, caption="Configured tools", density="dense", row_count=rows | length, table_id="pc-tools", sortable=true) }}
 {% for one in report.get("tools") or [] %}
 {% if one.get("parameters") %}{{ json_viewer(one.get("parameters"), label=one.get("name") ~ " arguments") }}{% endif %}
 {% endfor %}

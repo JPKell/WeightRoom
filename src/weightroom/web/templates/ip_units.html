@@ -45,7 +45,7 @@ that version covers, and whether its last validation passed.</p>
 ]) %}
 {% endfor %}
 {% if rows %}
-{{ table([{"label": "Unit", "mono": true}, {"label": "Title"}, {"label": "State"}, {"label": "Version"}, {"label": "Words"}, {"label": "Coverage"}, {"label": "Last validation"}, {"label": "Paused because"}], rows, caption="Units, in reading order", density="dense", complete=true, row_count=rows | length) }}
+{{ table([{"label": "Unit", "mono": true}, {"label": "Title"}, {"label": "State"}, {"label": "Version"}, {"label": "Words"}, {"label": "Coverage"}, {"label": "Last validation"}, {"label": "Paused because"}], rows, caption="Units, in reading order", density="dense", complete=true, row_count=rows | length, table_id="ip-units", sortable=true) }}
 {% elif detail.data is not none %}
 {{ empty_state("This project has no units yet: run its plan.", "Its plan", proj ~ "/plan") }}
 {% endif %}
