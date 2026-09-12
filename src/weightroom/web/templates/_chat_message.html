@@ -1,5 +1,10 @@
 {#- One message. Model text arrives here only as message.html (services/chat.py render_reply);
-    thinking, cards and halts only as escaped text or tojson. No chat template marks anything safe. -#}
+    thinking, cards and halts only as escaped text or tojson. No chat template marks anything safe.
+
+    Row WX4: every frame that is not the answer — thinking, the plan/step/tool/egress cards and the
+    routing and cost block — sits under one `<details class="chat-details">`, closed once the reply
+    is finished and open while it streams (so the thinking the operator asked to watch is watchable).
+    Approval cards stay **outside** it: a decision nobody has taken is never a click away. -#}
 <article class="chat-message chat-{{ message.role }}" id="m-{{ message.id }}" data-message-id="{{ message.id }}"
          {%- if message.in_progress %} data-streaming="true"{% endif %}>
   <div class="chat-role muted">{{ "You" if message.role == "user" else ("Reply" if message.role == "assistant" else message.role) }}
@@ -9,15 +14,20 @@
   <div class="chat-user-text">{{ message.text }}</div>
   {% else %}
 
+  {% set approvals = [] %}
+  {% set frames = [] %}
   {% for card in message.cards %}
-  {% set pending = card.get('kind') == "approval_pending" and card.get('status') == "requested"
+  {% set _ = (approvals if card.get('kind') == "approval_pending" else frames).append(card) %}
+  {% endfor %}
+
+  {% for card in approvals %}
+  {% set pending = card.get('status') == "requested"
                    and card.get('approval_request_id') in message.pending_approvals and message.in_progress %}
-  <details class="chat-card chat-card-{{ card.get('kind') }}"{% if pending %} open{% endif %}>
-    <summary>{{ (card.get('kind') or '') | replace('_', ' ') | capitalize }}
+  <details class="chat-card chat-card-approval-pending"{% if pending %} open{% endif %}>
+    <summary>Approval
       {%- if card.get('event') %} · <code>{{ card.get('event') }}</code>{% endif %}
       {%- if card.get('title') %} · {{ card.get('title') }}{% endif %}
-      {%- if card.get('outcome') %} · {{ card.get('outcome') }}{% endif %}
-      {%- if card.get('status') and card.get('kind') == "approval_pending" %} · <strong>{{ card.get('status') }}</strong>{% endif %}</summary>
+      {%- if card.get('status') %} · <strong>{{ card.get('status') }}</strong>{% endif %}</summary>
     <dl class="kv-list">
       {% for key, value in card.items() if key not in ("id", "kind", "message_id", "event", "title") %}
       <dt>{{ key }}</dt><dd><code>{% if value is string %}{{ value }}{% else %}{{ value | tojson }}{% endif %}</code></dd>
@@ -49,33 +59,57 @@
   </details>
   {% endfor %}
 
+  {% set steps = frames | length + (1 if message.thinking or message.in_progress else 0) + (1 if message.routing else 0) %}
+  {% if steps %}
+  <details class="chat-details"{% if message.in_progress %} open{% endif %}>
+    <summary>Details{% if not message.in_progress %} · {{ steps }} step{{ "" if steps == 1 else "s" }}{% endif %}</summary>
+
+    {% if message.in_progress %}
+    <details class="chat-thinking" hidden><summary>Thinking…</summary><div class="chat-thinking-body"></div></details>
+    {% elif message.thinking %}
+    <details class="chat-thinking"><summary>Thinking</summary><div class="chat-thinking-body">{{ message.thinking }}</div></details>
+    {% endif %}
+
+    {% for card in frames %}
+    <details class="chat-card chat-card-{{ card.get('kind') }}">
+      <summary>{{ (card.get('kind') or '') | replace('_', ' ') | capitalize }}
+        {%- if card.get('event') %} · <code>{{ card.get('event') }}</code>{% endif %}
+        {%- if card.get('title') %} · {{ card.get('title') }}{% endif %}
+        {%- if card.get('outcome') %} · {{ card.get('outcome') }}{% endif %}</summary>
+      <dl class="kv-list">
+        {% for key, value in card.items() if key not in ("id", "kind", "message_id", "event", "title") %}
+        <dt>{{ key }}</dt><dd><code>{% if value is string %}{{ value }}{% else %}{{ value | tojson }}{% endif %}</code></dd>
+        {% endfor %}
+      </dl>
+    </details>
+    {% endfor %}
+
+    {% if message.routing %}
+    {% set line = message.cost_line %}
+    <details class="chat-decision muted">
+      <summary>{{ message.routing.get('model') or "—" }}
+        {%- if message.routing.get('tier') %} · tier {{ message.routing.get('tier') }}{% endif %}
+        · {{ message.routing.get('candidates') or 0 }} candidates · {{ message.routing.get('rejected') or 0 }} rejected
+        {%- if line %} · {{ line.summary }}{% endif %}</summary>
+      {% if message.routing.get('rejections') %}
+      <ul>{% for reason, count in message.routing.get('rejections').items() %}<li><code>{{ reason }}</code> × {{ count }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if line and line.unpriced_count %}<p>{{ line.unpriced_count }} unpriced</p>{% endif %}
+      <p>{% if message.routing.get('task_profile') %}task <code>{{ message.routing.get('task_profile') }}</code> · {% endif %}
+         {% if message.routing.get('job_id') %}LoadCoach job <code>{{ message.routing.get('job_id') }}</code>{% endif %}
+         {% if message.finish_reason %} · finish <code>{{ message.finish_reason }}</code>{% endif %}</p>
+    </details>
+    {% endif %}
+  </details>
+  {% endif %}
+
   {% if message.in_progress %}
-  <details class="chat-thinking" hidden><summary>Thinking…</summary><div class="chat-thinking-body"></div></details>
   <div class="chat-live" aria-live="polite"></div>
   <p class="muted chat-waiting">Waiting for the reply… <noscript>Reload the page to see it.</noscript></p>
   {% else %}
-  {% if message.thinking %}
-  <details class="chat-thinking"><summary>Thinking</summary><div class="chat-thinking-body">{{ message.thinking }}</div></details>
-  {% endif %}
   <div class="chat-answer">{{ message.html }}</div>
   {% if message.halt_message %}
   <p class="notice" role="alert"><strong>Halted.</strong> {{ message.halt_message }}</p>
-  {% endif %}
-  {% if message.routing %}
-  {% set line = message.cost_line %}
-  <details class="chat-decision muted">
-    <summary>{{ message.routing.get('model') or "—" }}
-      {%- if message.routing.get('tier') %} · tier {{ message.routing.get('tier') }}{% endif %}
-      · {{ message.routing.get('candidates') or 0 }} candidates · {{ message.routing.get('rejected') or 0 }} rejected
-      {%- if line %} · {{ line.summary }}{% endif %}</summary>
-    {% if message.routing.get('rejections') %}
-    <ul>{% for reason, count in message.routing.get('rejections').items() %}<li><code>{{ reason }}</code> × {{ count }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if line and line.unpriced_count %}<p>{{ line.unpriced_count }} unpriced</p>{% endif %}
-    <p>{% if message.routing.get('task_profile') %}task <code>{{ message.routing.get('task_profile') }}</code> · {% endif %}
-       {% if message.routing.get('job_id') %}LoadCoach job <code>{{ message.routing.get('job_id') }}</code>{% endif %}
-       {% if message.finish_reason %} · finish <code>{{ message.finish_reason }}</code>{% endif %}</p>
-  </details>
   {% endif %}
   {% endif %}
   {% endif %}

@@ -48,6 +48,8 @@ ui_router = APIRouter(tags=["ui"], include_in_schema=False)
 
 _HEARTBEAT_SECONDS: Final = 15.0
 _POLL_SECONDS: Final = 0.05
+_TITLE_FROM_TEXT: Final = 80
+"""How much of a first message becomes the conversation's title when none was typed."""
 
 
 class NewConversation(BaseModel):
@@ -106,6 +108,27 @@ def _can_approve(request: Request, backend: str) -> bool | None:
     from weightroom.services.chat_promptcadence import token_can_approve
 
     return token_can_approve(request.app.state.settings)
+
+
+def _tool_choices(request: Request) -> tuple[list[str], str]:
+    """The tool names the composer offers, and why it offers none when it offers none.
+
+    PromptCadence's registry is read only when its unit says it can answer, so the page that starts
+    a LoadCoach conversation costs no call. Anything it refuses or fails with leaves the allowlist
+    as the free-text input it has always been, with PromptCadence's own words under it.
+    """
+    from baseaicore import SuiteError
+
+    from weightroom.services.chat_promptcadence import registered_tool_names
+
+    reason = _availability(request, "promptcadence")
+    if reason is not None:
+        return [], reason
+    try:
+        names = registered_tool_names(request.app.state.http, request.app.state.settings)
+    except SuiteError as exc:
+        return [], exc.message
+    return names, ""
 
 
 def _send(request: Request, principal: Principal, conversation_id: str, text: str) -> str:
@@ -308,6 +331,7 @@ def _render_thread(
         page="chat",
         principal=principal,
         conversation=view,
+        conversations=list_conversations(request.app.state.database),
         unavailable=_availability(request, view.backend),
         max_attachment_bytes=request.app.state.settings.chat.max_attachment_bytes,
         error=error,
@@ -317,10 +341,11 @@ def _render_thread(
 
 @ui_router.get("/chat", summary="Chat", response_class=HTMLResponse)
 def chat_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """The conversation list and the form that starts one."""
+    """The conversation rail and the composer that starts one."""
     from weightroom.web.routes.apps import render_shell_page
 
     settings = request.app.state.settings
+    tool_names, tools_unavailable = _tool_choices(request)
     return render_shell_page(
         request,
         "chat.html",
@@ -329,7 +354,17 @@ def chat_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
         conversations=list_conversations(request.app.state.database),
         default_task_profile=settings.chat.default_task_profile,
         default_classification=settings.chat.default_classification,
+        tool_names=tool_names,
+        tools_unavailable=tools_unavailable,
     )
+
+
+def _title_from(text: str) -> str:
+    """A conversation's title taken from its first message, the way a person would write one."""
+    line = next((one.strip() for one in text.splitlines() if one.strip()), "")
+    if len(line) <= _TITLE_FROM_TEXT:
+        return line
+    return line[: _TITLE_FROM_TEXT - 1].rstrip() + "\u2026"
 
 
 @ui_router.post("/chat", summary="Start a conversation from the page")
@@ -337,18 +372,26 @@ def chat_create_form(
     request: Request,
     principal: CurrentOperator,
     backend: Annotated[str, Form()],
-    title: Annotated[str, Form()],
+    title: Annotated[str, Form()] = "",
+    text: Annotated[str, Form()] = "",
     task_profile: Annotated[str, Form()] = "",
     model_override: Annotated[str, Form()] = "",
     classification: Annotated[str, Form()] = "",
     tier: Annotated[str, Form()] = "",
     tools: Annotated[str, Form()] = "",
-) -> RedirectResponse:
-    """Create, then go to the thread."""
+) -> Any:  # noqa: ANN401 — a redirect, or the new thread with the refusal
+    """Create the conversation, send the composer's first message if it carried one, show it.
+
+    The composer is one control: a title is optional and taken from the message when blank, because
+    a conversation named before it is had is a form, not a chat. An empty ``text`` (the JSON-shaped
+    form, and the audit test's) still creates the conversation and sends nothing.
+    """
+    from baseaicore import SuiteError
+
     conversation_id = create_conversation(
         request.app.state.database,
         backend=backend,
-        title=title,
+        title=title.strip() or _title_from(text),
         task_profile=task_profile,
         model_override=model_override,
         classification=classification,
@@ -357,6 +400,14 @@ def chat_create_form(
         now=now_of(request),
     )
     _audit(request, principal, "chat.create", conversation_id, backend=backend)
+    if text.strip():
+        try:
+            _send(request, principal, conversation_id, text)
+        except SuiteError as exc:
+            if exc.code == "NOT_FOUND":
+                raise
+            view = get_conversation(request.app.state.database, conversation_id)
+            return _render_thread(request, principal, view, error=exc.message)
     return RedirectResponse(f"/chat/{conversation_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
