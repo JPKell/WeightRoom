@@ -1,0 +1,133 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import badge, empty_state %}
+{% block title %}llama.cpp — WeightRoom{% endblock %}
+{% block page_content %}
+<div class="page-head">
+  <h2>llama.cpp
+    {{ badge((report.servers | length | string) ~ " running", tone="success" if report.servers else "neutral") }}
+    {% if report.total %}
+    {{ badge(("safe: " ~ report.passing ~ "/" ~ report.total) if report.safe else (report.passing ~ "/" ~ report.total ~ " memory-safety checks"),
+             tone="success" if report.safe else "danger") }}
+    {% endif %}
+  </h2>
+  <div class="page-actions">
+    <a href="/docs/page?path={{ setup_document }}">{{ setup_document }}</a> ·
+    <a href="/ollama">Ollama</a>
+  </div>
+</div>
+
+<p class="muted"><strong>This page reads and never acts.</strong> A <code>llama-server</code> is
+not a unit: it is a child of FreeWeight or LoadCoach, launched and supervised by the application
+that owns it (ADR-0062). WeightRoom starts none and stops none — ModelRack is imported for
+residency and discovery reads only (spec §3). To change what is running, change the owning
+application's configuration and restart it.</p>
+
+<h3>Running servers</h3>
+{% if report.servers_error %}
+<p class="notice">{{ report.servers_error }}</p>
+{% elif report.servers %}
+<table id="llamacpp-servers" data-density="dense">
+  <caption>Found by <code>pgrep -x llama-server</code>; each line is that process's own command line.</caption>
+  <thead><tr><th scope="col">PID</th><th scope="col">Model</th><th scope="col">Port</th>
+             <th scope="col">Launched context</th><th scope="col">Serving</th>
+             <th scope="col"><code>--fit</code></th><th scope="col">Build</th></tr></thead>
+  <tbody>
+  {% for server in report.servers %}
+    <tr>
+      <th scope="row"><code>{{ server.pid }}</code></th>
+      <td title="{{ server.model or '' }}"><code>{{ server.model_name }}</code></td>
+      <td><code>{{ server.port if server.port is not none else "—" }}</code></td>
+      <td><code>{{ server.context_size if server.context_size is not none else "unset" }}</code></td>
+      <td>
+        {%- if server.served_context_tokens is not none %}<code>{{ server.served_context_tokens }}</code>
+        {%- elif server.port is none %}<span class="muted">no port in its command line</span>
+        {%- else %}<span class="muted" title="{{ server.props_error or '' }}">/props did not answer</span>{% endif -%}
+      </td>
+      <td><code>{{ server.fit if server.fit else "unset (llama-server defaults to on)" }}</code></td>
+      <td><code>{{ server.build_info or "—" }}</code></td>
+    </tr>
+    <tr>
+      <td colspan="7"><details><summary class="muted">Command line</summary>
+        <code class="llamacpp-argv">{{ server.argv | join(" ") }}</code></details></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+{{ empty_state("No llama-server is running. FreeWeight and LoadCoach launch one on demand and stop it when the model is released.") }}
+{% endif %}
+<p class="muted">The binary on this console's <code>PATH</code>:
+  <code>{{ report.binary or "not found" }}</code>. Each application launches the path <em>it</em>
+  configures (<code>provider.server_path</code>), which may be another build.</p>
+
+<h3>Memory safety — <code>MEMORY_SAFETY.md</code> §2.2</h3>
+{% for app, kinds in (report.skipped or {}).items() %}
+<p class="muted">{% if kinds %}<strong>{{ app | app_label }} is configured for
+  <code>{{ kinds }}</code></strong>, not <code>llamacpp</code>, so §2.2's llama.cpp expectations
+  are not checked against it{% else %}<strong>{{ app | app_label }} named no provider</strong> —
+  it is not installed here, or its <code>config schema --json</code> did not answer, so there is
+  nothing to check it against{% endif %}. Its unit cap below still applies: the cap protects the
+  host from whatever the application launches.</p>
+{% endfor %}
+<table id="llamacpp-memory-safety" data-density="dense">
+  <caption>Each expectation of the two applications that launch <code>llama-server</code>, with what they actually say.</caption>
+  <thead><tr><th scope="col"></th><th scope="col">Application</th><th scope="col">Setting</th>
+             <th scope="col">Found</th><th scope="col">Expected</th>
+             <th scope="col">Protects against</th></tr></thead>
+  <tbody>
+  {% for finding in report.unit_findings %}
+    <tr>
+      <td>{{ badge("pass" if finding.severity == "ok" else ("fail" if finding.severity == "failure" else finding.severity),
+                   tone={"ok": "success", "failure": "danger"}.get(finding.severity, "neutral")) }}</td>
+      <td>{{ finding.app | app_label }}</td>
+      <th scope="row"><code>{{ finding.app }}.service</code></th>
+      <td>{% for one in finding.evidence.split(", ") %}<code>{{ one }}</code><br>{% endfor %}</td>
+      <td><code>MemoryHigh</code><br><code>MemoryMax</code><br><code>MemorySwapMax=0</code></td>
+      <td class="muted">{{ finding.summary }}</td>
+    </tr>
+  {% endfor %}
+  {% for check in report.checks %}
+    <tr>
+      <td>{{ badge(check.outcome, tone={"pass": "success", "fail": "danger"}.get(check.outcome, "neutral")) }}</td>
+      <td>{{ check.app | app_label }}</td>
+      <th scope="row"><code>{{ check.subject }}</code></th>
+      <td><code>{{ check.found }}</code></td>
+      <td><code>{{ check.expected }}</code></td>
+      <td class="muted">{{ check.why }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if not report.safe and report.total %}
+<p class="notice">Settings are edited on each application's own settings page
+  (<a href="/apps/freeweight/settings">FreeWeight</a>,
+  <a href="/apps/loadcoach/settings">LoadCoach</a>); a unit that is missing its cap is fixed with
+  <code>wr-gym units sync</code>. Neither is done from this page.</p>
+{% endif %}
+
+<h3>GGUF directories</h3>
+{% if report.directories %}
+{% for directory in report.directories %}
+<section class="card">
+  <h4>{{ directory.app | app_label }} <code>{{ directory.key }}</code></h4>
+  <p class="muted"><code>{{ directory.path }}</code>
+    {%- if not directory.exists %} — <strong>the directory does not exist.</strong>
+    {%- elif directory.error %} — <strong>could not be listed:</strong> <code>{{ directory.error }}</code>
+    {%- else %} — {{ directory.files | length }} GGUF{{ "" if directory.files | length == 1 else "s" }},
+    {{ directory.total_bytes | bytes_human }}{% if directory.omitted %} ({{ directory.omitted }} more not listed){% endif %}{% endif %}</p>
+  {% if directory.files %}
+  <table data-density="dense">
+    <thead><tr><th scope="col">File</th><th scope="col">Size</th></tr></thead>
+    <tbody>
+    {% for file in directory.files %}
+      <tr><th scope="row"><code>{{ file.name }}</code></th><td>{{ file.size_bytes | bytes_human }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% else %}
+{{ empty_state("Neither application configures a model directory, so there is nothing to list. FreeWeight sets provider.model_directory; LoadCoach sets one per llama.cpp registration.") }}
+{% endif %}
+{% endblock %}

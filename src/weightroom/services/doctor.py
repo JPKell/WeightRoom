@@ -55,6 +55,7 @@ __all__ = [
     "Finding",
     "Report",
     "diagnose",
+    "unit_cap_findings",
 ]
 
 SEVERITIES: Final[tuple[str, ...]] = ("failure", "warning", "notice", "unknown", "ok")
@@ -230,8 +231,13 @@ def _ollama_host(properties: Mapping[str, str]) -> str | None:
     return environment_of(dict(properties)).get("OLLAMA_HOST", "127.0.0.1:11434")
 
 
-def _unit_cap_findings(settings: Settings, *, controller: SystemdController) -> list[Finding]:
-    """``MEMORY_SAFETY.md`` §2.2: each application's unit carries the three ``Memory*`` lines."""
+def unit_cap_findings(settings: Settings, *, controller: SystemdController) -> list[Finding]:
+    """``MEMORY_SAFETY.md`` §2.2: each application's unit carries the three ``Memory*`` lines.
+
+    Public since row WX3, which shows the same three lines on the ``/llamacpp`` pane. It is the
+    same function rather than a second reading of the same properties so that the doctor and that
+    page cannot come to different conclusions about whether a unit is capped.
+    """
     findings = []
     # `MEMORY_SAFETY.md` §2.2 and ADR-0125 rule 1 cap the two units that launch `llama-server`,
     # not all four: IdeaPress and PromptCadence hold no model in their own cgroup, and flagging
@@ -751,7 +757,7 @@ def diagnose(
     findings.extend(
         _ollama_findings(settings, controller=controller, database=database, client=client)
     )
-    findings.extend(_unit_cap_findings(settings, controller=controller))
+    findings.extend(unit_cap_findings(settings, controller=controller))
     findings.extend(_bind_findings(forms))
     findings.extend(_token_scope_findings(settings))
     findings.extend(_caddy_findings(forms))

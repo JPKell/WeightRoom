@@ -98,7 +98,7 @@ phases that are gated ([development plan](development-plan.md)):
 |---|---|
 | Shell | Top bar, tabs with status dots, telemetry strip, left menus, theme, the console's own navigation |
 | Setup and doctor | The wizard; the cross-application check against the host-protection and exposure rubrics; printed commands for anything root-owned |
-| Processes | Unit files written and synced; start/stop/restart/enable; Ollama status and the polkit-gated restart ([ADR-0125](../../adr/0125-weightroom-drives-the-applications-through-systemd-user-units-it-writes.md)) |
+| Processes | Unit files written and synced; start/stop/restart/enable; Ollama status and the polkit-gated restart ([ADR-0125](../../adr/0125-weightroom-drives-the-applications-through-systemd-user-units-it-writes.md)); a read-only `llama.cpp` page — discovered servers, the configured GGUF directories and `MEMORY_SAFETY.md` §2.2's expectations — which starts and stops nothing, because a `llama-server` belongs to the application that launched it ([ADR-0062](../../adr/0062-llamacpp-serves-adapters-through-a-supervised-process.md)) |
 | Logs and audit | Journal streaming and history per application; WeightRoomGym's `audit_log` of every action it took |
 | Telemetry | The strip, the per-figure history pages, resident models |
 | Control surfaces | One native page set per application over that application's API, CLI and (read) database (§7.3) |

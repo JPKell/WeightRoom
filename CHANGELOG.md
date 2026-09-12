@@ -7,6 +7,37 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **A llama.cpp page, and the console's own pages move into the left menu** (row WX3). Four
+  changes to the shell, one new page:
+
+  - **`/llamacpp`**, beside `/ollama` and read-only end to end: the running `llama-server`
+    processes found by `pgrep -x llama-server` (never `-f`) with the port, `--model`, `--ctx-size`
+    and `--fit` read out of each one's own `/proc/<pid>/cmdline`, and the served `n_ctx` and build
+    from `GET /props` where the port answers; the GGUF directories FreeWeight and LoadCoach
+    configure, with the files found in them; and `MEMORY_SAFETY.md` §2.2's expectations of the two
+    applications that launch a server as found/expected rows — the unit-cap half being the
+    doctor's own `unit_cap_findings`, so the two pages cannot disagree. There is **no launch and
+    no kill**, and the page says why: a `llama-server` belongs to the application that started it
+    (ADR-0062), and ModelRack is imported for residency and discovery reads only (spec §3). An
+    application configured for another provider kind is named and skipped rather than shown rows
+    that could only ever fail.
+  - **The console's pages and tools are a left-menu section** — *Console* (Overview, Applications,
+    Ollama, llama.cpp, Logs, Audit, Doctor, Settings, Trust) and *Tools* (Chat, Docs, Database,
+    Catalog, Costs, Backups, Jobs) — appended under an application's own menu and under the
+    documentation tree, so they are on every page at every width. They used to sit in the top bar
+    and fold into *Menu* below 1080 px, which made *which pages exist* a function of the window's
+    width. The top bar now carries the brand, the four application tabs, the alerts count and the
+    operator menu; *Menu* overflows the tabs alone, at 860 px.
+  - **The shell's stylesheet is a file**, `static/css/weightroom-shell.css`, served from
+    `/app-static` and cached once per browser instead of re-sent inside every page, with a 32 KB
+    budget in `tests/performance/test_budgets.py` beside ADR-0139's JavaScript budget.
+  - **`app_page_header(view, title, section, supporting)`** in `_app_page.html`: the common head
+    of a page under an application's tab — where the page sits, its title, that application's
+    availability pill verbatim, one supporting sentence, and the caller's own actions through
+    `{% call %}`.
+  - **The documentation tree opens to the document you are reading**, folder by folder, instead of
+    showing one flat level of a section's top folders.
+
 - **IdeaPress's attempts tables name the transport call** (row WPF12). A stage run's *Attempts*
   table and a unit's *Provenance* table now fold `transport_call` (IdeaPress migration `0012`, row
   WPF7) into the attempt cell — `attempt N · round R · call C` — so two rows of one attempt are
