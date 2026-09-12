@@ -333,6 +333,34 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   application's page carries a Start that returns the operator to that page.
 
 ### Changed
+- **Chat is a chat page** (row WX4). The conversation list left the middle of the page for a rail
+  down its left side, newest first with the open one marked, and the composer is pinned to the
+  bottom of the thread it belongs to. One composer starts a conversation and sends its first
+  message: the title is optional and taken from that message when it is blank, because a
+  conversation named before it is had is a form, not a chat. The **Mode** radio pair is a select
+  inside the composer's own *Mode and settings* block, with the backend's fields beside it; on a
+  thread it is disabled and shows the mode the conversation was started with, since the mode is
+  fixed for a conversation's life (`services/chat.py`) and a per-message switch is not modelled.
+  The chat pages carry their own `chat.css` and `chat.js` — 1.6 KB, inside ADR-0139's 120 KB — and
+  work without the script: both backends' fieldsets are simply visible, and the tool allowlist is
+  the free-text input it has always been.
+
+- **The tool allowlist is picked from PromptCadence's registry** (row WX4). The composer lists what
+  `GET /tools` reports as *registered* and appends a chosen name to the comma-separated list;
+  **Allow all tools** writes today's registered names into that list, by name. It never leaves the
+  field empty to mean "all" — PromptCadence reads an omitted allowlist as *every* configured tool
+  (row W6), so what was allowed is recorded rather than implied, and a tool registered tomorrow
+  joins no conversation agreed today. A tool PromptCadence withheld is not offered: it cannot run.
+  The registry is read only when PromptCadence's unit says it can answer; stopped, refused or
+  silent, the page says so in PromptCadence's own words and the input stays free text.
+
+- **A reply's non-answer frames sit under one collapsed `Details`** (row WX4). Thinking, the plan,
+  step, tool-call and egress cards and the routing and cost block are wrapped in a single
+  `<details>` summarised `Details · N steps`, closed once the reply is finished and open while it
+  streams, so the thinking the operator asked to watch is still watchable live (ADR-0132) and a
+  finished thread reads as answers. A **pending approval stays outside** the wrapper with its
+  auto-open intact: a decision nobody has taken is never one click away.
+
 - An application's left menu is two sections: its own pages, a rule, then Settings, Tokens,
   Prompts, Logs and Database (design brief §4). A page not built yet names the row that builds it
   (`coming in row WP2`) instead of *not yet scheduled*.

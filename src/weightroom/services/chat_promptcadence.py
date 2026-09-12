@@ -48,6 +48,7 @@ __all__ = [
     "fetch_answer",
     "fetch_egress",
     "fetch_tier_remote",
+    "registered_tool_names",
     "stream_trajectory",
     "submit_trajectory",
     "token_can_approve",
@@ -337,6 +338,29 @@ def token_can_approve(settings: Settings, *, now: float | None = None) -> bool |
     with _SCOPE_LOCK:
         _SCOPE_CACHE["promptcadence"] = (moment, answer)
     return answer
+
+
+def registered_tool_names(client: httpx.Client, settings: Settings) -> list[str]:
+    """The names PromptCadence's registry has **registered**, sorted, for the chat composer.
+
+    A configured tool PromptCadence withheld (``registered`` false — no sandbox rung, a bad
+    signature) is left out: it cannot run, and "allow all tools" writes a snapshot of what exists
+    now, never a standing grant that a later registration would silently join.
+
+    Raises:
+        AppRefused: PromptCadence refused ``GET /tools``.
+        AppUnreachable: It did not answer.
+    """
+    from weightroom.services.promptcadence_pages import tools_api
+
+    report = tools_api(client, settings)
+    tools = report.get("tools")
+    names = {
+        str(one.get("name"))
+        for one in (tools if isinstance(tools, list) else [])
+        if isinstance(one, Mapping) and one.get("registered") and one.get("name")
+    }
+    return sorted(names)
 
 
 def fetch_tier_remote(

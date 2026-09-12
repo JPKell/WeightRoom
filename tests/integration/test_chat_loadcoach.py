@@ -547,3 +547,82 @@ def test_chat_never_calls_a_provider_directly() -> None:
         ):
             offenders.append(str(path.relative_to(SRC)))
     assert offenders == []
+
+
+# --- The page's shape (row WX4) --------------------------------------------------------------
+
+
+def test_the_chat_page_rails_the_conversations_and_pins_one_composer(tmp_path: Path) -> None:
+    console = _console(tmp_path)
+    first = _new(console, title="older")
+    second = _new(console, title="newer")
+    page = console.client.get("/chat", headers={"Accept": "text/html"}).text
+    assert 'class="chat-rail"' in page
+    assert f'href="/chat/{first}"' in page and f'href="/chat/{second}"' in page
+    newest, oldest = page.index(f'href="/chat/{second}"'), page.index(f'href="/chat/{first}"')
+    assert newest < oldest, "newest first"
+    assert 'class="chat-composer"' in page
+    assert '<select id="chat-backend" name="backend">' in page  # the mode, chosen here
+    assert "/app-static/css/chat.css" in page
+
+
+def test_the_thread_page_marks_the_open_conversation_and_fixes_its_mode(tmp_path: Path) -> None:
+    console = _console(tmp_path)
+    other = _new(console, title="other")
+    conversation_id = _new(console, title="open one")
+    page = console.client.get(f"/chat/{conversation_id}", headers={"Accept": "text/html"}).text
+    assert f'href="/chat/{conversation_id}" aria-current="page"' in page
+    assert f'href="/chat/{other}" aria-current="page"' not in page
+    assert '<select id="chat-backend" disabled>' in page  # fixed per conversation
+    assert 'name="backend"' not in page, "the thread page never submits a mode"
+
+
+def test_the_composer_starts_the_conversation_and_sends_its_first_message(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    console = _console(tmp_path)
+    mock_loadcoach(respx_mock)
+    response = console.post_form(
+        "/chat",
+        {"backend": "loadcoach", "text": "Is 1001 prime?\nsecond line", "task_profile": "general"},
+    )
+    assert response.status_code == 303, response.text
+    conversation_id = response.headers["location"].rsplit("/", 1)[-1]
+    _state(console).chat.join()
+    body = console.client.get(f"/api/v1/chat/conversations/{conversation_id}").json()
+    assert body["title"] == "Is 1001 prime?", "the title is taken from the first message"
+    assert [one["role"] for one in body["messages"]] == ["user", "assistant"]
+
+
+def test_a_long_first_message_becomes_a_title_that_fits(tmp_path: Path) -> None:
+    console = _console(tmp_path)
+    response = console.post_form("/chat", {"backend": "loadcoach", "text": "word " * 50})
+    conversation_id = response.headers["location"].rsplit("/", 1)[-1]
+    title = console.client.get(f"/api/v1/chat/conversations/{conversation_id}").json()["title"]
+    assert len(title) == 80 and title.endswith("…")
+
+
+def test_a_named_title_survives_the_first_message(tmp_path: Path) -> None:
+    console = _console(tmp_path)
+    response = console.post_form("/chat", {"backend": "loadcoach", "title": "mine", "text": "hi"})
+    conversation_id = response.headers["location"].rsplit("/", 1)[-1]
+    assert console.client.get(f"/api/v1/chat/conversations/{conversation_id}").json()["title"] == (
+        "mine"
+    )
+
+
+def test_every_non_answer_frame_sits_under_one_collapsed_details(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    console = _console(tmp_path)
+    mock_loadcoach(respx_mock)
+    conversation_id = _new(console)
+    _send(console, conversation_id)
+    page = console.client.get(f"/chat/{conversation_id}", headers={"Accept": "text/html"}).text
+    assert '<details class="chat-details">' in page, "closed by default: no `open` attribute"
+    # Thinking and the routing line are the two frames of a LoadCoach reply, both inside it.
+    wrapper = page.index('<details class="chat-details">')
+    answer = page.index('<div class="chat-answer">')
+    assert wrapper < page.index('<details class="chat-thinking">') < answer
+    assert wrapper < page.index('<details class="chat-decision muted">') < answer
+    assert "Details · 2 steps" in page

@@ -1,0 +1,22 @@
+{#- The conversation rail, newest first, the open one marked (row WX4). Included by chat.html and
+    chat_thread.html; `current_id` is the open conversation's id, or "" on the new-conversation
+    page. Titles are operator-written and escaped like any other value. -#}
+<nav class="chat-rail" aria-label="Conversations">
+  <p class="chat-rail-new"><a href="/chat"{% if not current_id %} aria-current="page"{% endif %}>+ New conversation</a></p>
+  <h3>Conversations</h3>
+  {% if conversations %}
+  <ul>
+    {% for one in conversations %}
+    <li>
+      <a href="/chat/{{ one.id }}"{% if one.id == current_id %} aria-current="page"{% endif %}
+         title="{{ one.title }} — {{ one.backend }}, {{ one.messages }} messages, updated {{ one.updated_at }}">
+        {{ one.title }}
+        <span class="chat-rail-meta">{{ one.backend }} · {{ one.messages }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">None yet.</p>
+  {% endif %}
+</nav>

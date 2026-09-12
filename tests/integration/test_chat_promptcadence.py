@@ -300,3 +300,90 @@ def test_an_unknown_approval_is_not_found_and_calls_nothing(
     )
     assert response.status_code == 404
     assert not routes["approve"].called
+
+
+# --- The composer's tool allowlist (row WX4) ---------------------------------------------------
+
+
+_TOOLS_REPORT = {
+    "tools": [
+        {"name": "read_file", "registered": True},
+        {"name": "list_dir", "registered": True},
+        {"name": "run_command", "registered": False, "withheld_cause": "no sandbox rung"},
+    ],
+    "isolation": {"tier": "bubblewrap"},
+}
+
+
+def _mock_tools(respx_mock: Any, report: dict[str, Any] | None = None) -> Any:  # noqa: ANN401
+    import httpx
+
+    from tests.support import PROMPTCADENCE_URL
+
+    respx_mock.get(f"{PROMPTCADENCE_URL}/api/v1/version").mock(
+        return_value=httpx.Response(
+            200, json={"application": "promptcadence", "version": "1.3.3", "api_version": "v1"}
+        )
+    )
+    return respx_mock.get(f"{PROMPTCADENCE_URL}/api/v1/tools").mock(
+        return_value=httpx.Response(200, json=report if report is not None else _TOOLS_REPORT)
+    )
+
+
+def test_the_composer_offers_the_registered_tools_and_allow_all_names_every_one(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    console = _console(tmp_path)
+    _mock_tools(respx_mock)
+    page = console.client.get("/chat", headers={"Accept": "text/html"}).text
+    assert '<select id="chat-tool-pick">' in page
+    assert '<option value="list_dir">list_dir</option>' in page
+    assert '<option value="read_file">read_file</option>' in page
+    assert "run_command" not in page, "a withheld tool cannot run, so it is not offered"
+    # "Allow all" is the snapshot written out by name — never an omitted key, which PromptCadence
+    # reads as every configured tool (services/chat_promptcadence.submit_trajectory).
+    assert 'data-all="list_dir, read_file"' in page
+    assert '<input id="chat-tools" name="tools"' in page
+
+
+def test_a_promptcadence_that_is_stopped_leaves_the_allowlist_as_free_text(tmp_path: Path) -> None:
+    console = _console(tmp_path, running=False)
+    page = console.client.get("/chat", headers={"Accept": "text/html"}).text
+    assert '<select id="chat-tool-pick">' not in page
+    assert "PromptCadence is stopped." in page
+    assert '<input id="chat-tools" name="tools"' in page
+
+
+def test_a_refused_tool_registry_leaves_the_allowlist_as_free_text(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    import httpx
+
+    from tests.support import PROMPTCADENCE_URL
+
+    console = _console(tmp_path)
+    respx_mock.get(f"{PROMPTCADENCE_URL}/api/v1/version").mock(
+        return_value=httpx.Response(
+            200, json={"application": "promptcadence", "version": "1.3.3", "api_version": "v1"}
+        )
+    )
+    respx_mock.get(f"{PROMPTCADENCE_URL}/api/v1/tools").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "FORBIDDEN", "message": "nope"}})
+    )
+    page = console.client.get("/chat", headers={"Accept": "text/html"}).text
+    assert '<select id="chat-tool-pick">' not in page
+    assert "nope" in page
+
+
+def test_a_pending_approval_stays_outside_the_collapsed_details(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    """A decision nobody has taken is never one click away (row WX4)."""
+    console = _console(tmp_path, token="pc_approver")
+    mock_promptcadence(respx_mock)
+    conversation_id, _request_id = _pending(console)
+    page = console.client.get(f"/chat/{conversation_id}", headers={"Accept": "text/html"}).text
+    assert '<details class="chat-card chat-card-approval-pending" open>' in page
+    assert ">Approve</button>" in page
+    if '<details class="chat-details"' in page:
+        assert page.index("chat-card-approval-pending") < page.index('class="chat-details"')

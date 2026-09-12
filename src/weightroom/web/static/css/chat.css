@@ -1,0 +1,133 @@
+/* chat.css — the chat pages' own layout and message styling (row WX4).
+ *
+ * Loaded by chat.html and chat_thread.html only, through their `extra_head` block; nothing here
+ * touches the shell (WX3 owns `weightroom-shell.css`). Every rule is scoped to a `chat-` class,
+ * so the escape hatch the conversation rail and the pinned composer need cannot reach a page
+ * that does not opt in.
+ *
+ * The composer is pinned with `position: sticky; bottom: 0` rather than a full-height flex
+ * column: the shell's own grid is left alone, the page keeps one scrollbar (the document's), and
+ * the composer un-pins at its natural place when the thread is short.
+ */
+
+.chat-layout {
+  display: flex;
+  gap: var(--mw-space-4, 16px);
+  align-items: flex-start;
+}
+
+/* --- The conversation rail --------------------------------------------------------------- */
+
+.chat-rail {
+  flex: 0 0 14rem;
+  max-width: 14rem;
+  min-width: 0;
+  position: sticky;
+  top: var(--mw-space-4, 16px);
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
+}
+
+.chat-rail h3 {
+  margin: 0 0 var(--mw-space-2, 8px);
+  font-size: var(--mw-font-size-sm, 12px);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.chat-rail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-rail li { margin-bottom: 2px; }
+
+.chat-rail a {
+  display: block;
+  padding: var(--mw-space-1, 4px) var(--mw-space-2, 8px);
+  border-radius: var(--mw-radius-sm, 6px);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-rail a:hover { background: var(--mw-surface-hover, rgba(127, 127, 127, .12)); }
+
+.chat-rail a[aria-current="page"] {
+  background: var(--mw-surface-alt, rgba(127, 127, 127, .18));
+  font-weight: 600;
+}
+
+.chat-rail .chat-rail-meta {
+  display: block;
+  font-size: var(--mw-font-size-sm, 12px);
+  opacity: .75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-rail-new { margin-bottom: var(--mw-space-2, 8px); }
+
+/* --- The thread and its composer ---------------------------------------------------------- */
+
+.chat-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: var(--mw-space-3, 12px);
+  padding: var(--mw-space-2, 8px) 0 var(--mw-space-3, 12px);
+  background: var(--mw-bg, #fff);
+  border-top: 1px solid var(--mw-border, #ddd);
+}
+
+.chat-composer textarea { width: 100%; }
+.chat-composer .chat-settings { margin-bottom: var(--mw-space-2, 8px); }
+.chat-composer .chat-settings summary { cursor: pointer; }
+.chat-send-row { display: flex; gap: var(--mw-space-2, 8px); align-items: flex-end; }
+.chat-send-row textarea { flex: 1 1 auto; }
+
+/* --- Messages ------------------------------------------------------------------------------ */
+
+.chat-message { border-top: 1px solid var(--mw-border, #ddd); padding: .6rem 0; }
+.chat-role { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.chat-user-text, .chat-live, .chat-thinking-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-thinking { margin: .3rem 0; opacity: .85; }
+.chat-thinking summary, .chat-decision summary, .chat-details > summary { cursor: pointer; }
+.chat-answer pre { overflow-x: auto; }
+.chat-code { position: relative; }
+.chat-copy { position: absolute; top: .25rem; right: .25rem; font-size: .75rem; }
+.chat-decision { font-size: .8rem; margin-top: .3rem; }
+.chat-answer, .chat-decision summary { overflow-wrap: anywhere; }
+
+/* One collapsed wrapper per reply for every frame that is not the answer (row WX4). A pending
+   approval sits outside it, so a decision nobody has taken is never a click away. */
+.chat-details {
+  margin: .3rem 0;
+  font-size: var(--mw-font-size-sm, 12px);
+}
+.chat-details > summary { opacity: .8; }
+.chat-details[open] > summary { margin-bottom: var(--mw-space-1, 4px); }
+.chat-details .chat-card { margin: .2rem 0; }
+
+/* --- Narrow ------------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .chat-layout { flex-direction: column; align-items: stretch; gap: var(--mw-space-3, 12px); }
+  .chat-rail {
+    position: static;
+    flex-basis: auto;
+    width: 100%;
+    max-width: none;
+    /* Deep enough to read, never the whole phone screen: the open conversation's title is the
+       page heading directly under it, so a list that scrolls loses nothing. */
+    max-height: 40vh;
+  }
+  .chat-pane { width: 100%; }
+}

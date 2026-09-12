@@ -1,73 +1,97 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, empty_state %}
 {% block title %}Chat — WeightRoomGym{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/app-static/css/chat.css">
+{% endblock %}
 {% block page_content %}
-<h2>Chat</h2>
-<p class="muted">A conversation goes through <strong>LoadCoach</strong> or <strong>PromptCadence</strong>
-and nothing else — this console is never a provider client (spec §3). Every reply shows the model
-LoadCoach chose and what it cost. <a href="/api/v1/chat/conversations">JSON</a></p>
+<div class="chat-layout">
+{% set current_id = "" %}
+{% include "_chat_rail.html" %}
 
-{% if conversations %}
-<table id="conversations" data-density="dense">
-  <caption>Most recently active first.</caption>
-  <thead><tr><th scope="col">Conversation</th><th scope="col">Backend</th><th scope="col">Messages</th><th scope="col">Updated</th></tr></thead>
-  <tbody>
-  {% for one in conversations %}
-  <tr>
-    <th scope="row"><a href="/chat/{{ one.id }}">{{ one.title }}</a></th>
-    <td>{{ badge(one.backend, tone="neutral") }}</td>
-    <td>{{ one.messages }}</td>
-    <td class="muted">{{ one.updated_at }}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}
-{{ empty_state("No conversations yet.") }}
-{% endif %}
+<div class="chat-pane">
+  <h2>New conversation</h2>
+  <p class="muted">A conversation goes through <strong>LoadCoach</strong> or <strong>PromptCadence</strong>
+  and nothing else — this console is never a provider client (spec §3). Every reply shows the model
+  LoadCoach chose and what it cost. The mode is fixed for the life of a conversation, so it is chosen
+  here and nowhere else. <a href="/api/v1/chat/conversations">JSON</a></p>
 
-<h3>Start a conversation</h3>
-<form method="post" action="/chat">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <div class="field">
-    <label for="chat-title">Title</label>
-    <input id="chat-title" name="title" required maxlength="200">
-  </div>
-  <fieldset class="field">
-    <legend>Backend</legend>
-    <label><input type="radio" name="backend" value="loadcoach" checked> LoadCoach — one routed generation per message</label>
-    <label><input type="radio" name="backend" value="promptcadence"> PromptCadence — a planned, governed trajectory</label>
-  </fieldset>
-  <details open>
-    <summary>LoadCoach</summary>
-    <div class="field">
-      <label for="chat-task">Task profile <span class="field-hint">LoadCoach routes by this.</span></label>
-      <input id="chat-task" name="task_profile" value="{{ default_task_profile }}">
+  {% if not conversations %}
+  <p class="muted">Nothing has been asked yet. Type below.</p>
+  {% endif %}
+
+  <form method="post" action="/chat" class="chat-composer">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <details class="chat-settings" open>
+      <summary>Mode and settings</summary>
+      <div class="field">
+        <label for="chat-backend">Mode</label>
+        <select id="chat-backend" name="backend">
+          <option value="loadcoach" selected>LoadCoach — one routed generation per message</option>
+          <option value="promptcadence">PromptCadence — a planned, governed trajectory</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="chat-title">Title <span class="field-hint">Optional; the first message names it when blank.</span></label>
+        <input id="chat-title" name="title" maxlength="200">
+      </div>
+      <fieldset data-backend="loadcoach">
+        <legend>LoadCoach</legend>
+        <div class="field">
+          <label for="chat-task">Task profile <span class="field-hint">LoadCoach routes by this.</span></label>
+          <input id="chat-task" name="task_profile" value="{{ default_task_profile }}">
+        </div>
+        <div class="field">
+          <label for="chat-model">Model override <span class="field-hint">Optional canonical id; blank lets LoadCoach choose.</span></label>
+          <input id="chat-model" name="model_override" spellcheck="false">
+        </div>
+      </fieldset>
+      <fieldset data-backend="promptcadence" hidden>
+        <legend>PromptCadence</legend>
+        <div class="field">
+          <label for="chat-class">Classification</label>
+          <select id="chat-class" name="classification">
+            {% for level in ("public", "internal", "confidential") %}
+            <option value="{{ level }}"{% if level == default_classification %} selected{% endif %}>{{ level }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="chat-tier">Tier pin <span class="field-hint">Optional.</span></label>
+          <input id="chat-tier" name="tier">
+        </div>
+        <div class="field">
+          <label for="chat-tools">Tools <span class="field-hint">Comma-separated allowlist, e.g. <code>read_file, list_dir</code>.
+          What is named here is what the trajectory may call; an empty list allows none.</span></label>
+          <input id="chat-tools" name="tools" spellcheck="false">
+        </div>
+        {% if tool_names %}
+        <div class="field">
+          <label for="chat-tool-pick">Add a registered tool</label>
+          <select id="chat-tool-pick">
+            <option value="">Choose…</option>
+            {% for name in tool_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="chat-tools-all" data-all="{{ tool_names | join(', ') }}"> Allow all tools</label>
+          <span class="field-hint">Writes today's {{ tool_names | length }} registered tools into the list, by name.
+          The list is never left empty to mean "all": PromptCadence reads an omitted allowlist as every
+          configured tool, so the names are recorded instead of being implied.</span>
+        </div>
+        {% else %}
+        <p class="field-hint">{{ tools_unavailable }} Name the tools by hand.</p>
+        {% endif %}
+      </fieldset>
+    </details>
+    <div class="chat-send-row">
+      <textarea id="chat-text" name="text" rows="3" required placeholder="Ask something…"></textarea>
+      <button type="submit">Send</button>
     </div>
-    <div class="field">
-      <label for="chat-model">Model override <span class="field-hint">Optional canonical id; blank lets LoadCoach choose.</span></label>
-      <input id="chat-model" name="model_override" spellcheck="false">
-    </div>
-  </details>
-  <details>
-    <summary>PromptCadence</summary>
-    <div class="field">
-      <label for="chat-class">Classification</label>
-      <select id="chat-class" name="classification">
-        {% for level in ("public", "internal", "confidential") %}
-        <option value="{{ level }}"{% if level == default_classification %} selected{% endif %}>{{ level }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="chat-tier">Tier pin <span class="field-hint">Optional.</span></label>
-      <input id="chat-tier" name="tier">
-    </div>
-    <div class="field">
-      <label for="chat-tools">Tools <span class="field-hint">Comma-separated allowlist, e.g. <code>read_file, list_dir</code>.</span></label>
-      <input id="chat-tools" name="tools">
-    </div>
-  </details>
-  <button type="submit">Start</button>
-</form>
+  </form>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="/app-static/js/chat.js" defer></script>
 {% endblock %}

@@ -2,26 +2,24 @@
 {% from "mirrorwall/components.html" import badge %}
 {% block title %}{{ conversation.title }} — Chat — WeightRoomGym{% endblock %}
 {% block extra_head %}
-<style>
-  .chat-message { border-top: 1px solid var(--mw-border, #ddd); padding: .6rem 0; }
-  .chat-role { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
-  .chat-user-text, .chat-live, .chat-thinking-body { white-space: pre-wrap; overflow-wrap: anywhere; }
-  .chat-thinking { margin: .3rem 0; opacity: .85; }
-  .chat-thinking summary, .chat-decision summary { cursor: pointer; }
-  .chat-answer pre { overflow-x: auto; }
-  .chat-code { position: relative; }
-  .chat-copy { position: absolute; top: .25rem; right: .25rem; font-size: .75rem; }
-  .chat-decision { font-size: .8rem; margin-top: .3rem; }
-  .chat-answer, .chat-decision summary { overflow-wrap: anywhere; }
-</style>
+<link rel="stylesheet" href="/app-static/css/chat.css">
 {% endblock %}
 {% block page_content %}
-<h2>{{ conversation.title }} {{ badge(conversation.backend, tone="neutral") }}</h2>
-<p class="muted">
-  {% if conversation.backend == "loadcoach" %}task <code>{{ conversation.task_profile or "default" }}</code>{% if conversation.model_override %} · pinned <code>{{ conversation.model_override }}</code>{% endif %}
-  {% else %}classification <code>{{ conversation.classification }}</code>{% if conversation.tier %} · tier <code>{{ conversation.tier }}</code>{% endif %}{% if conversation.tools %} · tools <code>{{ conversation.tools | join(", ") }}</code>{% endif %}{% endif %}
-  · <a href="/chat">all conversations</a> · <a href="/api/v1/chat/conversations/{{ conversation.id }}">JSON</a>
-</p>
+<div class="chat-layout">
+{% set current_id = conversation.id %}
+{% include "_chat_rail.html" %}
+
+<div class="chat-pane">
+<div class="page-head">
+  <h2>{{ conversation.title }} {{ badge(conversation.backend, tone="neutral") }}</h2>
+  <div class="page-actions">
+    <a href="/api/v1/chat/conversations/{{ conversation.id }}">JSON</a>
+    <form method="post" action="/chat/{{ conversation.id }}/delete">
+      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+      <button type="submit" data-variant="quiet">Delete</button>
+    </form>
+  </div>
+</div>
 
 {% if error %}<p class="notice" role="alert"><strong>Refused.</strong> {{ error }}</p>{% endif %}
 
@@ -31,37 +29,74 @@
   {% endfor %}
 </section>
 
-{% if unavailable %}
-<p class="notice" role="status" id="chat-unavailable"><strong>Sending is off.</strong> {{ unavailable }}</p>
-{% endif %}
-
-<form method="post" action="/chat/{{ conversation.id }}/messages" id="chat-send">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <div class="field">
-    <label for="chat-text">Message</label>
-    <textarea id="chat-text" name="text" rows="4" required {% if unavailable or conversation.in_progress %}disabled{% endif %}></textarea>
-  </div>
-  <button type="submit" {% if unavailable or conversation.in_progress %}disabled title="{{ unavailable or 'The previous reply is still streaming.' }}"{% endif %}>Send</button>
-</form>
-
-<details>
-  <summary>Attachments ({{ conversation.attachments | length }})</summary>
-  <p class="muted">Text and markdown only, up to {{ max_attachment_bytes | bytes_human }}. Every file here is
-  context for every message in this conversation — read, never executed or fetched from.</p>
-  {% if conversation.attachments %}
-  <ul>{% for file in conversation.attachments %}<li><code>{{ file.filename }}</code> · {{ file.size_bytes | bytes_human }}</li>{% endfor %}</ul>
+<div class="chat-composer">
+  {# Inside the composer, not above it: the composer is pinned to the bottom of the viewport, so a
+     notice left in the thread's flow is the one thing it would cover. #}
+  {% if unavailable %}
+  <p class="notice" role="status" id="chat-unavailable"><strong>Sending is off.</strong> {{ unavailable }}</p>
   {% endif %}
-  <form method="post" action="/chat/{{ conversation.id }}/attachments" enctype="multipart/form-data">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <input type="file" name="file" accept=".txt,.md,.markdown,.text,.log,text/plain,text/markdown">
-    <button type="submit">Attach</button>
-  </form>
-</details>
+  <details class="chat-settings">
+    <summary>Mode: {{ conversation.backend }}{% if conversation.backend == "loadcoach" %} · task {{ conversation.task_profile or "default" }}{% else %} · {{ conversation.classification }}{% endif %}</summary>
+    {# Fixed for the life of the conversation (services/chat.py create_conversation): the mode and
+       its fields are shown as they were chosen and cannot be changed here. A different mode is a
+       different conversation — there is no per-message switch, by design. #}
+    <div class="field">
+      <label for="chat-backend">Mode <span class="field-hint">Fixed when the conversation started.
+      <a href="/chat">Start a new conversation</a> to use the other one.</span></label>
+      <select id="chat-backend" disabled>
+        <option{% if conversation.backend == "loadcoach" %} selected{% endif %}>loadcoach</option>
+        <option{% if conversation.backend == "promptcadence" %} selected{% endif %}>promptcadence</option>
+      </select>
+    </div>
+    {% if conversation.backend == "loadcoach" %}
+    <div class="field">
+      <label for="chat-task">Task profile</label>
+      <input id="chat-task" value="{{ conversation.task_profile or 'default' }}" disabled>
+    </div>
+    <div class="field">
+      <label for="chat-model">Model override</label>
+      <input id="chat-model" value="{{ conversation.model_override or '—' }}" disabled>
+    </div>
+    {% else %}
+    <div class="field">
+      <label for="chat-class">Classification</label>
+      <input id="chat-class" value="{{ conversation.classification or '—' }}" disabled>
+    </div>
+    <div class="field">
+      <label for="chat-tier">Tier pin</label>
+      <input id="chat-tier" value="{{ conversation.tier or '—' }}" disabled>
+    </div>
+    <div class="field">
+      <label for="chat-tools">Tools <span class="field-hint">Every message of this conversation is
+      submitted with exactly these names; an empty list allows none.</span></label>
+      <input id="chat-tools" value="{{ (conversation.tools or []) | join(', ') or 'none' }}" disabled>
+    </div>
+    {% endif %}
+  </details>
 
-<form method="post" action="/chat/{{ conversation.id }}/delete" class="field">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <button type="submit" data-variant="quiet">Delete this conversation</button>
-</form>
+  <details class="chat-attachments">
+    <summary>Attachments ({{ conversation.attachments | length }})</summary>
+    <p class="muted">Text and markdown only, up to {{ max_attachment_bytes | bytes_human }}. Every file here is
+    context for every message in this conversation — read, never executed or fetched from.</p>
+    {% if conversation.attachments %}
+    <ul>{% for file in conversation.attachments %}<li><code>{{ file.filename }}</code> · {{ file.size_bytes | bytes_human }}</li>{% endfor %}</ul>
+    {% endif %}
+    <form method="post" action="/chat/{{ conversation.id }}/attachments" enctype="multipart/form-data">
+      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+      <input type="file" name="file" accept=".txt,.md,.markdown,.text,.log,text/plain,text/markdown">
+      <button type="submit">Attach</button>
+    </form>
+  </details>
+
+  <form method="post" action="/chat/{{ conversation.id }}/messages" id="chat-send" class="chat-send-row">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <textarea id="chat-text" name="text" rows="3" required aria-label="Message"
+              placeholder="Ask something…" {% if unavailable or conversation.in_progress %}disabled{% endif %}></textarea>
+    <button type="submit" {% if unavailable or conversation.in_progress %}disabled title="{{ unavailable or 'The previous reply is still streaming.' }}"{% endif %}>Send</button>
+  </form>
+</div>
+</div>
+</div>
 
 <script>
   // Live replies. Model text is only ever written as textContent here; the finished message is
@@ -127,8 +162,12 @@
         if (!el) { return; }
         var waiting = el.querySelector(".chat-waiting");
         if (waiting && kind !== "done" && kind !== "halt") { waiting.remove(); }
+        // The frames a reply is made of live under one `<details class="chat-details">` (row WX4),
+        // open while the reply streams and closed by the server-rendered replacement at `done`.
+        var wrapper = el.querySelector(".chat-details");
         var thinking = el.querySelector(".chat-thinking");
         if (kind === "delta.thinking" && thinking) {
+          if (wrapper) { wrapper.open = true; }
           thinking.hidden = false;
           thinking.open = true;
           thinking.querySelector(".chat-thinking-body").textContent += body.delta || "";
