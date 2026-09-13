@@ -217,9 +217,22 @@ file, **stop and say so**.
 git -C ~/ai/suite/<Repo> worktree add ~/ai/worktrees/<repo>-wy<N> -b row/wy<N>-<slug> <base>
 cd ~/ai/worktrees/<repo>-wy<N>
 python3.14 -m venv .venv
-.venv/bin/pip install -q -e ".[dev]"
-.venv/bin/pip install -q -e ~/ai/suite/py/MirrorWall   # WeightRoom worktrees; WY4 points at its own MirrorWall worktree
+S=~/ai/suite/py
+.venv/bin/pip install -q -e $S/BaseAiCore -e $S/SetSpec -e $S/WeightsDB -e $S/MirrorWall \
+  -e $S/SweatMeter -e $S/ModelRack -e "$S/LoadLedger[sql]" -e ".[dev]"
+.venv/bin/pip list --editable   # must show all seven suite packages from ~/ai/suite/py, plus this repo
 ```
+
+**Suite packages come from `~/ai/suite`, never from PyPI** (added 2026-09-13, after wave 1). PyPI
+lags the suite: `mirrorwall 0.3.1` is not published, and the other packages have unreleased commits
+on `main` that the applications already use. Install every suite dependency editable **in the same
+`pip install` command as the repository itself**, so that the resolver never fetches a PyPI copy.
+If `pip list --editable` does not show a suite package, or `python -c "import <pkg>;
+print(<pkg>.__file__)"` points into `site-packages`, fix the venv before running anything else. A
+gate result from a PyPI copy does not count. Never edit a pin in `pyproject.toml` to make an install
+resolve. If an install still fails, stop and report the error. For a FreeWeight or MirrorWall
+worktree, install that repository's own suite dependencies the same way; its `pyproject.toml` lists
+them.
 
 ---
 

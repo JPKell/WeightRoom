@@ -19,6 +19,13 @@ operator's console password.
 
 * WeightRoom `main` is clean (roadmap §0: the operator's eight template edits are committed or
   discarded).
+* **Every venv you run a gate in installs the suite packages from `~/ai/suite`, not PyPI** (roadmap
+  §5, *Suite packages come from `~/ai/suite`*). PyPI lags: `mirrorwall 0.3.1` is unpublished, and
+  the other packages have unreleased commits on `main`. Check each branch worktree's venv and each
+  `~/ai/suite/<Repo>/.venv` with `.venv/bin/pip list --editable`. Every suite dependency must point
+  into `~/ai/suite/py/…`. A worktree venv that is wrong is reinstalled with the §5 command before its
+  gate counts. For the `~/ai/suite` venvs that the running units use, **report** a wrong venv; do not
+  reinstall it without the operator.
 * Every branch named in the roadmap §3 exists, and each row's report says its gate was green.
   Re-run each branch's gate in its own worktree before merging (`ruff format --check .`,
   `ruff check .`, `mypy src tests`, `lint-imports`, `pytest`) and record the interpreter and the

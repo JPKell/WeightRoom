@@ -12,8 +12,17 @@ BASE=$(git -C ~/ai/suite/WeightRoom log row/wy1-shell-nav --grep='row WY1 gate A
 test -n "$BASE" || { echo "WY1 gate A not committed yet — stop"; exit 1; }
 git -C ~/ai/suite/WeightRoom worktree add ~/ai/worktrees/weightroom-wy8 -b row/wy8-model-tables "$BASE"
 cd ~/ai/worktrees/weightroom-wy8 && python3.14 -m venv .venv
-.venv/bin/pip install -q -e ".[dev]" && .venv/bin/pip install -q -e ~/ai/suite/py/MirrorWall
+S=~/ai/suite/py
+.venv/bin/pip install -q -e $S/BaseAiCore -e $S/SetSpec -e $S/WeightsDB -e $S/MirrorWall \
+  -e $S/SweatMeter -e $S/ModelRack -e "$S/LoadLedger[sql]" -e ".[dev]"
+.venv/bin/pip list --editable   # all seven suite packages from ~/ai/suite/py, plus wr-gym
 ```
+
+**Install the suite packages from `~/ai/suite`, never from PyPI.** PyPI does not have the versions
+WeightRoom needs (`mirrorwall 0.3.1` is unpublished, and the rest have unreleased commits on
+`main`). Use the one command above, so that pip never fetches a PyPI copy. Before any gate, confirm
+that every suite package imports from `~/ai/suite/py/…`, not `site-packages`. Do not change a pin to
+make an install resolve: stop and report the error instead. Details are in roadmap §5.
 
 **Read before code:** `fw_models.html`, `fw_results.html`, `fw_evidence.html`, `lc_models.html`,
 their macro files `_fw.html` and `_lc.html` (read only; do not change a macro other templates use,
