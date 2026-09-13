@@ -317,3 +317,89 @@ were taken from a throwaway console on 8817 running the fully merged tree (§6).
    WY7 (no *New conversation* link, because Chat is in the left menu on every console page);
    WY9 §2.3 (`page_source` macro not adopted).
 9. **`stash@{0}`** in WeightRoom is still the operator's.
+
+## 10. Follow-ups decided with the operator and built the same day
+
+After the arc closed, the operator was interviewed on every open item in §9 (2026-09-13). Decisions:
+
+| §9 item | Decision | Done |
+|---|---|---|
+| 2 — column resize collapses a wide table | Fix now | MirrorWall `3a4ef62` |
+| 3 — FreeWeight schema `0011` unknown | Review and add now | WeightRoom `9a6e137` (migration `0009`) |
+| 4 — per-character wrap in table cells | Fix now in shell CSS | WeightRoom `9a6e137`, `ce25795` |
+| 5 — production venvs on PyPI | Reinstall WeightRoom and FreeWeight; then LoadCoach too, restart if idle | venvs reinstalled, all suite packages editable from `~/ai/suite/py` |
+| 6 — WY6 follow-ups | Build all three now | ModelRack `aa4c830`, LoadCoach `b37c966`, FreeWeight `86501fb` |
+| 8 — WY3 Overview layout | Keep stacked | — |
+| 8 — WY7 chat bar | Add *New conversation* | WeightRoom `9a6e137` |
+| Row branches | Keep | — |
+| Release hold | Keep: no version bumps, no tags | everything under `[Unreleased]` |
+
+### 10.1 What changed
+
+* **MirrorWall `table.js`** — before a table switches to `table-layout: fixed`, every visible column is
+  pinned at the width auto layout gave it (or its stored width) and the table's width becomes their
+  sum, so `.table-scroll` scrolls instead of squeezing. Hidden columns are skipped and re-pinned when
+  shown; clearing the last stored width returns the table to auto layout. Two JS tests;
+  `ASSETS.sha256` updated.
+* **WeightRoom** — migration `0009` adds FreeWeight `0011` (`machines.nickname`, nullable, written only
+  by FreeWeight's `PATCH /api/v1/machines/{id}`) to `known_revisions`; `machines` is already in the
+  guard's *Subject identity, hashed* lock class, so no raw write reaches it. Fixture
+  `freeweight-0011.sqlite3` was built by FreeWeight's own migrations (same tables as `0010`, no rows).
+  `console_side_nav(current_path)` marks the console menu's entry for the page, which lets every chat
+  page's bar offer *New conversation* under the selected Chat entry (WY9's one exception). A `.mono`
+  or `code` value in a table cell uses `overflow-wrap: break-word`, which stops auto layout squeezing
+  the column. Two `test_shell.py` assertions were widened to allow `aria-current` on the console menu.
+* **ModelRack** `LlamaCppProvider` — an expired header whose `ArtifactStamp` still matches is put back
+  with a fresh TTL after one `stat` instead of re-parsed. `refresh=True`, a changed stamp,
+  `clear_metadata_cache()` and a disabled cache still re-read. This removes the root cause WY6 found.
+* **LoadCoach** — `/api/v1/health` and the System page bound the provider check to 0.5 s (late →
+  `degraded`, the check finishes on a daemon thread) and `/api/v1/health` is a plain `def` route.
+* **FreeWeight** — the Machines page is a `def` route; the enable switch and the Provider form run
+  their database write, probe and reload in the threadpool after awaiting the form.
+
+### 10.2 Gates (Python 3.14.4; ruff, mypy and lint-imports green)
+
+| Repository | Commit | Venv | pytest |
+|---|---|---|---|
+| ModelRack | `aa4c830` | scratch `mr-gate` | 1446 passed, 16 skipped, 27 deselected |
+| MirrorWall | `3a4ef62` | `~/ai/suite/py/MirrorWall/.venv` | 402 passed, 3 deselected |
+| FreeWeight | `86501fb` | scratch `fw-main` | 2816 passed, 30 skipped, 31 deselected |
+| LoadCoach | `b37c966` | scratch `lc-gate` | 1125 passed, 5 skipped, 19 deselected |
+| WeightRoom | `9a6e137` | scratch `wr-main` | 2086 passed, 3 skipped, 14 deselected |
+
+Found on the way: the first ModelRack test counted `broken.gguf`, which is never cached and so read on
+every pass by design; and a new MirrorWall test constant shadowed an existing `_WIDE_TABLE`. Both fixed
+before the commits.
+
+### 10.3 Deployed
+
+* Production venvs of WeightRoom, FreeWeight and LoadCoach now import baseaicore, setspec, weightsdb,
+  mirrorwall, sweatmeter and modelrack (and loadledger for WeightRoom) from `~/ai/suite/py`.
+* `freeweight.service` and `loadcoach.service` restarted at 09:39:17Z after an idle check (FreeWeight:
+  no active run, queue 0; LoadCoach: no job outside completed/failed/cancelled in its database, read
+  only). `weightroom.service` restarted at the same time. All three started clean.
+
+### 10.4 Verified
+
+Browser pass against a throwaway console on 8817 running WeightRoom `main` (Playwright, system
+Chrome, both widths, both themes; screenshots and `report.json` in the session scratchpad under
+`shots2/`):
+
+* **Resize (L2):** LoadCoach Models is a 1693 px table in a 1172 px wrapper. A 57 px drag on the
+  first column now gives a 1748 px table: the first column 258 → 315 px, and every other column keeps
+  its width (130, 92, 100, 101, …), where WY5's code had collapsed them to 61 px. The wrapper
+  scrolls; the page does not.
+* **Schema `0011` (§9 item 3):** FreeWeight Database Tables and Query no longer show
+  `SCHEMA_UNKNOWN`.
+* **Per-character wrap (F4):** the first CSS rule matched `.mono` inside a cell but not
+  `td.mono`, which is how Results marks its metric key; the Metric column stayed at 68 px. With
+  `td.mono` included (`ce25795`) Metric is 250 px, Model 125 px and Created 149 px, the 1489 px
+  table scrolls inside its wrapper, and no page scrolls horizontally at 1440 or 412 px.
+* **Chat bar:** `/chat` and `/chat/history` show *New conversation · History · JSON*, the current one
+  marked, with Chat selected in the left menu. The throwaway console has no conversations, so a thread
+  page was checked by `test_chat_history.py` (all three chat pages) rather than in the browser; the
+  duplicate rule (`test_page_nav.py`) still passes over every page.
+* No page in the pass scrolls horizontally at either width.
+
+FreeWeight health after the ModelRack fix, sampled every 20 s from the 09:39:17Z restart through
+at least one 300 s cache expiry: 24 samples from 09:39:47 to 09:47:32, **all HTTP 200 and `ok`** (0.18–0.27 s), with no `degraded` answer at the 300 s expiry (due about 09:44:47; the 09:44:50 and 09:45:11 samples took 0.20 s). Before the ModelRack fix every expiry answered `degraded` in 0.76–0.94 s (§6.2), and before WY6 it timed out. No console alert opened after 08:20:24Z and none is open.
