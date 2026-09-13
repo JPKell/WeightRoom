@@ -87,6 +87,11 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
   font-size: var(--mw-font-size-sm, 12px); text-decoration: none;
 }
 .console-alerts:hover { color: var(--mw-text); }
+.console-chat {
+  padding: 4px var(--mw-space-2, 8px); border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-muted); font-size: var(--mw-font-size-sm, 12px); text-decoration: none;
+}
+.console-chat:hover, .console-chat[aria-current="page"] { color: var(--mw-text); background: var(--mw-accent-soft); }
 .console-alerts[data-open="true"] { color: var(--mw-status-degraded); }
 
 /* The alert banner (ADR-0137): one line under the top bar while an alert is unacknowledged. */
