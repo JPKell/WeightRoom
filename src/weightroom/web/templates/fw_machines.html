@@ -1,12 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_fw.html" import value, yes_no, link %}
 {% block title %}Machines — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Machines", "Runs", "Every machine FreeWeight has measured on. Performance, memory and energy figures are only comparable within one.") %}
-  <a href="/apps/freeweight/runs">Runs</a> · <a href="/apps/freeweight/results">Results</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Machines", "href": "/apps/freeweight/machines", "current": true}], actions=[docs_action("freeweight")]) }}
+{{ app_page_header(view, "Machines", "Runs", "Every machine FreeWeight has measured on. Performance, memory and energy figures are only comparable within one.") }}
 {% include "_app_state.html" %}
 <p class="muted">A machine is recorded when a run is created on it, so the list is legitimately empty before anything has
 been measured, and reading it never makes a machine look freshly used. A name is the operator's own label, set on a

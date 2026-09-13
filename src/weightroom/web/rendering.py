@@ -32,6 +32,7 @@ __all__ = [
     "PILL_TONES",
     "app_side_nav",
     "app_side_nav_stubs",
+    "docs_action",
     "pill_status",
     "pill_tone",
     "render",
@@ -213,6 +214,20 @@ def app_label(name: str) -> str:
     return APP_LABELS.get(name, name)
 
 
+def docs_action(app_name: str) -> dict[str, str]:
+    """The page bar's *Docs* action for an application's page (row WY1).
+
+    Args:
+        app_name: The lowercase identifier (``loadcoach``).
+
+    Returns:
+        ``{"label": "Docs", "href": …}`` pointing at the application's folder in the docs tree
+        (``folder_anchor`` in ``_docs_tree.html``). A docs root without that folder still opens;
+        the anchor matches nothing, which is never a 500 (row WX2).
+    """
+    return {"label": "Docs", "href": f"/docs?section=apps#docs-apps-{app_name}"}
+
+
 def app_side_nav(app_name: str, *, selected: str = "Overview") -> tuple[dict[str, Any], ...]:
     """The sections :func:`~mirrorwall.side_nav` renders under an application's tab.
 
@@ -332,6 +347,9 @@ def templates() -> Environment:
             "product_version": "",
             "console_version": __version__,
             "nav_items": NAV_ITEMS,
+            # A page bar's Docs action (`_app_page.html` `page_nav`, row WY1): one application's
+            # entry in the docs tree, the same anchor `docs_link` renders.
+            "docs_action": docs_action,
             "theme_storage_key": "weightroom-theme",
             # ADR-0128: every fragment swap and SSE region in the shell is htmx, vendored by
             # MirrorWall 0.3 and opt-in per page — WeightRoomGym opts every page in at once

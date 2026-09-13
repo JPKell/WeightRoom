@@ -1,16 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_fw.html" import link, short %}
 {% from "_fw_goals.html" import calibration, mix, csrf with context %}
 {% block title %}Goals — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
 {% set off = not sourced.live %}
-{% call app_page_header(view, "Goals", "Goals", "A benchmark you write: your criteria, scored by a rule where a rule can check them and by a jury where only judgement can.") %}
-  <a href="#results">Results</a> · <a href="#set-up">Set up a run</a> · <a href="#runs">Runs</a> ·
-  <a href="/apps/freeweight/judges">Judges</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Results", "href": "#results"}, {"label": "Set up a run", "href": "#set-up"}, {"label": "Runs", "href": "#runs"}, {"label": "Judges", "href": "/apps/freeweight/judges"}], actions=[docs_action("freeweight")]) }}
+{{ app_page_header(view, "Goals", "Goals", "A benchmark you write: your criteria, scored by a rule where a rule can check them and by a jury where only judgement can.") }}
 {% include "_app_state.html" %}
 {% if done_message %}<p class="notice" role="status">{{ done_message }}</p>{% endif %}
 <p class="muted">A jury is calibrated against your own grades before its scores are believed. Each goal is a directory of JSON

@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% block title %}Providers — LoadCoach — WeightRoom{% endblock %}
 
 {% macro registration_fields(prefix, one) -%}
@@ -30,9 +30,8 @@
 
 {% block page_content %}
 {% set data = sourced.data %}
-{% call app_page_header(view, "Providers", "Providers", "Each block below is one [providers.<name>] table in LoadCoach's own configuration file; saving edits that file in place and the running server re-registers immediately.") %}
-  <a href="/apps/loadcoach/providers?kind=llamacpp#provider-new" data-variant="primary">Add llama.cpp</a> · <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/adapters">Adapters</a> · <a href="/apps/loadcoach/settings">Every other key</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Add llama.cpp", "href": "/apps/loadcoach/providers?kind=llamacpp#provider-new"}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Providers", "Providers", "Each block below is one [providers.<name>] table in LoadCoach's own configuration file; saving edits that file in place and the running server re-registers immediately.") }}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if saved %}<p class="notice" role="status">Saved <code>{{ saved }}</code>: LoadCoach wrote its file and re-registered its providers.</p>{% endif %}

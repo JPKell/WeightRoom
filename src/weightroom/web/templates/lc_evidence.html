@@ -1,13 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import num, measure %}
 {% block title %}Evidence — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
-{% call app_page_header(view, "Evidence", "Evidence", "Benchmark evidence imported from FreeWeight, record by record. Confidence is FreeWeight's, applied here and never recomputed.") %}
-  <a href="/apps/loadcoach/evidence/admin">Store and import</a> · <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/routing">Routing</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Store and import", "href": "/apps/loadcoach/evidence/admin"}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Evidence", "Evidence", "Benchmark evidence imported from FreeWeight, record by record. Confidence is FreeWeight's, applied here and never recomputed.") }}
 {% include "_app_state.html" %}
 <p class="muted">Evidence for a model LoadCoach has not discovered is kept and binds when discovery
 finds it; it scores nothing until it does (ADR-0022).</p>

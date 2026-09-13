@@ -6,7 +6,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>Units {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/ideapress/projects">Projects</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">A project's units in reading order: each one's state, its committed version, how many of its requirements

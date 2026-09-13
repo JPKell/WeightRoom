@@ -1,12 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import decision_link, job_link, num %}
 {% block title %}Decision history — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Decision history", "Routing", "Every routing decision LoadCoach has made, persisted rather than sampled — what it chose, what it scored, and the job it became.") %}
-  <a href="/apps/loadcoach/routing">Explain</a> · <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "History", "href": "/apps/loadcoach/routing/decisions", "current": true}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Decision history", "Routing", "Every routing decision LoadCoach has made, persisted rather than sampled — what it chose, what it scored, and the job it became.") }}
 {% include "_app_state.html" %}
 {{ refusal(decisions.error) }}
 {% if decisions.data is not none %}

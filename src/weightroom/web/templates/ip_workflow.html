@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, json_viewer %}
-{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% block title %}{{ workflow_id or "New workflow" }} — Workflows — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
 <style>
@@ -14,9 +14,8 @@
 {% set vocabulary = (sourced.data or {}).get("vocabulary") or {} %}
 {% set versions = (sourced.data or {}).get("versions") or [] %}
 {% set action = "/apps/ideapress/workflows" ~ ("/" ~ (workflow_id | urlencode) if workflow_id else "") %}
-{% call app_page_header(view, workflow_id or "New workflow", "Workflows", "Saving writes a new version. Earlier versions stay, and every project keeps the version it was created on.") %}
-<a href="/apps/ideapress/workflows">All workflows</a> · <a href="/apps/ideapress/projects/new">New project on it</a>
-{% endcall %}
+{{ page_nav(links=[{"label": "New project on it", "href": "/apps/ideapress/projects/new"}], actions=[docs_action("ideapress")]) }}
+{{ app_page_header(view, workflow_id or "New workflow", "Workflows", "Saving writes a new version. Earlier versions stay, and every project keeps the version it was created on.") }}
 {% include "_app_state.html" %}
 {% if saved %}<p class="notice" role="status">Saved as version {{ saved }}. Projects already running keep the version they were created on; a new project on this workflow gets the newest.</p>{% endif %}
 {{ refusal(save_error) }}

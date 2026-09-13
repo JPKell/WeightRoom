@@ -86,7 +86,7 @@
 {#- Every application page links back to its own entry in the docs tree (row WX2); the anchor is
     `folder_anchor` in `_docs_tree.html` for `apps/<app>`, so a docs root missing that folder is
     still a page that opens — the anchor just matches nothing on it, never a 500. -#}
-<a href="/docs?section=apps#docs-apps-{{ app }}" class="muted">Docs</a>
+<a href="{{ docs_action(app).href }}" class="muted">Docs</a>
 {%- endmacro %}
 
 {% macro rows_table(rows, columns, caption) -%}

@@ -6,7 +6,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>Tiers {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/settings">Settings</a> · <a href="/apps/loadcoach">LoadCoach</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">A tier is configuration over exactly one LoadCoach task profile: which model serves

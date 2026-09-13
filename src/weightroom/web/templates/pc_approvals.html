@@ -6,7 +6,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>Approvals {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/trajectories">Trajectories</a> · <a href="/apps/promptcadence/egress">Egress</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

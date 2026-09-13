@@ -152,7 +152,9 @@ def test_the_new_trajectory_page_is_its_own_route_with_the_history_new_nav(tmp_p
         new_page = _page(console, f"{BASE}/trajectories/new")
     assert 'name="task"' not in listing
     assert 'name="task"' in new_page
-    assert '<a href="/apps/promptcadence/trajectories" aria-current="page">History</a>' in listing
+    # Row WY1: *History* was the left menu's Trajectories, so the bar carries only *New*.
+    assert ">History</a>" not in listing
+    assert '<a href="/apps/promptcadence/trajectories/new">New</a>' in listing
     assert '<a href="/apps/promptcadence/trajectories/new" aria-current="page">New</a>' in new_page
     # The left-menu entry stays "Trajectories" for both halves of the tab's own nav.
     assert (

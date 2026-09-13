@@ -3,6 +3,7 @@
     that off. Dictionary fields are read with `.get`, because the environment is StrictUndefined and
     an application omitting an optional key is not a page error. -#}
 {% from "mirrorwall/components.html" import badge %}
+{% from "_app_page.html" import page_nav %}
 
 {% macro short(value) -%}
 {%- if value and value | length > 14 -%}
@@ -21,18 +22,29 @@
 {%- endmacro %}
 
 {% macro projects_nav(nav, current) -%}
-{#- Row WX10: the eight most recent projects, *All* and *New*, on Projects and every one project's
-    page — `nav` is a first-page, unfiltered read of `GET /projects` (up to eight), so the strip
-    never depends on the page's own filters or which project it names. `current` is a project's
-    id, the string ``"new"`` on the create page, or ``none`` on the list. A `nav` that could not be
-    read (`nav.data is none`) still shows *All* and *New*: only the recent-project links are lost. -#}
-<nav class="page-actions" aria-label="Recent projects">
-  {% for one in ((nav.data or {}).get("items") or [])[:8] %}
-  <a href="/apps/ideapress/projects/{{ one.get('id') | urlencode }}"{% if one.get('id') == current %} aria-current="page"{% endif %}>{{ one.get("title") or one.get("id") }}</a> ·
-  {% endfor %}
-  <a href="/apps/ideapress/projects"{% if current is none %} aria-current="page"{% endif %}>All</a> ·
-  <a href="/apps/ideapress/projects/new"{% if current == "new" %} aria-current="page"{% endif %}>New</a>
-</nav>
+{#- Row WX10's recent projects as the Projects and New project pages' bar (row WY1): the eight most
+    recent projects by name, then *New*. `nav` is a first-page, unfiltered read of `GET /projects`,
+    so the bar never depends on the page's own filters. `current` is a project's id, ``"new"`` on
+    the create page, or ``none`` on the list. A `nav` that could not be read still shows *New*.
+    *All* is gone: it was the left menu's Projects. -#}
+{% set links = [] %}
+{% for one in ((nav.data or {}).get("items") or [])[:8] %}{% set _ = links.append({"label": one.get("title") or one.get("id"), "href": "/apps/ideapress/projects/" ~ (one.get("id") | urlencode), "current": one.get("id") == current}) %}{% endfor %}
+{% set _ = links.append({"label": "New", "href": "/apps/ideapress/projects/new", "current": current == "new"}) %}
+{{ page_nav(links=links, actions=[docs_action("ideapress")]) }}
+{%- endmacro %}
+
+{% macro project_bar(project_id, current=none, unit_key=none) -%}
+{#- One project's page bar (row WY1): the project, its plan, workspace, units and export, on every
+    page of the project; `current` names the one showing, and `unit_key` opens the workspace on that
+    unit. -#}
+{% set here = "/apps/ideapress/projects/" ~ (project_id | urlencode) %}
+{{ page_nav(links=[
+  {"label": "Project", "href": here, "current": current == "project"},
+  {"label": "Plan", "href": here ~ "/plan", "current": current == "plan"},
+  {"label": "Workspace", "href": here ~ "/workspace" ~ (("?unit=" ~ (unit_key | urlencode)) if unit_key else ""), "current": current == "workspace"},
+  {"label": "Units", "href": "/apps/ideapress/units?project=" ~ (project_id | urlencode), "current": current == "units"},
+  {"label": "Export", "href": here ~ "/export", "current": current == "export"},
+], actions=[docs_action("ideapress")]) }}
 {%- endmacro %}
 
 {% macro measure(value, unit="") -%}

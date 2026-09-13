@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, kv_list, table, empty_state %}
 {% from "_app_page.html" import page_source, refusal %}
-{% from "_ip.html" import short, state_badge, measure %}
+{% from "_ip.html" import short, state_badge, measure, project_bar %}
 {% from "_pc.html" import verdict_badge %}
 {% block title %}{{ unit_key }} — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
@@ -14,9 +14,9 @@
   .ip-content { max-width: 72ch; overflow-wrap: anywhere; }
   .ip-content pre { white-space: pre-wrap; }
 </style>
+{{ project_bar(project_id, "units", unit_key) }}
 <div class="page-head">
   <h2>{{ unit_key }}{% if u.get("title") %} — {{ u.get("title") }}{% endif %} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ proj }}">The project</a> · <a href="{{ proj }}/workspace?unit={{ unit_key | urlencode }}">Workspace</a> · <a href="/apps/ideapress/units?project={{ project_id | urlencode }}">All units</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

@@ -5,7 +5,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>System {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/queue">Queue</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · <a href="/apps/loadcoach/settings">Settings</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">Version and health components — as LoadCoach's own System page shows them, read from its

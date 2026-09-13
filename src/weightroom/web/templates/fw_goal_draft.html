@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import link %}
 {% from "_fw_goals.html" import percent, csrf with context %}
 {% block title %}Draft — FreeWeight — WeightRoom{% endblock %}
@@ -8,10 +8,9 @@
 {% set draft = sourced.data %}
 {% set here = "/apps/freeweight/goals/drafts/" ~ (draft_id | urlencode) %}
 {% set off = not sourced.live %}
+{{ page_nav(links=[{"label": "Criteria", "href": "#step-criteria"}, {"label": "Rules", "href": "#step-rules"}, {"label": "Tasks", "href": "#step-tasks"}, {"label": "Save", "href": "#step-save"}], actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>{{ draft.get("name") if draft else "Draft" }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/goals">Every goal</a> · <a href="#step-criteria">Criteria</a> · <a href="#step-rules">Rules</a> ·
-  <a href="#step-tasks">Tasks</a> · <a href="#step-save">Save</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

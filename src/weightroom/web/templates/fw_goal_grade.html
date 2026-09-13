@@ -1,13 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw_goals.html" import csrf with context %}
 {% block title %}Grade — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
+{{ page_nav(links=[{"label": back_label, "href": back_href}] + ([{"label": "Report", "href": report_href}] if report_href else []), actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Grade — {{ title }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ back_href }}">{{ back_label }}</a>{% if report_href %} · <a href="{{ report_href }}">Report</a>{% endif %}</div>
 </div>
 {% include "_app_state.html" %}
 {% if unreachable %}

@@ -6,7 +6,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>Egress decisions {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/tiers">Tiers</a> · <a href="/apps/promptcadence/approvals">Approvals</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">Every decision about whether data could leave this machine, approvals and refusals

@@ -1,16 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, kv_list, table, empty_state %}
-{% from "_app_page.html" import app_page_header, page_source, refusal %}
+{% from "_app_page.html" import app_page_header, page_source, refusal, page_nav %}
 {% from "_pc.html" import tool_link %}
 {% block title %}Tools — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Tools", "Tools", "Every tool configuration names, registered or not. A tool asked for and withheld is here with its cause — a list of only the working tools cannot tell that apart from a tool nobody asked for.") %}
-<a href="/apps/promptcadence/settings">Settings</a>
-{% endcall %}
+{{ page_nav(links=[{"label": "Registry", "href": "#pc-tools-registry"}, {"label": "Create a tool", "href": "#pc-tools-create"}], actions=[docs_action("promptcadence")]) }}
+{{ app_page_header(view, "Tools", "Tools", "Every tool configuration names, registered or not. A tool asked for and withheld is here with its cause — a list of only the working tools cannot tell that apart from a tool nobody asked for.") }}
 {% include "_app_state.html" %}
-<nav class="page-actions" aria-label="Sections">
-  <a href="#pc-tools-registry">Registry</a> · <a href="#pc-tools-create">Create a tool</a>
-</nav>
 
 {{ refusal(sourced.error) }}
 {% set report = sourced.data %}

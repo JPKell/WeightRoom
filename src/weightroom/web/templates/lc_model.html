@@ -1,13 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_lc.html" import recorded, measure, num, breaker_badge, profile_link, model_actions with context %}
 {% block title %}Model — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set model = sourced.data %}
+{{ page_nav(links=([{"label": "Its reliability", "href": "/apps/loadcoach/reliability?model=" ~ (model.get("canonical_id") | urlencode)}] if model else []), actions=[docs_action("loadcoach")]) }}
 <div class="page-head">
   <h2>Model {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/models">Every model</a>{% if model %} · <a href="/apps/loadcoach/reliability?model={{ model.get('canonical_id') | urlencode }}">Its reliability</a>{% endif %}</div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}

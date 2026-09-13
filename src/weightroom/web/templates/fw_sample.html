@@ -1,14 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import run_link, status_badge, value %}
 {% block title %}Sample — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data or {} %}
 {% set sample = data.get("sample") %}
+{{ page_nav(links=([{"label": "The test's samples", "href": "/apps/freeweight/runs/" ~ (data.get("run_id") | urlencode) ~ "/tests/" ~ ((data.get("run_test_id") or "") | urlencode)}] if data.get("run_id") else []), actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Case inspector {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">{% if data.get("run_id") %}<a href="/apps/freeweight/runs/{{ data.get('run_id') | urlencode }}/tests/{{ (data.get('run_test_id') or '') | urlencode }}">The test's samples</a>{% endif %}</div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}

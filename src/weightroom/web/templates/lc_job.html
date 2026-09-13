@@ -1,22 +1,22 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import measure, explanation %}
 {% block title %}Job — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
 {% set job = data.get("job") if data else none %}
 {% set routing = (job.get("routing") or {}) if job else {} %}
-{% call app_page_header(view, "Job", "Queue", "One job end to end: what was asked, what routing chose and why, what ran, and what came back.") %}
-    <a href="/apps/loadcoach/queue/history#jobs">Every job</a>
-    {% if routing.get("decision_id") %} · <a href="/apps/loadcoach/routing/decisions/{{ routing.get('decision_id') | urlencode }}">Its routing decision</a>{% endif %}
-    {% if sourced.live and job and job.get("state") not in terminal %}
-    <form method="post" action="/apps/loadcoach/queue/jobs/{{ job_id | urlencode }}/cancel" class="kit-inline">
-      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-      <button type="submit">Cancel job</button>
-    </form>
-    {% endif %}
-{% endcall %}
+{{ page_nav(links=[{"label": "History", "href": "/apps/loadcoach/queue/history"}, {"label": "New job", "href": "/apps/loadcoach/queue/new"}] + ([{"label": "Its routing decision", "href": "/apps/loadcoach/routing/decisions/" ~ (routing.get("decision_id") | urlencode)}] if routing.get("decision_id") else []), actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Job", "Queue", "One job end to end: what was asked, what routing chose and why, what ran, and what came back.") }}
+{% if sourced.live and job and job.get("state") not in terminal %}
+<div class="kit-actions">
+  <form method="post" action="/apps/loadcoach/queue/jobs/{{ job_id | urlencode }}/cancel">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <button type="submit">Cancel job</button>
+  </form>
+</div>
+{% endif %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 <p class="mono muted">{{ job_id }}</p>

@@ -1,13 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_fw.html" import run_link, status_badge %}
 {% block title %}Machine — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set machine = sourced.data %}
-{% call app_page_header(view, (machine.get("display_name") if machine else None) or "Machine", "Runs", "One machine's static profile, and the runs measured on it. Every figure measured here is comparable only within this machine.") %}
-  <a href="/apps/freeweight/machines">Every machine</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Machines", "href": "/apps/freeweight/machines"}], actions=[docs_action("freeweight")]) }}
+{{ app_page_header(view, (machine.get("display_name") if machine else None) or "Machine", "Runs", "One machine's static profile, and the runs measured on it. Every figure measured here is comparable only within this machine.") }}
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}
 {{ refusal(action_error) }}

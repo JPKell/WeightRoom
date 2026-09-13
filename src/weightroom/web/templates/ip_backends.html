@@ -5,9 +5,7 @@
 {% from "_lc.html" import model_link %}
 {% block title %}Backends — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Backends", "Backends", "Where IdeaPress sends a prompt: the selected backend and its fallback. A remote one carries the author's content off this machine, and says so below. Reachability is a live probe, so this page reads only IdeaPress's running API.") %}
-<a href="/apps/ideapress/projects">Projects</a> · <a href="/apps/ideapress/settings">Settings</a>
-{% endcall %}
+{{ app_page_header(view, "Backends", "Backends", "Where IdeaPress sends a prompt: the selected backend and its fallback. A remote one carries the author's content off this machine, and says so below. Reachability is a live probe, so this page reads only IdeaPress's running API.") }}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if tested %}

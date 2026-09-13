@@ -1,13 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw_goals.html" import csrf with context %}
 {% block title %}Edit goal — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set here = "/apps/freeweight/goals/" ~ (slug | urlencode) %}
+{{ page_nav(links=[{"label": "Goal", "href": here}, {"label": "Edit", "href": here ~ "/edit", "current": true}], actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Edit {{ slug }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ here }}">The goal</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

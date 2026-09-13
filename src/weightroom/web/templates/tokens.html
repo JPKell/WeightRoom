@@ -1,13 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
-{% from "_app_page.html" import docs_link %}
+{% from "_app_page.html" import page_nav %}
 {% block title %}{{ app | app_label }} tokens — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": "JSON", "href": "/api/v1/apps/" ~ app ~ "/tokens"}, docs_action(app)]) }}
 <h2>Tokens</h2>
 <p class="muted">{{ app | app_label }}'s API tokens, through its own
 <code>{{ app }} token list|create|revoke</code> — a token is minted in <em>local</em> mode against
-the application's own database, so there is no HTTP surface for the console to call.
-<a href="/api/v1/apps/{{ app }}/tokens">JSON</a> · {{ docs_link(app) }}</p>
+the application's own database, so there is no HTTP surface for the console to call.</p>
 
 {% if error %}<p class="notice" role="alert"><strong>Refused.</strong> {{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}

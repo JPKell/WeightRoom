@@ -4,10 +4,8 @@
 {% from "_ip.html" import short, state_badge, project_link, projects_nav %}
 {% block title %}Projects — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Projects", "Projects", "Newest activity first. A project is an idea, its brief, the plan compiled from it and the units drafted against that plan. Open one to plan it, run its stages and read what came back.") %}
-<a href="/apps/ideapress/workflows">Workflows</a> · <a href="/apps/ideapress/backends">Backends</a>
-{% endcall %}
 {{ projects_nav(nav, none) }}
+{{ app_page_header(view, "Projects", "Projects", "Newest activity first. A project is an idea, its brief, the plan compiled from it and the units drafted against that plan. Open one to plan it, run its stages and read what came back.") }}
 {% include "_app_state.html" %}
 {% if deleted %}<p class="notice" role="status">Deleted <strong>{{ deleted }}</strong>{% if archive_path %}; its archive was written first, to <code>{{ archive_path }}</code>{% endif %}.</p>{% endif %}
 

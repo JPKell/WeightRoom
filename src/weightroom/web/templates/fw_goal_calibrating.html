@@ -1,12 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, kv_list %}
-{% from "_app_page.html" import refusal %}
+{% from "_app_page.html" import refusal, page_nav %}
 {% block title %}Calibrating — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set here = "/apps/freeweight/goals/" ~ (slug | urlencode) %}
+{{ page_nav(links=[{"label": "Goal", "href": here}, {"label": "Calibration", "href": here ~ "/calibration", "current": true}, {"label": "Report", "href": here ~ "/report"}] + ([{"label": "The job", "href": "/jobs/" ~ (job.id | urlencode)}] if job else [])) }}
 <div class="page-head">
   <h2>Calibrating {{ slug }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ here }}">The goal</a> · <a href="{{ here }}/calibration">Calibration</a> · <a href="{{ here }}/report">Report</a>{% if job %} · <a href="/jobs/{{ job.id | urlencode }}">The job</a>{% endif %}</div>
 </div>
 {{ refusal(error) }}
 {% if job %}
