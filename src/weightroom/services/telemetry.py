@@ -36,6 +36,7 @@ same code runs unchanged on SQLite and PostgreSQL (ADR-0006).
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -65,19 +66,24 @@ if TYPE_CHECKING:
     from weightroom.services.database import Database
 
 __all__ = [
+    "CHART_POINTS",
     "FIGURE_COLUMNS",
+    "FIGURE_SCALES",
     "RESIDENT_REFRESH_SECONDS",
     "SWEEP_INTERVAL_SECONDS",
+    "FigurePanel",
+    "FigureScale",
     "TelemetryService",
     "build_collector",
     "downsample_and_retain",
+    "format_figure",
     "format_heartbeat",
     "history_rows",
     "read_since",
     "sample_frame",
     "sample_to_json",
     "snapshot_to_row",
-    "sparkline_svg",
+    "telemetry_panels",
 ]
 
 logger = logging.getLogger(__name__)
@@ -255,79 +261,282 @@ def history_rows(
         return [(at, value) for at, value in rows]
 
 
-_SPARKLINE_WIDTH: Final = 640
-_SPARKLINE_HEIGHT: Final = 160
-_SPARKLINE_PAD: Final = 8
+@dataclass(frozen=True, slots=True)
+class FigureScale:
+    """How one charted figure is named, printed and scaled on the telemetry page (row WY4).
+
+    Attributes:
+        label: The chart's and the bar's short label.
+        unit: One of :func:`format_figure`'s unit names.
+        low: The bottom of the value scale, and of the fill's colour ramp.
+        high: The top of the scale. ``None`` takes the paired ``total`` figure and, with no total
+            (or none measured), the highest sample in the window.
+        total: The figure that bounds this one (RAM used by RAM total) — printed beside the
+            current value, never charted on its own.
+    """
+
+    label: str
+    unit: str
+    low: float = 0.0
+    high: float | None = None
+    total: str | None = None
 
 
-def sparkline_svg(rows: Sequence[tuple[datetime, float | int | None]]) -> str | None:
-    """A server-rendered SVG polyline over ``rows`` — no chart library (ADR-0020 rule 5).
+FIGURE_SCALES: Final[dict[str, FigureScale]] = {
+    "cpu_percent": FigureScale("CPU", "percent", high=100.0),
+    "ram_used_bytes": FigureScale("RAM", "bytes", total="ram_total_bytes"),
+    "gpu_utilization_percent": FigureScale("GPU", "percent", high=100.0),
+    "gpu_vram_used_bytes": FigureScale("VRAM", "bytes", total="gpu_vram_total_bytes"),
+    # ponytail: 30–100 °C is a desktop-CPU guess (an idle floor, Tjmax as the ceiling); take the
+    # sensor's own critical threshold if SweatMeter ever reports one.
+    "cpu_temperature_c": FigureScale("CPU temp", "celsius", low=30.0, high=100.0),
+    # ponytail: 30–95 °C is a consumer-GPU guess, 10 °C over `[alerts] gpu_temperature_c`'s 85;
+    # take the card's slowdown temperature if the telemetry ever carries it.
+    "gpu_temperature_c": FigureScale("GPU temp", "celsius", low=30.0, high=95.0),
+    # The telemetry carries no power limit: 0 to the highest sample in the window.
+    "gpu_power_watts": FigureScale("GPU power", "watts"),
+}
+"""Every charted figure, in page order, with its scale — the one table the page reads.
 
-    Row WX6 vendored ECharts into MirrorWall (ADR-0142) and the history page now draws one
-    alongside this SVG (:func:`echarts_line_option`); this function stays as that chart's
-    accessible alternative (UI standards §5, §7), rendered whether or not the reader's browser
-    ever draws the chart.
+The two totals are not keys: they are values printed beside their used figure (``18.2 G / 64 G``).
+"""
+
+CHART_POINTS: Final = 240
+"""The most points one small multiple is sent. A chart a quarter of a 1440 px page wide cannot
+show more, and a day of samples is about 5 000 rows per figure."""
+
+_EM_DASH: Final = "—"
+_SUFFIXES: Final = ("", "K", "M", "G", "T")
+
+
+def _half_up(value: float, decimals: int) -> float:
+    """Round half up with the same floating-point steps as ``charts.js``'s ``roundHalfUp``."""
+    scale = 10 if decimals else 1
+    return math.floor(value * scale + 0.5) / scale
+
+
+def _number(value: float) -> str:
+    """``64.0`` as ``64`` and ``18.2`` as ``18.2`` — what JavaScript's ``String()`` prints."""
+    return str(int(value)) if value == int(value) else str(value)
+
+
+def _scaled(value: float, base: int, smallest: str) -> str:
+    """``value`` over ``base`` until it fits, with its suffix; ``smallest`` below one ``K``."""
+    index = 0
+    while value >= base and index < len(_SUFFIXES) - 1:
+        value /= base
+        index += 1
+    shown = _half_up(value, 0 if value >= 100 else 1)
+    if shown >= base and index < len(_SUFFIXES) - 1:
+        index += 1
+        shown = _half_up(shown / base, 1)
+    suffix = _SUFFIXES[index] or smallest
+    return _number(shown) + (f" {suffix}" if suffix else "")
+
+
+def format_figure(value: float | None, unit: str) -> str:
+    """Print one telemetry value exactly as the page's JavaScript does (``mirrorwallCharts``).
 
     Args:
-        rows: ``(at, value)`` pairs, ascending; a ``None`` value is a gap in the line, never
-            plotted as zero (ADR-0016).
+        value: The reading; ``None`` is unavailable.
+        unit: ``bytes`` (binary, ``K``/``M``/``G``/``T``, ``B`` below 1 K), ``count`` (SI, the same
+            suffixes), or ``percent``, ``celsius`` and ``watts`` (whole numbers). Any other unit
+            prints the bare number to one decimal.
 
     Returns:
-        The ``<svg>...</svg>`` markup, or ``None`` when there is nothing to plot.
+        The text — one decimal below 100 of a suffix, none from 100 — or ``—`` for ``None``, never
+        ``0`` (ADR-0016).
     """
-    plottable = [(at, float(value)) for at, value in rows if value is not None]
-    if not plottable:
-        return None
-    values = [value for _at, value in plottable]
-    low, high = min(values), max(values)
-    span = (high - low) or 1.0
-    inner_w = _SPARKLINE_WIDTH - 2 * _SPARKLINE_PAD
-    inner_h = _SPARKLINE_HEIGHT - 2 * _SPARKLINE_PAD
-    count = len(plottable)
-    points = []
-    for index, (_at, value) in enumerate(plottable):
-        x = _SPARKLINE_PAD + (inner_w * index / (count - 1) if count > 1 else inner_w / 2)
-        y = _SPARKLINE_PAD + inner_h * (1 - (value - low) / span)
-        points.append(f"{x:.1f},{y:.1f}")
-    polyline = " ".join(points)
-    return (
-        f'<svg viewBox="0 0 {_SPARKLINE_WIDTH} {_SPARKLINE_HEIGHT}" role="img" '
-        f'aria-label="History from {low:g} to {high:g}" class="sparkline">'
-        f'<polyline points="{polyline}" fill="none" stroke="currentColor" stroke-width="2"/>'
-        f"</svg>"
+    if value is None:
+        return _EM_DASH
+    if unit == "percent":
+        return f"{_number(_half_up(value, 0))}%"
+    if unit == "celsius":
+        return f"{_number(_half_up(value, 0))} °C"
+    if unit == "watts":
+        return f"{_number(_half_up(value, 0))} W"
+    if unit == "bytes":
+        return _scaled(value, 1024, "B")
+    if unit == "count":
+        return _scaled(value, 1000, "")
+    return _number(_half_up(value, 1))
+
+
+@dataclass(frozen=True, slots=True)
+class FigurePanel:
+    """One figure as the telemetry page draws it: a live bar and a small multiple.
+
+    Attributes:
+        name: The figure (a :data:`FIGURE_SCALES` key).
+        label: Its short label.
+        unit: Its :func:`format_figure` unit.
+        low: The bottom of its scale.
+        high: The top of its scale, resolved for this window.
+        current: The newest sample's reading; ``None`` when that sample could not measure it.
+        total: The paired total's newest measured reading, when the figure has a total.
+        total_field: The paired total's name, which the live bar reads beside the figure.
+        percent: ``current`` on the scale, 0–100, or ``None`` with no current reading.
+        text: ``current`` printed.
+        total_text: ``total`` printed when the figure has a total (``—`` if none was measured),
+            otherwise ``None``.
+        aria_label: The chart's accessible name: its current, minimum and maximum.
+        option: The ECharts option, or ``None`` when the window holds no reading at all.
+    """
+
+    name: str
+    label: str
+    unit: str
+    low: float
+    high: float
+    current: float | None
+    total: float | None
+    total_field: str | None
+    percent: float | None
+    text: str
+    total_text: str | None
+    aria_label: str
+    option: dict[str, Any] | None
+
+
+def telemetry_panels(
+    database: Database, *, hours: float, now: datetime, max_points: int = CHART_POINTS
+) -> list[FigurePanel]:
+    """Every :data:`FIGURE_SCALES` figure over the ``hours`` before ``now``, from one read.
+
+    One ``SELECT`` of every figure column; each series is cut from its rows — never one query per
+    figure.
+
+    Args:
+        database: WeightRoomGym's own database.
+        hours: The window; a negative value is an empty one.
+        now: The window's end, injected like :func:`history_rows`'s.
+        max_points: The most points sent per chart. Above it, time buckets keep their highest
+            reading, so a spike survives the reduction.
+
+    Returns:
+        One panel per figure, in :data:`FIGURE_SCALES` order. A figure with no reading anywhere in
+        the window has ``option=None`` and prints ``—``: no chart, never a flat line at zero
+        (ADR-0016).
+    """
+    names = list(FIGURE_COLUMNS)
+    columns = [getattr(TelemetrySample, FIGURE_COLUMNS[name]) for name in names]
+    cutoff = now - timedelta(hours=max(0.0, hours))
+    with database.read() as session:
+        rows = session.execute(
+            select(TelemetrySample.at, *columns)
+            .where(TelemetrySample.at >= cutoff)
+            .order_by(TelemetrySample.at.asc())
+        ).all()
+    series = {name: [(row[0], row[index + 1]) for row in rows] for index, name in enumerate(names)}
+    return [
+        _panel(name, scale, series, max_points=max_points) for name, scale in FIGURE_SCALES.items()
+    ]
+
+
+def _panel(
+    name: str,
+    scale: FigureScale,
+    series: dict[str, list[tuple[datetime, Any]]],
+    *,
+    max_points: int,
+) -> FigurePanel:
+    """Build one figure's panel from the window's series (:func:`telemetry_panels`)."""
+    points = series[name]
+    values = [value for _at, value in points if value is not None]
+    current = points[-1][1] if points else None
+    total = None
+    if scale.total is not None:
+        total = next((v for _at, v in reversed(series[scale.total]) if v is not None), None)
+    high = scale.high if scale.high is not None else (total or max(values, default=0.0))
+    high = max(float(high), scale.low + 1.0)
+    percent = None
+    if current is not None:
+        percent = round(min(100.0, max(0.0, (current - scale.low) / (high - scale.low) * 100)), 1)
+    total_text = format_figure(total, scale.unit) if scale.total is not None else None
+    option = None
+    aria_label = f"{scale.label}: not measured"
+    if values:
+        aria_label = (
+            f"{scale.label}: now {format_figure(current, scale.unit)}, "
+            f"minimum {format_figure(min(values), scale.unit)}, "
+            f"maximum {format_figure(max(values), scale.unit)}"
+        )
+        option = _chart_option(scale, high=high, data=_bucketed(points, max_points))
+    return FigurePanel(
+        name=name,
+        label=scale.label,
+        unit=scale.unit,
+        low=scale.low,
+        high=high,
+        current=current,
+        total=total,
+        total_field=scale.total,
+        percent=percent,
+        text=format_figure(current, scale.unit),
+        total_text=total_text,
+        aria_label=aria_label,
+        option=option,
     )
 
 
-def echarts_line_option(
-    rows: Sequence[tuple[datetime, float | int | None]], *, figure: str
-) -> dict[str, Any] | None:
-    """The ECharts option :func:`~weightroom.web.rendering.render`'s ``chart_container`` draws.
+def _bucketed(points: Sequence[tuple[datetime, Any]], max_points: int) -> list[list[Any]]:
+    """``[epoch_ms, value]`` pairs, at most ``max_points``; each bucket keeps its highest reading.
 
-    Row WX6 (ADR-0142): the same data :func:`sparkline_svg` plots, reshaped for ECharts instead of
-    drawn as SVG here. Colour is never in this dict — ``charts.js`` themes it from tokens at draw
-    time (ADR-0020), so this function stays server-side and library-agnostic in what it returns.
-
-    Args:
-        rows: ``(at, value)`` pairs, ascending; a ``None`` value is a gap, dropped rather than
-            plotted at zero (ADR-0016) — the same rule :func:`sparkline_svg` follows.
-        figure: the figure's own name, used as the series label only.
-
-    Returns:
-        An ECharts option dict, or ``None`` when there is nothing to plot — the caller falls back
-        to the accessible alternative alone, same as an absent SVG.
+    A bucket whose every reading is ``None`` stays ``None`` — a gap in the line, not a zero. A
+    stretch with no rows at all (the console was stopped) is joined across, not gapped.
     """
-    plottable = [(at, float(value)) for at, value in rows if value is not None]
-    if not plottable:
-        return None
+
+    def compact(value: float | None) -> float | None:
+        return round(value, 1) if isinstance(value, float) else value
+
+    if len(points) <= max_points:
+        return [[int(at.timestamp() * 1000), compact(value)] for at, value in points]
+    start = points[0][0]
+    span_seconds = (points[-1][0] - start).total_seconds() or 1.0
+    merged: dict[int, list[Any]] = {}
+    for at, value in points:
+        key = min(int((at - start).total_seconds() * max_points / span_seconds), max_points - 1)
+        slot = merged.setdefault(key, [at, None])
+        slot[0] = at
+        if value is not None and (slot[1] is None or value > slot[1]):
+            slot[1] = value
+    return [[int(at.timestamp() * 1000), compact(value)] for at, value in merged.values()]
+
+
+def _chart_option(scale: FigureScale, *, high: float, data: list[list[Any]]) -> dict[str, Any]:
+    """A compact area chart whose fill follows its value (ADR-0147), with no colour in it.
+
+    ``visualMap.mw_scale`` and the top-level ``mw_unit`` are MirrorWall ``charts.js`` markers: it
+    colours the scale from the status tokens and prints the axis and tooltip through its formatter.
+    """
     return {
-        "xAxis": {"type": "time"},
-        "yAxis": {"type": "value"},
+        "mw_unit": scale.unit,
+        "animation": False,
+        "grid": {"left": 48, "right": 8, "top": 8, "bottom": 20},
+        "tooltip": {"trigger": "axis"},
+        "xAxis": {"type": "time", "splitNumber": 3, "splitLine": {"show": False}},
+        "yAxis": {
+            "type": "value",
+            "min": scale.low,
+            "max": high,
+            "interval": (high - scale.low) / 2,
+        },
+        "visualMap": {
+            "type": "continuous",
+            "show": False,
+            "dimension": 1,
+            "min": scale.low,
+            "max": high,
+            "mw_scale": "load",
+        },
         "series": [
             {
-                "name": figure,
+                "name": scale.label,
                 "type": "line",
                 "showSymbol": False,
-                "data": [[at.isoformat(), value] for at, value in plottable],
+                "lineStyle": {"width": 1.5},
+                "areaStyle": {"opacity": 0.35},
+                "data": data,
             }
         ],
     }

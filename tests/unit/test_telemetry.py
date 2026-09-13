@@ -35,7 +35,6 @@ from weightroom.services.telemetry import (
     sample_frame,
     sample_to_json,
     snapshot_to_row,
-    sparkline_svg,
 )
 
 _SAMPLER_THREAD_NAME = "sweatmeter-sampler"
@@ -144,28 +143,6 @@ def test_sample_frame_carries_the_row_id_as_the_sse_sequence() -> None:
 
 def test_format_heartbeat_is_an_sse_comment() -> None:
     assert format_heartbeat().startswith(": heartbeat ")
-
-
-class TestSparklineSvg:
-    def test_empty_series_has_nothing_to_plot(self) -> None:
-        assert sparkline_svg([]) is None
-
-    def test_an_all_unavailable_series_has_nothing_to_plot(self) -> None:
-        now = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
-        assert sparkline_svg([(now, None), (now, None)]) is None
-
-    def test_a_gap_in_the_middle_does_not_stop_the_rest_plotting(self) -> None:
-        now = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
-        svg = sparkline_svg([(now, 1.0), (now, None), (now, 3.0)])
-        assert svg is not None
-        assert "<polyline" in svg
-        assert svg.count(",") >= 2  # two plotted points, the gap skipped rather than zeroed
-
-    def test_a_single_point_still_renders(self) -> None:
-        now = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
-        svg = sparkline_svg([(now, 42.0)])
-        assert svg is not None
-        assert "<svg" in svg and "</svg>" in svg
 
 
 class TestDownsampleAndRetain:

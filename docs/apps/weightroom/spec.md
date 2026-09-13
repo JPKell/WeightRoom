@@ -292,8 +292,11 @@ prepended as context in the request — never executed, never fetched from.
 resident model with its context, and LoadCoach's queue depth. An unavailable reading is `—`,
 never `0` ([ADR-0016](../../adr/0016-unavailable-is-not-zero.md)). Samples are kept in
 `telemetry_samples` for `[telemetry] history_hours` (72) at one row per interval, downsampled to
-one per minute beyond an hour; clicking a figure opens its history page with a chart over that
-window. Resident models are `/api/ps` (through ModelRack's Ollama client) and LoadCoach's
+one per minute beyond an hour. The telemetry page (`/telemetry/history`) shows every figure at
+once: a live bar per figure over a small multiple per figure for the window, each shaded by value
+([ADR-0147](../../adr/0147-a-chart-may-map-its-fill-to-value-coloured-from-tokens.md)), with RAM
+and VRAM totals printed beside their used figure rather than charted; clicking a strip figure
+opens it with that figure's chart marked (`?figure=`). Resident models are `/api/ps` (through ModelRack's Ollama client) and LoadCoach's
 `/models` residency, shown together with their source.
 
 ### 7.8 Database viewer

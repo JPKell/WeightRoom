@@ -6,6 +6,24 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed (row WY4)
+- **The telemetry page shows every figure on one page.** `/telemetry/history` draws a large live
+  bar per figure (CPU, RAM, GPU, VRAM, both temperatures, GPU power) over a compact small multiple
+  per figure — no heading, no copy, no figure selector. RAM and VRAM totals are printed beside
+  their used figure (`18.2 G / 64 G`), never charted. Each chart is an area shaded by value, green
+  low to red high, on a fixed scale per figure (`services/telemetry.py` `FIGURE_SCALES`:
+  percentages 0–100, temperatures on stated ranges, bytes 0 to the paired total, watts 0 to the
+  window's highest sample), coloured from the status tokens by MirrorWall's `charts.js`
+  (ADR-0147). Large numbers print as `K`/`M`/`G`/`T` through `format_figure`, whose JavaScript twin
+  is tested against the same case table. `?figure=` (the strip's links) now marks and scrolls to
+  that figure's chart; a total marks the chart it is printed on. One database read builds every
+  chart, at most 240 points each (a bucket keeps its peak). A figure with no reading in the window
+  prints `—` and draws no chart (ADR-0016); each chart's `aria-label` states current, minimum and
+  maximum.
+### Removed (row WY4)
+- `sparkline_svg` and `echarts_line_option` — the inline SVG drawn inside the ECharts chart (the
+  double) is gone.
+
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker
