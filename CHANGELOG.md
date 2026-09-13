@@ -77,6 +77,34 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   document's `json_schema`, and LoadCoach emitted `additionalProperties: true` for `[providers]`,
   which carries no type to descend into. Fixed in LoadCoach's schema output, so the console needed
   no application-specific rule; the vendored fixture is re-recorded.
+### Added (row WX7)
+- **FreeWeight's Models page filters the way the list is read**: provider, family and quantization
+  as selects over the values FreeWeight's own list holds, and a parameter range typed in billions
+  as the table shows them (converted to parameters once, in the console, so FreeWeight is never
+  asked to learn a second unit). Every one of them is `GET /models`'s own filter, so a stopped
+  FreeWeight says the list it is reading from the database file is filtered by none of them. A
+  filtered page reads the list once more, unfiltered, for the selects' vocabulary alone — a select
+  narrowed to what the filtered list holds is a filter that cannot be undone.
+- **A model is named by FreeWeight's `display_name`** wherever the console names one — the
+  provider's own name, or the canonical ID where two enabled models share it. The console renders
+  the name and never re-derives it, and the canonical ID is always the link's title.
+- **A machine can be given a name** from its own page: a form posting to FreeWeight's new
+  `PATCH /machines/{id}`, audited as `freeweight.machine_nickname` and **not** security-relevant —
+  a nickname identifies nothing, and every measurement stays attributed to the fingerprint, which
+  the page keeps showing. The name appears in the machines list, on the machine's own page, and
+  beside every run's machine. Not offered while FreeWeight is stopped: it is a write.
+- **The Runs filter bar offers what FreeWeight lists**: Model, Suite and Machine become selects
+  over its models, benchmarks and machines, with the machine shown by name rather than by a
+  fingerprint nobody types. A value being filtered by that the list no longer holds stays an
+  option, so applying a second filter cannot drop the first; with FreeWeight stopped each falls
+  back to the text box it was.
+- **Compare gets a model picker and a chart.** Checkboxes over the enabled models join with the
+  free-text box into the one subject list FreeWeight is asked for, and a checkbox per metric draws
+  it as a horizontal ECharts bar chart (ADR-0142) under the existing grid. **A metric FreeWeight
+  marks separated is never charted** — bars on one axis *are* a comparison, and that is the
+  reading it refuses; those metrics are listed unticked with their reason in the table. A cell
+  with no value is left out of the series rather than drawn at zero (ADR-0016).
+- Row WX3's `app_page_header` is now used: Models, Runs, Compare, Machines and one machine's page.
 
 ### Added (row WX6)
 - **The telemetry history page draws an ECharts line chart** beside its existing accessible SVG

@@ -29,6 +29,7 @@ __all__ = [
     "provider_values",
     "repeat_run",
     "save_provider",
+    "set_machine_nickname",
     "touched",
 ]
 
@@ -92,6 +93,25 @@ def repeat_run(
             params={"force": "true" if force else None, "label": label.strip() or None},
             timeout_seconds=_ACTION_TIMEOUT_SECONDS,
         )
+    )  # fmt: skip
+
+
+def set_machine_nickname(
+    client: httpx.Client, settings: Settings, machine_id: str, *, nickname: str
+) -> dict[str, Any]:
+    """``PATCH /machines/{id}``: the operator's own label for one machine (row WX7).
+
+    A blank field clears it. The label identifies nothing — FreeWeight still attributes every
+    measurement to the fingerprint — so this is the one machine field a console may write.
+
+    Raises:
+        AppRefused: ``NOT_FOUND`` when no machine has that ULID, in FreeWeight's words.
+        AppUnreachable: It did not answer.
+    """
+    return _answer(
+        call(client, settings, APP, "PATCH", f"machines/{segment(machine_id)}",
+             body={"nickname": nickname.strip() or None},
+             timeout_seconds=_ACTION_TIMEOUT_SECONDS)
     )  # fmt: skip
 
 

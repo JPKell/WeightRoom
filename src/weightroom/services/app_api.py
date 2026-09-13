@@ -162,7 +162,7 @@ def call(
         client: The pooled HTTP client.
         settings: The validated settings (base URL and token file).
         app: One of the four.
-        method: ``GET``, ``POST``, ``PUT`` or ``DELETE``.
+        method: ``GET``, ``POST``, ``PUT``, ``PATCH`` or ``DELETE``.
         path: The path under ``/api/v1`` (``trajectories/01J…``).
         params: Query parameters; ``None`` values are dropped rather than sent as ``"None"``.
         body: A JSON body, or ``None`` for none.

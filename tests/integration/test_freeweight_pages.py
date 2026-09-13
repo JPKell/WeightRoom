@@ -39,6 +39,7 @@ RUN = "01M26MTEM1SGTMWVB3PR6EXY8F"
 MODEL = "01M26MN12V1DGS767ENPN75HMB"
 TEST = "01M26MTJ1SAQDDVHR4ESBYCBX2"
 SAMPLE = "01M26MTM5XS87ZJPG7PE51BQVH"
+MACHINE = "01M1B9PNA4BK4TEJ3T5EQTFQS4"
 CANONICAL = "ollama/smollm2:135m@sha256:9077fe9d2ae1"
 
 STOPPED_MODEL = "01STOPPEDMODEL00000000000A"
@@ -89,6 +90,9 @@ def mock_api(
         # The Runs page's Start form offers an adapter where one can be served (row WPF2); the
         # recording is the reference machine's, which had no adapter directory configured.
         "adapters": fixture("adapters"),
+        # The Runs page's Machine filter is a select over FreeWeight's own machines (row WX7).
+        "machines": fixture("machines"),
+        f"machines/{MACHINE}": fixture("machine"),
         "runs": fixture("runs"),
         f"runs/{RUN}": fixture("run"),
         f"runs/{RUN}/telemetry": fixture("run-telemetry"),

@@ -38,6 +38,7 @@ __all__ = [
     "EVIDENCE_FILTERS",
     "EXPORT_FORMATS",
     "EXPORT_SCOPES",
+    "MODEL_FILTERS",
     "RESULT_FILTERS",
     "RUN_FILTERS",
     "RUN_STATUSES",
@@ -50,7 +51,9 @@ __all__ = [
     "benchmarks_api",
     "charts",
     "compare_api",
+    "compare_bar_options",
     "context_fit_api",
+    "model_facets",
     "dashboard_api",
     "database_stats_api",
     "evidence_api",
@@ -208,20 +211,60 @@ def _names(handle: AppDatabase) -> dict[str, dict[Any, Any]]:
 # --- Models ---------------------------------------------------------------------------------------
 
 
+MODEL_FILTERS: Final[tuple[str, ...]] = (
+    "has_results",
+    "provider_kind",
+    "family",
+    "quantization",
+    "min_parameters",
+    "max_parameters",
+)
+"""Every ``GET /models`` filter the Models page offers, by FreeWeight's own parameter name."""
+
+
 def models_api(
-    client: httpx.Client, settings: Settings, *, has_results: str | None, sort: str | None
+    client: httpx.Client,
+    settings: Settings,
+    *,
+    sort: str | None,
+    filters: Mapping[str, str | None] | None = None,
 ) -> list[dict[str, Any]]:
     """``GET /models``: every identity with its latest descriptor, ``enabled`` and ``has_results``.
+
+    Args:
+        client: The pooled HTTP client.
+        settings: The validated settings.
+        sort: ``last_seen_at`` or ``canonical_id``, ``-`` for descending.
+        filters: Any of :data:`MODEL_FILTERS`; a blank or missing one is not sent.
 
     Raises:
         AppRefused: FreeWeight refused (``VALIDATION_ERROR`` for an unknown ``sort``).
         AppUnreachable: It did not answer.
     """
+    wanted = {key: (filters or {}).get(key) or None for key in MODEL_FILTERS}
     body = call(
         client, settings, APP, "GET", "models",
-        params={"has_results": has_results, "sort": sort}, timeout_seconds=30.0,
+        params={**wanted, "sort": sort}, timeout_seconds=30.0,
     )  # fmt: skip
     return _listed(body, "items")
+
+
+def model_facets(models: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
+    """The provider, family and quantization values a model list actually holds.
+
+    The Models page's three selects are built from this rather than from a vocabulary the console
+    keeps: a family FreeWeight has never seen is not a filter anyone can want, and a list that
+    grew one is a select that grew an option with no console release.
+
+    Args:
+        models: The rows ``GET /models`` returned.
+
+    Returns:
+        ``{"provider_kind": [...], "family": [...], "quantization": [...]}``, each sorted, each
+        without the blank a row that reported nothing leaves.
+    """
+    keys = ("provider_kind", "family", "quantization")
+    return {key: sorted({str(row.get(key)) for row in models if row.get(key)}) for key in keys}
 
 
 def _descriptor(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -1055,6 +1098,68 @@ def compare_api(
             params={"subjects": subjects, "suite": suite}, timeout_seconds=60.0,
         )
     )  # fmt: skip
+
+
+def compare_bar_options(
+    comparison: Mapping[str, Any], chosen: Sequence[str]
+) -> list[dict[str, Any]]:
+    """One horizontal-bar ECharts option per chosen metric of a comparison (row WX7, ADR-0142).
+
+    **A separated metric is never charted.** FreeWeight marks a metric row ``mergeable: false``
+    when its cells sit in groups that must not be read against each other, and a bar chart is
+    exactly the reading it refuses — bars in one axis *are* a comparison. Those metrics are left
+    out here and the page says why beside the table, which keeps every cell and its group.
+
+    A cell with no value is left out of the series rather than plotted at zero (ADR-0016).
+
+    Args:
+        comparison: ``GET /results/compare``'s body.
+        chosen: The metric keys the reader ticked. Anything not in the comparison is ignored.
+
+    Returns:
+        ``[{"metric_key", "unit", "higher_is_better", "option"}, …]`` in the comparison's own
+        metric order, with ``option`` an ECharts dict carrying no colour — ``charts.js`` themes it
+        at draw time. Empty when nothing chosen is chartable.
+    """
+    labels = {
+        str(one.get("run_id")): str(one.get("label") or (one.get("run_id") or "")[:8])
+        for one in comparison.get("subjects") or []
+    }
+    wanted = set(chosen)
+    charts: list[dict[str, Any]] = []
+    for row in comparison.get("metrics") or []:
+        key = str(row.get("metric_key") or "")
+        if key not in wanted or not row.get("mergeable"):
+            continue
+        points = [
+            (labels.get(str(cell.get("run_id")), "—"), cell.get("value"))
+            for cell in row.get("cells") or []
+            if isinstance(cell.get("value"), int | float)
+            and not isinstance(cell.get("value"), bool)
+        ]
+        if not points:
+            continue
+        charts.append(
+            {
+                "metric_key": key,
+                "unit": row.get("unit") or "",
+                "higher_is_better": bool(row.get("higher_is_better")),
+                "option": {
+                    # Categories run bottom-to-top on a horizontal bar, so the order is reversed
+                    # to put the comparison's first subject at the top where a reader starts.
+                    "xAxis": {"type": "value", "name": row.get("unit") or ""},
+                    "yAxis": {"type": "category", "data": [name for name, _ in reversed(points)]},
+                    "series": [
+                        {
+                            "name": key,
+                            "type": "bar",
+                            "data": [value for _, value in reversed(points)],
+                        }
+                    ],
+                },
+            }
+        )
+    return charts
 
 
 def export_params(form: Mapping[str, str]) -> dict[str, str]:

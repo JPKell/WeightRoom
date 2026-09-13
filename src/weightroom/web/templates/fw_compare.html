@@ -1,25 +1,38 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal, context_k %}
-{% from "_fw.html" import run_link, value, machine_link %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer, chart_container %}
+{% from "_app_page.html" import page_source, refusal, context_k, app_page_header, docs_link %}
+{% from "_fw.html" import run_link, value, machine_link, filter_styles %}
 {% block title %}Compare — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Compare {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/results">Results</a></div>
-</div>
+{{ filter_styles() }}
+{% call app_page_header(view, "Compare", "Results", "Runs set side by side, aligned by metric — with FreeWeight's own verdict on which of them may be read against each other.") %}
+  <a href="/apps/freeweight/results">Results</a> · <a href="/apps/freeweight/models">Models</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">Runs set side by side, aligned by metric. FreeWeight never averages across a boundary it marks separate: where
-two columns cannot be read against each other, the row says so, each cell names its group, and the fingerprint fields that
-separate them are listed with the reason.</p>
+<p class="muted">FreeWeight never averages across a boundary it marks separate: where two columns cannot be read against each
+other, the row says so, each cell names its group, and the fingerprint fields that separate them are listed with the reason.</p>
 <form method="get" action="/apps/freeweight/results/compare" class="filter-bar" aria-label="Compare">
-  <div class="field kit-wide"><label for="fw-cmp-subjects">Subjects</label><input id="fw-cmp-subjects" name="subjects" value="{{ subjects }}" placeholder="run ULIDs or prefixes, or model references, comma separated" required>
-    <span class="field-hint">Two or more. A model reference means that model's latest completed run of the suite.</span></div>
+  <div class="field kit-wide"><label for="fw-cmp-subjects">Subjects</label><input id="fw-cmp-subjects" name="subjects" value="{{ subjects }}" placeholder="run ULIDs or prefixes, or model references, comma separated">
+    <span class="field-hint">Two or more, counting the models ticked below. A model reference means that model's latest completed run of the suite.</span></div>
+  {% if models %}
+  <fieldset class="field kit-wide fw-picker">
+    <legend>Models</legend>
+    <span class="field-hint">Every enabled model (ADR-0118). Each ticked one is compared at its latest completed run of the suite.</span>
+    <div class="fw-picker-grid">
+      {% for one in models %}
+      <label class="fw-picker-item"><input type="checkbox" name="subject" value="{{ one.get('canonical_id') }}"{{ " checked" if one.get("canonical_id") in picked else "" }}>
+        <span title="{{ one.get('canonical_id') }}">{{ one.get("display_name") or one.get("canonical_id") }}</span></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
+  {% for one in metrics %}<input type="hidden" name="metric" value="{{ one }}">{% endfor %}
   <div class="field"><label for="fw-cmp-suite">Suite</label><input id="fw-cmp-suite" name="suite" value="{{ suite }}">
     <span class="field-hint">Refuses any run of another suite rather than comparing across suites.</span></div>
   {#- Compare is FreeWeight's own comparability verdict and has no database reading behind it, so
       a stopped FreeWeight can answer nothing here (row WPF1; `WP6_HANDOFF.md` §4). -#}
   <button type="submit"{% if not view.reachable %} disabled title="FreeWeight is not answering"{% endif %}>Compare</button>
+  <a href="/apps/freeweight/results/compare">Clear</a>
 </form>
 
 {% if not view.reachable %}
@@ -96,13 +109,15 @@ runs, not a benchmark result.</p>
 {% endif %}
 
 <h3>Metrics</h3>
-{% set metrics = comparison.get("metrics") or [] %}
-{% if metrics %}
+{#- `metrics` is the reader's chosen metric keys (the route's), so the comparison's own rows are
+    bound under their own name rather than shadowing it. -#}
+{% set metrics_list = comparison.get("metrics") or [] %}
+{% if metrics_list %}
 {% set head = [{"label": "Metric", "mono": true}, {"label": "Kind"}] %}
 {% for one in subjects_list %}{% set _ = head.append({"label": (one.get("label") or (one.get("run_id") or "")[:8]), "numeric": true}) %}{% endfor %}
 {% set _ = head.append({"label": "Comparable"}) %}
 {% set rows = [] %}
-{% for row in metrics %}
+{% for row in metrics_list %}
 {% set cells = [row.get("metric_key") ~ " (" ~ (row.get("unit") or "—") ~ ", " ~ ("higher is better" if row.get("higher_is_better") else "lower is better") ~ ")", row.get("metric_kind") or "—"] %}
 {% for cell in row.get("cells") or [] %}
 {% set _ = cells.append(value(cell.get("value"), cell.get("unavailable_reason")) ~ (" best" if row.get("mergeable") and row.get("best_run_id") == cell.get("run_id") else "") ~ " · n=" ~ (cell.get("sample_count") if cell.get("sample_count") is not none else "—") ~ (" · group " ~ (cell.get("group_index") + 1) if not row.get("mergeable") and cell.get("group_index") is number else "")) %}
@@ -111,6 +126,34 @@ runs, not a benchmark result.</p>
 {% set _ = rows.append(cells) %}
 {% endfor %}
 {{ table(head, rows, caption="One cell per run; cells in different groups are never to be read against each other", density="dense", row_count=rows | length, table_id="fw-compare-4", sortable=true) }}
+
+<h3>Chart a metric</h3>
+<form method="get" action="/apps/freeweight/results/compare" class="filter-bar" aria-label="Metrics to chart">
+  <input type="hidden" name="subjects" value="{{ chosen | join(',') }}">
+  <input type="hidden" name="suite" value="{{ suite }}">
+  <fieldset class="field kit-wide fw-picker">
+    <legend>Metrics</legend>
+    <span class="field-hint">A bar chart is a comparison, so only a metric FreeWeight calls mergeable can be drawn as one:
+    a separated metric's cells sit in groups that must not be read against each other, and it is listed below unticked with
+    its reason in the table above.</span>
+    <div class="fw-picker-grid">
+      {% for row in metrics_list %}
+      <label class="fw-picker-item"><input type="checkbox" name="metric" value="{{ row.get('metric_key') }}"{{ " checked" if row.get("metric_key") in metrics else "" }}{{ "" if row.get("mergeable") else " disabled" }}>
+        <span class="mono">{{ row.get("metric_key") }}</span>{% if not row.get("mergeable") %} <span class="muted">separated</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <button type="submit">Draw</button>
+</form>
+{% for one in charts %}
+{% call chart_container("fw-compare-chart-" ~ loop.index, one.metric_key, (one.unit or "no unit") ~ " · " ~ ("higher is better" if one.higher_is_better else "lower is better"), option=one.option) %}
+<p class="muted">The same figures are the <code>{{ one.metric_key }}</code> row of the table above, which is the reading of
+record: this chart adds no number it does not carry.</p>
+{% endcall %}
+{% endfor %}
+{% if metrics and not charts %}
+<p class="muted">Nothing to draw: every metric chosen is either separated, or has no cell carrying a value.</p>
+{% endif %}
 {% else %}
 {{ empty_state("No aggregate metrics on these runs: most often none of them completed.") }}
 {% endif %}

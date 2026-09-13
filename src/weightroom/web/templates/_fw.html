@@ -10,10 +10,14 @@
 <a{% if class_ %} class="{{ class_ }}"{% endif %} href="{{ href }}"{% if title %} title="{{ title }}"{% endif %}>{{ text }}</a>
 {%- endmacro %}
 
-{% macro model_link(model_id, canonical_id) -%}
+{% macro model_link(model_id, canonical_id, display_name=none) -%}
+{#- Row WX7: the text is FreeWeight's `display_name` — the provider's own name, or the canonical ID
+    where two enabled models share it — and the canonical ID is always the title, so the identity
+    is one hover away and never guessed at from a short name. A body recorded before WX7 carries
+    no `display_name`, and falls back to what this macro always showed. -#}
 {%- if model_id -%}
-<a class="mono" href="/apps/freeweight/models/{{ model_id | urlencode }}" title="{{ model_id }}">{{ canonical_id or model_id }}</a>
-{%- else -%}<span class="mono">{{ canonical_id or "—" }}</span>{%- endif -%}
+<a class="mono" href="/apps/freeweight/models/{{ model_id | urlencode }}" title="{{ canonical_id or model_id }}">{{ display_name or canonical_id or model_id }}</a>
+{%- else -%}<span class="mono" title="{{ canonical_id or '' }}">{{ display_name or canonical_id or "—" }}</span>{%- endif -%}
 {%- endmacro %}
 
 {% macro run_link(run_id) -%}
@@ -23,7 +27,9 @@
 {%- endmacro %}
 
 {% macro machine_link(fingerprint, name=none) -%}
-{#- A run, a result or a comparison names its machine by fingerprint; the Machines page finds it. -#}
+{#- A run, a result or a comparison names its machine by fingerprint; the Machines page finds it.
+    `name` is the machine's `display_name` where the caller has one (row WX7: its nickname, else
+    its hostname, else its ULID); the fingerprint stays the title and the identity. -#}
 {%- if fingerprint -%}
 <a class="mono kit-id" href="/apps/freeweight/machines?fingerprint={{ fingerprint | urlencode }}" title="{{ fingerprint }}">{{ name or (fingerprint[:12] ~ "…") }}</a>
 {%- else -%}<span class="muted">—</span>{%- endif -%}
@@ -88,5 +94,27 @@
   .fw-chart { margin: 0; }
   .fw-chart svg { width: 100%; height: 96px; color: var(--mw-accent, currentColor); border-bottom: 1px solid var(--mw-border); }
   .fw-chart figcaption { font-size: var(--mw-font-size-sm, 12px); }
+</style>
+{%- endmacro %}
+
+{% macro filter_styles() -%}
+<style>
+  /* Row WX7. A filter bar whose select holds a canonical ID has an option 400 px wide, and a
+     `.field` flex item defaults to `min-width: auto` — so the select refused to shrink and the
+     page scrolled sideways at 412 px. These two rules are what stop that; kept here rather than
+     in the shell's stylesheet because only FreeWeight's bars carry such long options. */
+  .filter-bar .field { min-width: 0; max-width: 100%; }
+  .filter-bar select, .filter-bar input { max-width: 100%; }
+  /* A `.field`'s width is its widest child, and a hint is a sentence: without this the one field
+     carrying an explanation is three times the width of the control it explains. */
+  .filter-bar .field-hint { max-width: 34ch; }
+  /* The Compare page's two checkbox pickers — models, and the metrics to chart. A grid that wraps
+     to one column on a phone; the models list is long, so it scrolls rather than pushing the
+     form's own button off the screen. */
+  .fw-picker { border: 1px solid var(--mw-border); border-radius: 6px; padding: 8px 10px; }
+  .fw-picker legend { font-size: var(--mw-font-size-sm, 12px); padding: 0 4px; }
+  .fw-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px 12px; margin-top: 6px; max-height: 40vh; overflow-y: auto; }
+  .fw-picker-item { display: flex; align-items: baseline; gap: 6px; font-weight: 400; overflow-wrap: anywhere; }
+  .fw-picker-item input { width: auto; margin: 0; }
 </style>
 {%- endmacro %}

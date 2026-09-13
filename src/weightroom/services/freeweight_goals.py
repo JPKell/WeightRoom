@@ -685,9 +685,7 @@ def calibration_api(client: httpx.Client, settings: Settings, slug: str) -> dict
         runs = None
     try:
         models = [
-            one
-            for one in models_api(client, settings, has_results=None, sort="canonical_id")
-            if one.get("enabled")
+            one for one in models_api(client, settings, sort="canonical_id") if one.get("enabled")
         ]
     except AppRefused:
         models = None

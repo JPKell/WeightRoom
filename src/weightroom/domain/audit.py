@@ -119,6 +119,7 @@ ACTIONS: Final[frozenset[str]] = frozenset(
         "freeweight.run_cancel",
         "freeweight.run_repeat",
         "freeweight.provider_save",
+        "freeweight.machine_nickname",
         # WP4 Gate A. From FreeWeight's Goals page: a goal created from a pack, forked from a
         # starter, edited (a separating edit's preview is a `pending` row), deleted (its preview a
         # `pending` row) or imported; a wizard draft begun, stepped, saved as a pack or abandoned.
