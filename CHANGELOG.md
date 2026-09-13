@@ -6,6 +6,24 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX13)
+- **FreeWeight's provider profiles are a card each on its settings page**
+  ([ADR-0144](docs/adr/0144-freeweight-keeps-several-provider-profiles-and-runs-one.md)). Where an
+  application's schema document states `provider_profiles` — the key that selects, the active
+  name, the kinds it can construct, and each profile's name and dotted prefix — the settings form
+  lifts those keys out of their sections into one card per profile with an **Active** radio in its
+  heading. Nothing here names a key of any application (ADR-0127 rule 3): the prefixes are the
+  application's and the fields are its schema's.
+  - A card carries **every key the schema gives a profile**, not only the keys the file names, so
+    a newly added profile is editable in full without the raw editor.
+  - Switching profile is an ordinary field on the same save, and a security key: the password, an
+    audit row that says so, and the restart the page already offers.
+  - **Add a provider profile** (`POST /apps/{app}/settings/provider-profile`) writes one key, the
+    `kind`, through the same validate-before-write, `.bak` and mtime race as every other file
+    write. It switches nothing. A name that is not a TOML bare key, one already taken, or a kind
+    the application did not state is refused with the reason.
+  - `GET /apps/{app}/settings` carries `provider_profiles` (`null` for the other applications).
+
 ### Added (row WX10)
 - **IdeaPress's Projects tab gets a top nav; Backends gets a LoadCoach-backed models table.**
   `ip_projects.html` and `ip_project.html` now carry a nav strip — the eight most recent projects

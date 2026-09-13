@@ -250,6 +250,16 @@ key* on their audit row. A raw TOML editor for the whole file is one click from 
 for security keys — its own page rather than a section of the form because it shows the file
 verbatim, secrets included, and this console is reachable from the LAN by design (row W4).
 
+**Provider profiles are a card each.** Where an application's document states
+`provider_profiles` ([ADR-0144](../../adr/0144-freeweight-keeps-several-provider-profiles-and-runs-one.md)
+rule 7 — FreeWeight, today), the keys of each profile are lifted out of their sections into one
+card per profile, with an **Active** radio in its heading. The radio posts the key the document
+names, so switching profile is an ordinary field on the same save — a security key, needing the
+password, and taking effect at the restart the page then offers. A card shows every key the
+application's schema gives a profile, not only the ones the file names, so a profile added here is
+complete without an excursion to the raw editor. *Add a provider profile* writes one key, the
+`kind`, chosen from the kinds the application says it can construct; it switches nothing.
+
 ### 7.5 Docs viewer
 
 Renders `WeightRoom/docs/` — the suite's canonical tree — from a configured root

@@ -12,6 +12,8 @@
   --- calibration.n_holdout_target: integer ≥ 1
   --- calibration.partition_seed: integer
   --- calibration.target_samples: integer ≥ 1
+[console]
+  --- console.url: string
 [evidence]
   --- evidence.capability_weights_path: string
   --- evidence.freshness_floor: number 0 … 1
@@ -49,6 +51,7 @@
   -S- judge.allow_remote: boolean
   --- judge.blind_candidate_identity: boolean
   --- judge.jury_size: integer ≥ 1
+  --- judge.max_output_tokens: integer ≥ 1
   --- judge.models: array
   --- judge.randomize_order: boolean
   --- judge.refuse_self_judging: boolean
@@ -59,6 +62,7 @@
   -S- logging.include_content: boolean
   L-- logging.level: string
 [provider]
+  -S- provider.active: string
   -S- provider.base_url: string
   --- provider.kind: string
   --- provider.memory_high_bytes: integer ≥ 1

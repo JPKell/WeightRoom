@@ -1,6 +1,11 @@
 # ADR-0077 — A named provider block and the singular block are one registry, and both together is a refusal
 
 **Status:** Accepted (2026-09-05)
+**Amended by:** [ADR-0144](0144-freeweight-keeps-several-provider-profiles-and-runs-one.md) — for
+one application, FreeWeight, `[providers.<name>]` blocks are *saved profiles* of which `[provider]
+active` runs exactly one, the `[provider]` block is itself the profile named `default`, and the two
+forms together are refused only on a name collision; every rule here is unchanged for LoadCoach,
+whose named blocks remain registrations in a routing pool.
 **Extends:** [ADR-0055](0055-loadcoach-registers-providers-by-name-and-kind.md) (LoadCoach
 registers providers by name and kind), [LoadCoach Spec §12](../apps/loadcoach/spec.md)
 (configuration).

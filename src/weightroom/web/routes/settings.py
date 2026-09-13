@@ -22,6 +22,7 @@ header or a second cookie was rejected.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -38,7 +39,7 @@ from weightroom.domain.units import UNIT_APPLICATIONS
 from weightroom.services.apps import AppUnknown, AppView, bearer_token
 from weightroom.services.audit import record
 from weightroom.services.auth import ReauthRequired, require_fresh_reauth
-from weightroom.services.config_files import parse_or_reason, write_config
+from weightroom.services.config_files import parse_or_reason, read_config, write_config
 from weightroom.services.settings_forms import (
     REDACTED,
     KeyOutcome,
@@ -840,6 +841,108 @@ def save_raw_from_page(
     _audit_write(request, principal, name, result=result, security=security, raw=True)
     state.schemas.forget(name)
     return _render(request, principal, name, result=result, notice=f"{form.config_path} written.")
+
+
+_PROFILE_NAME: Final = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+"""What a provider-profile name may be: a TOML bare key, lower-case, at most 32 characters."""
+
+
+@ui_router.post("/apps/{app}/settings/provider-profile", summary="Add a provider profile")
+def add_provider_profile(
+    request: Request,
+    principal: CurrentOperator,
+    app: str,
+    profile_name: Annotated[str, Form()] = "",
+    profile_kind: Annotated[str, Form()] = "",
+    base_mtime: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """Write one new ``[providers.<name>]`` table with its ``kind`` and nothing else.
+
+    A new profile is a *file* write of one key, so it goes through the same
+    :func:`~weightroom.services.config_files.write_config` as everything else here — the
+    application's own validation, the ``.bak``, the mtime race. Its remaining keys are then on
+    the page, at their defaults, because the application's schema describes them (ADR-0144 rule 7,
+    ADR-0127 rule 3); this route invents none of them.
+
+    No password: the only key written is ``kind``, and the endpoint a profile talks to — its
+    ``base_url``, a security key — is edited afterwards on the card, under the usual rule.
+    Adding a profile does not switch to it either: that is the *Active* radio, and a restart.
+    """
+    from weightroom.services.config_files import (
+        ConfigChangedOnDisk,
+        ConfigValidationFailed,
+        apply_changes,
+    )
+
+    name = require_settings_app(app)
+    state = request.app.state
+    form, _view = form_for(request, name)
+    stated = form.provider_profiles or {}
+    wanted = profile_name.strip().lower()
+    existing = {str(one.get("name")) for one in stated.get("profiles") or ()}
+    kinds = [str(one) for one in stated.get("kinds") or ()]
+    key = f"providers.{wanted}.kind"
+    refusal = ""
+    if not stated:
+        refusal = f"{APP_LABELS.get(name, name)} does not keep provider profiles."
+    elif not _PROFILE_NAME.match(wanted):
+        refusal = (
+            f"{profile_name!r} is not a profile name: lower-case letters, digits, '-' and '_', "
+            "starting with a letter or digit, up to 32 characters."
+        )
+    elif wanted in existing:
+        refusal = f"There is already a profile called {wanted!r}."
+    elif kinds and profile_kind not in kinds:
+        offered = ", ".join(kinds)
+        refusal = f"{profile_kind!r} is not a provider kind {name} can construct: {offered}."
+    if refusal:
+        _audit_refusal(
+            request,
+            principal,
+            name,
+            keys=[key],
+            message=refusal,
+            code="VALIDATION_ERROR",
+            security=False,
+        )
+        return _render(request, principal, name, error=refusal)
+    text, _ = read_config(Path(form.config_path))
+    try:
+        landed = write_config(
+            state.settings,
+            name,
+            Path(form.config_path),
+            apply_changes(text, {key: profile_kind}),
+            base_mtime=int(base_mtime) if base_mtime else None,
+            keys=(key,),
+        )
+    except (ConfigChangedOnDisk, ConfigValidationFailed, ValueError) as exc:
+        message = getattr(exc, "message", str(exc))
+        _audit_refusal(
+            request,
+            principal,
+            name,
+            keys=[key],
+            message=message,
+            code=getattr(exc, "code", "VALIDATION_ERROR"),
+            security=False,
+        )
+        return _render(request, principal, name, error=message)
+    result = SaveResult(
+        outcomes=(KeyOutcome(key, "written"),),
+        base_mtime=landed.base_mtime,
+        backup=str(landed.backup) if landed.backup else None,
+        pending_restart=True,
+    )
+    _audit_write(request, principal, name, result=result, security=False)
+    state.schemas.forget(name)
+    return _render(
+        request,
+        principal,
+        name,
+        result=result,
+        notice=f"Profile {wanted} added. It is not the active one until you make it so",
+    )
 
 
 @ui_router.post("/settings", summary="Save WeightRoomGym's own settings")

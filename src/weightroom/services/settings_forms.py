@@ -284,6 +284,30 @@ class FormSection:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderCard:
+    """One saved provider profile, as the settings page renders it.
+
+    Built from what the application's own document states under ``provider_profiles``
+    (ADR-0144 rule 7) — the name, the dotted prefix its keys live under, its kind, and whether it
+    is the one running. Nothing here knows a key of any application: the fields are simply this
+    form's own fields whose key starts with the stated prefix.
+
+    Attributes:
+        name: The profile's name (``default``, ``served``).
+        prefix: Where its keys live (``provider``, ``providers.served``).
+        kind: What the application says it is, for the card's badge.
+        active: Whether the application is running it.
+        fields: Its editable leaves, in the model's order.
+    """
+
+    name: str
+    prefix: str
+    kind: str
+    active: bool
+    fields: tuple[FormField, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsForm:
     """One application's whole settings page.
 
@@ -299,6 +323,10 @@ class SettingsForm:
             (ADR-0127 rule 3), never dropped and never invented.
         problems: What the application itself reported about its own file.
         provider_form: LoadCoach's ``singular``/``plural`` (ADR-0077), or ``None``.
+        provider_profiles: FreeWeight's saved provider profiles as its own document states them
+            (ADR-0144 rule 7) — ``key`` (the leaf that selects), ``active``, ``kinds`` and one
+            ``name``/``prefix``/``kind`` entry per profile — or ``None`` for an application that
+            states none.
         document_error: Why the document could not be read, when it could not. The page then
             degrades to the raw TOML editor with this as the reason.
         running: Whether the application answered, so runtime keys have a live path.
@@ -315,6 +343,7 @@ class SettingsForm:
     undescribed: tuple[str, ...] = ()
     problems: tuple[str, ...] = ()
     provider_form: str | None = None
+    provider_profiles: Mapping[str, Any] | None = None
     document_error: str | None = None
     running: bool = False
     pending_restart: bool = False
@@ -331,6 +360,48 @@ class SettingsForm:
         """The field with that dotted key, or ``None``."""
         return next((one for one in self.fields() if one.key == key), None)
 
+    def provider_cards(self) -> tuple[ProviderCard, ...]:
+        """One card per provider profile the application's document states, or ``()``.
+
+        Returns:
+            The cards, in the order the application listed them. Empty for an application whose
+            document says nothing about profiles, which is every application but FreeWeight.
+        """
+        stated = self.provider_profiles or {}
+        entries = stated.get("profiles") or ()
+        selector = str(stated.get("key") or "")
+        active = str(stated.get("active") or "")
+        cards: list[ProviderCard] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            prefix = str(entry.get("prefix") or "")
+            name = str(entry.get("name") or "")
+            if not prefix or not name:
+                continue
+            cards.append(
+                ProviderCard(
+                    name=name,
+                    prefix=prefix,
+                    kind=str(entry.get("kind") or ""),
+                    active=name == active,
+                    fields=tuple(
+                        one
+                        for one in self.fields()
+                        if one.key.startswith(f"{prefix}.") and one.key != selector
+                    ),
+                )
+            )
+        return tuple(cards)
+
+    def provider_keys(self) -> frozenset[str]:
+        """Every key a provider card renders, so its section does not render it twice."""
+        stated = self.provider_profiles or {}
+        keys = {str(stated.get("key") or "")} - {""}
+        for card in self.provider_cards():
+            keys.update(one.key for one in card.fields)
+        return frozenset(keys)
+
     def as_json(self) -> dict[str, Any]:
         """The ``GET /apps/{app}/settings`` body (api.md §2)."""
         return {
@@ -342,6 +413,7 @@ class SettingsForm:
             "running": self.running,
             "pending_restart": self.pending_restart,
             "provider_form": self.provider_form,
+            "provider_profiles": dict(self.provider_profiles) if self.provider_profiles else None,
             "document_error": self.document_error,
             "problems": list(self.problems),
             "undescribed": list(self.undescribed),
@@ -664,6 +736,54 @@ def _schema_for_path(
     return current
 
 
+def _provider_profiles(document: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """The document's ``provider_profiles`` block, when it states one of the right shape."""
+    stated = (document or {}).get("provider_profiles")
+    if not isinstance(stated, Mapping) or not stated.get("profiles"):
+        return None
+    return stated
+
+
+def _profile_keys(
+    document: Mapping[str, Any] | None,
+    json_schema: Mapping[str, Any],
+    defs: Mapping[str, Any],
+) -> list[str]:
+    """Every leaf of every provider profile the document states, in the model's own order.
+
+    A profile's keys are not in the document's three key sets — the application cannot enumerate
+    operator-chosen names in a static list — and a profile the operator has only half filled in
+    names few of them in the file. Asking the *schema* what a profile has, at the prefix the
+    application itself stated (ADR-0144 rule 7), is what makes every key of every profile editable
+    without this module knowing one of them.
+
+    Args:
+        document: The application's schema document.
+        json_schema: Its ``json_schema`` block.
+        defs: That block's ``$defs``.
+
+    Returns:
+        Every profile's dotted keys, profile by profile, in the model's order.
+    """
+    stated = _provider_profiles(document)
+    if stated is None:
+        return []
+    selector = str(stated.get("key") or "")
+    selector_parent, _, selector_leaf = selector.rpartition(".")
+    found: list[str] = []
+    for entry in stated.get("profiles") or ():
+        if not isinstance(entry, Mapping) or not entry.get("prefix"):
+            continue
+        prefix = str(entry["prefix"])
+        schema = _schema_for_path(json_schema, defs, prefix) or {}
+        for leaf in schema.get("properties") or {}:
+            if leaf == selector_leaf and prefix != selector_parent:
+                # Only the selector's own block may carry it: a profile does not choose itself.
+                continue
+            found.append(f"{prefix}.{leaf}")
+    return found
+
+
 def _lookup(data: Mapping[str, Any], key: str) -> tuple[bool, Any]:
     """``(present, value)`` for a dotted key in a nested mapping."""
     current: Any = data
@@ -850,6 +970,15 @@ def settings_form(
     unresolved: list[str] = []
     for key in dict.fromkeys(keys):
         grouped.setdefault(key.split(".", 1)[0], []).append(key)
+    seen = set(keys)
+    for key in _profile_keys(document, json_schema, defs):
+        # Ordered even where the key is already collected: a profile's `base_url` arrives with the
+        # security keys, and without a slot here it would sort to the end of its own card.
+        order.setdefault(key, len(order))
+        if key not in seen:
+            seen.add(key)
+            grouped.setdefault(key.split(".", 1)[0], []).append(key)
+            keys.append(key)
     for key in _file_keys(file_data):
         if any(key in group for group in grouped.values()):
             continue
@@ -900,6 +1029,7 @@ def settings_form(
         undescribed=undescribed,
         problems=tuple(problems),
         provider_form=(document or {}).get("provider_form"),
+        provider_profiles=_provider_profiles(document),
         document_error=document_error,
         running=bool(view is not None and view.running and view.reachable),
         pending_restart=_pending_restart(path, view, now=now if now is not None else time.time()),

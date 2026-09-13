@@ -121,6 +121,14 @@ def _settings_raw(console: Console) -> Any:  # noqa: ANN401
     )
 
 
+def _provider_profile(console: Console) -> Any:  # noqa: ANN401
+    """A refusal — LoadCoach's document states no profiles — and still exactly one row."""
+    return console.post_form(
+        "/apps/loadcoach/settings/provider-profile",
+        {"profile_name": "served", "profile_kind": "llamacpp", "base_mtime": ""},
+    )
+
+
 def _restart_for_settings(console: Console) -> Any:  # noqa: ANN401
     return console.post_form("/apps/loadcoach/restart-for-settings", {})
 
@@ -700,6 +708,7 @@ EXERCISES: dict[tuple[str, str], Exercise] = {
     ("POST", "/apps/{app}/settings"): _settings_form,
     ("POST", "/settings"): _own_settings_form,
     ("POST", "/apps/{app}/settings/raw"): _settings_raw,
+    ("POST", "/apps/{app}/settings/provider-profile"): _provider_profile,
     ("POST", "/apps/{app}/restart-for-settings"): _restart_for_settings,
     ("POST", "/apps/{app}/tokens"): _token_create,
     ("POST", "/apps/{app}/tokens/revoke"): _token_revoke,
