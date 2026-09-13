@@ -6,12 +6,11 @@
 {% block page_content %}
 {{ page_nav(actions=[{"label": "Docs", "href": "/docs?section=apps#docs-apps-freeweight"}]) }}
 {{ filter_styles() }}
-{% call app_page_header(view, "Models", "Models", "Every model identity FreeWeight's discovery has recorded, with its latest descriptor.") %}
-  <form method="post" action="/apps/freeweight/models/discover" class="kit-inline">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="FreeWeight is not answering"{% endif %}>Refresh from provider</button>
-  </form>
-{% endcall %}
+{{ app_page_header(view, "Models", "Models", "Every model identity FreeWeight's discovery has recorded, with its latest descriptor.") }}
+<form method="post" action="/apps/freeweight/models/discover" class="kit-actions">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="FreeWeight is not answering"{% endif %}>Refresh from provider</button>
+</form>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if scanned %}

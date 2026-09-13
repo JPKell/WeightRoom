@@ -6,6 +6,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed (row WY10)
+- **`app_page_header` takes no caller.** Its action slot is gone, with the `.page-actions` styles:
+  a page's links are in its page bar and its forms sit below the header. FreeWeight Runs' last
+  link strip became a page bar (*Machines*, with *Jobs* and *Docs* as actions), and the *Refresh
+  from provider* and *Scan for models* buttons on the FreeWeight and LoadCoach Models pages moved
+  under the header.
+
 ### Changed (row WY1)
 - **The page bar.** `_app_page.html` gains `page_nav(links, actions)`: one bar at the top of a page
   for its own subsections, with JSON/Docs actions muted at its right. It renders nothing when it has

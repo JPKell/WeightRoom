@@ -212,12 +212,6 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
   margin: 0 0 var(--mw-space-4, 16px);
 }
 .page-head h2 { margin: 0; font-size: var(--mw-font-size-title, 18px); font-weight: 600; }
-.page-actions {
-  display: flex; flex-wrap: wrap; gap: var(--mw-space-3, 12px); margin-left: auto;
-  font-size: var(--mw-font-size-sm, 12px);
-}
-.page-actions a { color: var(--mw-text-muted); text-decoration: none; }
-.page-actions a:hover { color: var(--mw-text); }
 
 /* The page bar (`_app_page.html` `page_nav`, row WY1): a page's own subsections on the left, its
    JSON/Docs actions muted at the right, one rule under both. It wraps rather than scrolls. */
@@ -382,6 +376,5 @@ h3.docs-folder-title {
 
 /* A page bar (row WY1) carries the application's Docs action; the standalone link
    `_app_state.html` adds (row WX2) would be the second "Docs" on the same screen. Hidden where a
-   bar precedes it. The caller slot of `app_page_header` still carries one until WY10. */
-.page-nav ~ .app-docs-link,
-.app-page-intro:has(.app-page-actions) ~ .app-docs-link { display: none; }
+   bar precedes it. */
+.page-nav ~ .app-docs-link { display: none; }

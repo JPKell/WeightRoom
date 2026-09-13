@@ -1,13 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_fw.html" import filter_styles, run_link, status_badge, machine_link %}
 {% block title %}Runs — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(links=[{"label": "Machines", "href": "/apps/freeweight/machines"}], actions=[{"label": "Jobs", "href": "/jobs"}, docs_action("freeweight")]) }}
 {{ filter_styles() }}
-{% call app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded; the form that starts another is on the Overview.") %}
-  <a href="/apps/freeweight/models">Models</a> · <a href="/apps/freeweight/machines">Machines</a> · <a href="/jobs">Jobs</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded; the form that starts another is on the Overview.") }}
 {% include "_app_state.html" %}
 
 {# Row WX8 moved the Start form onto the Overview, where the dashboard's figures say what is
