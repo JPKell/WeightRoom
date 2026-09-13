@@ -41,6 +41,7 @@
     {%- if one.secret %} {{ badge("secret", tone="neutral", title="Never rendered; leave it as ******** to keep it.") }}{% endif %}
   </td>
   <td>
+  <div class="applies-stack">
     {% if one.runtime and form.running and one.applies %}{{ badge(one.applies | replace("_", " "), tone="warning", title="Saved through the application's own PUT /settings; it says the value applies at " ~ (one.applies | replace("_", " ")) ~ ", not at once.") }}
     {% elif one.runtime and form.running %}{{ badge("live", tone="success", title="Saved through the application's own PUT /settings; no restart.") }}
     {% endif %}
@@ -54,6 +55,7 @@
               onclick="document.getElementById('to-file').value='{{ one.key }}'">to file</button>
     {% else %}{{ badge("restart", tone="neutral", title="Written to config.toml; applied when the application restarts.") }}{% endif %}
     {%- if one.security %} {{ badge("security key", tone="danger", title="Needs the operator's password again (ADR-0127 rule 6).") }}{% endif %}
+  </div>
   </td>
 </tr>
 {% if one.description or one.bounds_text or one.default_text %}
@@ -100,6 +102,20 @@
   .provider-card > h4 label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
   .provider-card { border-left: 3px solid transparent; padding-left: 12px; }
   .provider-card-active { border-left-color: currentColor; }
+  /* Row WY2: Value, Source and Applies right-aligned; Source and Applies shrink to content so Key
+     and Value get the room. Applies stacks its pills and buttons one per line, right-aligned. The
+     hint row (colspan 4) is untouched by the nth-child rules below — it is one <td>, not four. */
+  .settings-table th:nth-child(2), .settings-table td:nth-child(2),
+  .settings-table th:nth-child(3), .settings-table td:nth-child(3),
+  .settings-table th:nth-child(4), .settings-table td:nth-child(4) { text-align: end; }
+  .settings-table td:nth-child(2) input, .settings-table td:nth-child(2) select { text-align: end; }
+  .settings-table th:nth-child(3), .settings-table td:nth-child(3),
+  .settings-table th:nth-child(4), .settings-table td:nth-child(4) {
+    width: 1%; white-space: nowrap;
+  }
+  /* A flex display on the <td> itself corrupts Chromium's text painting for its first child
+     (row WY2); the flex box lives on this inner div instead, the <td> stays a plain table cell. */
+  .applies-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 </style>
 {% endblock %}
 {% block page_content %}
