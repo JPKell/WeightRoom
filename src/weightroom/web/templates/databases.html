@@ -28,4 +28,12 @@ them (ADR-0123 rule 2).</p>
   </tbody>
 </table>
 </div>
+
+<h3>PostgreSQL bootstrap</h3>
+<p class="muted">SQLite is the default for all five (ADR-0006); this stands one up for whichever
+applications the operator chooses to move onto it. WeightRoom <strong>prints this script and
+never runs it</strong> — it would edit every application's own <code>config.toml</code> and this
+console is never a database administrator (ADR-0123 rule 2).</p>
+<pre id="pg-bootstrap"><code>{{ bootstrap_script }}</code></pre>
+<button type="button" data-variant="quiet" onclick="if(navigator.clipboard){navigator.clipboard.writeText(document.getElementById('pg-bootstrap').textContent);this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1500)}">Copy</button>
 {% endblock %}

@@ -199,3 +199,21 @@ def test_an_application_with_no_database_to_read_says_why(tmp_path: Path) -> Non
     assert "No database to read." in grid.text
     tables = console.client.get("/api/v1/apps/ideapress/db/tables", headers=JSON_HEADERS)
     assert (tables.status_code, tables.json()["error"]["code"]) == (502, "APP_UNREACHABLE")
+
+
+def test_databases_page_prints_the_postgres_bootstrap_script(tmp_path: Path) -> None:
+    """Row WX15: the console-wide page names all five apps and never a literal password."""
+    console, _path = _console(tmp_path)
+    page = console.client.get("/database", headers=HTML)
+    assert page.status_code == 200
+    text = page.text
+    assert "PostgreSQL bootstrap" in text
+    for app in ("freeweight", "loadcoach", "ideapress", "promptcadence"):
+        assert app in text
+        assert f"{app} db upgrade" in text
+    assert "wr-gym db upgrade" in text
+    assert "psycopg" in text
+    assert "config.toml" in text
+    for line in text.splitlines():
+        if "PASSWORD" in line:
+            assert "PG_PASSWORD" in line

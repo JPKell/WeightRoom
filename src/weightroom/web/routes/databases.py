@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import time
+from pathlib import Path
 from typing import Annotated, Any, Final
 from urllib.parse import quote, urlencode
 
@@ -28,9 +29,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from weightroom.config import APPLICATIONS
 from weightroom.domain.guard import GuardDryRunFailed, GuardStatementRefused, lock_for
+from weightroom.domain.units import UNIT_APPLICATIONS
 from weightroom.services.apps import require_app
 from weightroom.services.audit import record
 from weightroom.services.auth import Principal, require_fresh_reauth
+from weightroom.services.database import postgres_bootstrap_script
 from weightroom.services.db_curated import (
     RESULTS_DELETION,
     TABLE_OPERATIONS,
@@ -60,6 +63,7 @@ from weightroom.services.db_reader import (
     table_page,
 )
 from weightroom.services.freeweight_pages import database_stats_api
+from weightroom.services.settings_forms import config_file_path, read_schema_document
 from weightroom.web.routes.apps import app_view, render_shell_page
 from weightroom.web.session import CurrentOperator, now_of, reauthenticated
 
@@ -571,7 +575,10 @@ def _database_page(request: Request, principal: Principal, app: str, **extra: An
 
 @ui_router.get("/database", summary="Every application's database", response_class=HTMLResponse)
 def databases_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """The four databases: where each is, its revision, and whether this console knows it."""
+    """The four databases: where each is, its revision, and whether this console knows it.
+
+    Also renders the PostgreSQL bootstrap script (row WX15) — printed, never run.
+    """
     state = request.app.state
     databases = []
     for app in APPLICATIONS:
@@ -579,8 +586,24 @@ def databases_page(request: Request, principal: CurrentOperator) -> HTMLResponse
             state.settings, state.database, app, urls=state.database_urls, now=time.monotonic()
         )
         databases.append({"app": app, "revision": revision, "reason": reason})
+    config_paths: dict[str, Path] = {}
+    for app in UNIT_APPLICATIONS:
+        if app == "weightroom":
+            config_paths[app] = state.config_path
+            continue
+        document, _error = state.schemas.get(
+            app,
+            now=time.monotonic(),
+            read=lambda app=app: read_schema_document(state.settings, app),
+        )
+        config_paths[app] = config_file_path(document, app=app)
     return render_shell_page(
-        request, "databases.html", page="database", principal=principal, databases=databases
+        request,
+        "databases.html",
+        page="database",
+        principal=principal,
+        databases=databases,
+        bootstrap_script=postgres_bootstrap_script(config_paths),
     )
 
 
