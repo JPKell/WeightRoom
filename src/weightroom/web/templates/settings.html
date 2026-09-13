@@ -1,5 +1,77 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, json_viewer %}
+{% macro field_rows(fields, form, app) %}
+{#- One <tr> per field, plus its hint row. Called by each section's table and by each provider
+    profile card (row WX13), which is why it takes `form` and `app` rather than reading them. -#}
+{% for one in fields %}
+{% set field_id = "f-" ~ one.key | replace(".", "-") %}
+<tr{% if one.shadowed %} class="shadowed"{% endif %}>
+  <th scope="row">
+    <label for="{{ field_id }}"><code>{{ one.key }}</code></label>
+  </th>
+  <td>
+    {#- A select always posts something, so a key the model allows to be unset needs an
+        *unset* option, or every save writes a value the operator never chose (row WPF1). -#}
+    {% set unset = one.nullable and one.value is none %}
+    {% if one.choices %}
+    <select id="{{ field_id }}" name="field:{{ one.key }}">
+      {% if one.nullable %}<option value=""{% if unset %} selected{% endif %}>unset</option>{% endif %}
+      {% for choice in one.choices %}
+      <option value="{{ choice }}"{% if not unset and choice == one.value_text %} selected{% endif %}>{{ choice }}</option>
+      {% endfor %}
+    </select>
+    {% elif one.kind == "boolean" %}
+    <select id="{{ field_id }}" name="field:{{ one.key }}">
+      {% if one.nullable %}<option value=""{% if unset %} selected{% endif %}>unset</option>{% endif %}
+      <option value="true"{% if one.value is sameas true %} selected{% endif %}>true</option>
+      <option value="false"{% if not unset and one.value is not sameas true %} selected{% endif %}>false</option>
+    </select>
+    {% else %}
+    <input id="{{ field_id }}" name="field:{{ one.key }}"
+           type="{{ "number" if one.kind in ("integer", "number") else "text" }}"
+           {%- if one.kind == "number" %} step="any"{% endif %}
+           {%- if one.minimum is not none %} min="{{ one.minimum }}"{% endif %}
+           {%- if one.maximum is not none %} max="{{ one.maximum }}"{% endif %}
+           value="{{ one.value_text }}"
+           {%- if one.secret %} autocomplete="off" spellcheck="false"{% endif %}>
+    {% endif %}
+  </td>
+  <td class="muted"><code>{{ one.source }}</code>
+    {%- if one.shadowed %} {{ badge("shadowed", tone="warning", title="A file edit to this key cannot take effect while the environment pins it.") }}{% endif %}
+    {%- if one.secret %} {{ badge("secret", tone="neutral", title="Never rendered; leave it as ******** to keep it.") }}{% endif %}
+  </td>
+  <td>
+    {% if one.runtime and form.running and one.applies %}{{ badge(one.applies | replace("_", " "), tone="warning", title="Saved through the application's own PUT /settings; it says the value applies at " ~ (one.applies | replace("_", " ")) ~ ", not at once.") }}
+    {% elif one.runtime and form.running %}{{ badge("live", tone="success", title="Saved through the application's own PUT /settings; no restart.") }}
+    {% endif %}
+    {% if one.runtime and form.running and one.stored %}
+      <button type="submit" name="clear" value="{{ one.key }}" data-variant="quiet"
+              title="Remove the stored row; the key reads its config.toml value again.">clear</button>
+    {% endif %}
+    {% if one.runtime and form.running %}
+    {% elif one.runtime %}{{ badge("live", tone="neutral", title=app ~ " is stopped; this key has no runtime path.") }}
+      <button type="submit" name="to_file_now" value="{{ one.key }}" data-variant="quiet"
+              onclick="document.getElementById('to-file').value='{{ one.key }}'">to file</button>
+    {% else %}{{ badge("restart", tone="neutral", title="Written to config.toml; applied when the application restarts.") }}{% endif %}
+    {%- if one.security %} {{ badge("security key", tone="danger", title="Needs the operator's password again (ADR-0127 rule 6).") }}{% endif %}
+  </td>
+</tr>
+{% if one.description or one.bounds_text or one.default_text %}
+<tr class="field-hint-row{% if one.shadowed %} shadowed{% endif %}">
+  <td colspan="4">
+    {% if one.description %}
+    <details class="field-hint-details"><summary>{{ one.description }}</summary>
+      <p class="field-hint">{{ one.description }}</p>
+    </details>
+    {% endif %}
+    {% if one.bounds_text %}<span class="field-hint">range {{ one.bounds_text }}</span>{% endif %}
+    <span class="field-hint">default <code>{{ one.default_text or "—" }}</code></span>
+  </td>
+</tr>
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
 {% block title %}{{ app | app_label }} settings — WeightRoom{% endblock %}
 {% block extra_head %}
 <style>
@@ -22,6 +94,12 @@
     cursor: pointer;
   }
   .field-hint-details p.field-hint { margin: 4px 0 0; }
+  /* Row WX13: a provider profile's card. Page-specific, so it stays here rather than in the
+     shell's CSS budget. */
+  .provider-card > h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; }
+  .provider-card > h4 label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .provider-card { border-left: 3px solid transparent; padding-left: 12px; }
+  .provider-card-active { border-left-color: currentColor; }
 </style>
 {% endblock %}
 {% block page_content %}
@@ -92,13 +170,47 @@ Each one below offers <em>save to the file instead</em>, which takes effect at t
 (ADR-0127 rule 4).</p>
 {% endif %}
 
+{% set profiles = form.provider_profiles %}
+{% set cards = form.provider_cards() %}
+{% set carded = form.provider_keys() %}
 {% if form.sections %}
 <form method="post" action="{% if is_own %}/settings{% else %}/apps/{{ app }}/settings{% endif %}">
   <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
   <input type="hidden" name="base_mtime" value="{{ form.base_mtime if form.base_mtime is not none else '' }}">
   <input type="hidden" name="to_file" id="to-file" value="">
 
+  {% if cards %}
+  <h3 id="section-provider-profiles">Provider profiles</h3>
+  <p class="muted">One profile runs; the others are saved settings. Choosing another is a change to
+  <code>{{ profiles.key }}</code> like any other key here — it is a security key, and it takes
+  effect when {{ app | app_label }} restarts.</p>
+  {% for card in cards %}
+  <section class="settings-section provider-card{% if card.active %} provider-card-active{% endif %}">
+    <h4>
+      <label>
+        <input type="radio" name="field:{{ profiles.key }}" value="{{ card.name }}"
+               {%- if card.active %} checked{% endif %}>
+        <code>{{ card.name }}</code>
+      </label>
+      {% if card.kind %}{{ badge(card.kind, tone="neutral", title="The provider kind this profile names.") }}{% endif %}
+      {% if card.active %}{{ badge("active", tone="success", title="The profile this application runs.") }}{% endif %}
+      <span class="muted"><code>[{{ card.prefix }}]</code></span>
+    </h4>
+    <table class="settings-table" data-density="dense">
+      <caption class="visually-hidden">Every key of the {{ card.name }} provider profile</caption>
+      <thead><tr>
+        <th scope="col">Key</th><th scope="col">Value</th>
+        <th scope="col">Source</th><th scope="col">Applies</th>
+      </tr></thead>
+      <tbody>{{ field_rows(card.fields, form, app) }}</tbody>
+    </table>
+  </section>
+  {% endfor %}
+  {% endif %}
+
   {% for section in form.sections %}
+  {% set shown = section.fields | rejectattr("key", "in", carded) | list %}
+  {% if shown %}
   <section class="settings-section">
     <h3 id="section-{{ section.name }}"><code>[{{ section.name }}]</code>
       {%- if section.description %} <span class="muted">{{ section.description }}</span>{% endif %}</h3>
@@ -108,77 +220,10 @@ Each one below offers <em>save to the file instead</em>, which takes effect at t
         <th scope="col">Key</th><th scope="col">Value</th>
         <th scope="col">Source</th><th scope="col">Applies</th>
       </tr></thead>
-      <tbody>
-      {% for one in section.fields %}
-      {% set field_id = "f-" ~ one.key | replace(".", "-") %}
-      <tr{% if one.shadowed %} class="shadowed"{% endif %}>
-        <th scope="row">
-          <label for="{{ field_id }}"><code>{{ one.key }}</code></label>
-        </th>
-        <td>
-          {#- A select always posts something, so a key the model allows to be unset needs an
-              *unset* option, or every save writes a value the operator never chose (row WPF1). -#}
-          {% set unset = one.nullable and one.value is none %}
-          {% if one.choices %}
-          <select id="{{ field_id }}" name="field:{{ one.key }}">
-            {% if one.nullable %}<option value=""{% if unset %} selected{% endif %}>unset</option>{% endif %}
-            {% for choice in one.choices %}
-            <option value="{{ choice }}"{% if not unset and choice == one.value_text %} selected{% endif %}>{{ choice }}</option>
-            {% endfor %}
-          </select>
-          {% elif one.kind == "boolean" %}
-          <select id="{{ field_id }}" name="field:{{ one.key }}">
-            {% if one.nullable %}<option value=""{% if unset %} selected{% endif %}>unset</option>{% endif %}
-            <option value="true"{% if one.value is sameas true %} selected{% endif %}>true</option>
-            <option value="false"{% if not unset and one.value is not sameas true %} selected{% endif %}>false</option>
-          </select>
-          {% else %}
-          <input id="{{ field_id }}" name="field:{{ one.key }}"
-                 type="{{ "number" if one.kind in ("integer", "number") else "text" }}"
-                 {%- if one.kind == "number" %} step="any"{% endif %}
-                 {%- if one.minimum is not none %} min="{{ one.minimum }}"{% endif %}
-                 {%- if one.maximum is not none %} max="{{ one.maximum }}"{% endif %}
-                 value="{{ one.value_text }}"
-                 {%- if one.secret %} autocomplete="off" spellcheck="false"{% endif %}>
-          {% endif %}
-        </td>
-        <td class="muted"><code>{{ one.source }}</code>
-          {%- if one.shadowed %} {{ badge("shadowed", tone="warning", title="A file edit to this key cannot take effect while the environment pins it.") }}{% endif %}
-          {%- if one.secret %} {{ badge("secret", tone="neutral", title="Never rendered; leave it as ******** to keep it.") }}{% endif %}
-        </td>
-        <td>
-          {% if one.runtime and form.running and one.applies %}{{ badge(one.applies | replace("_", " "), tone="warning", title="Saved through the application's own PUT /settings; it says the value applies at " ~ (one.applies | replace("_", " ")) ~ ", not at once.") }}
-          {% elif one.runtime and form.running %}{{ badge("live", tone="success", title="Saved through the application's own PUT /settings; no restart.") }}
-          {% endif %}
-          {% if one.runtime and form.running and one.stored %}
-            <button type="submit" name="clear" value="{{ one.key }}" data-variant="quiet"
-                    title="Remove the stored row; the key reads its config.toml value again.">clear</button>
-          {% endif %}
-          {% if one.runtime and form.running %}
-          {% elif one.runtime %}{{ badge("live", tone="neutral", title=app ~ " is stopped; this key has no runtime path.") }}
-            <button type="submit" name="to_file_now" value="{{ one.key }}" data-variant="quiet"
-                    onclick="document.getElementById('to-file').value='{{ one.key }}'">to file</button>
-          {% else %}{{ badge("restart", tone="neutral", title="Written to config.toml; applied when the application restarts.") }}{% endif %}
-          {%- if one.security %} {{ badge("security key", tone="danger", title="Needs the operator's password again (ADR-0127 rule 6).") }}{% endif %}
-        </td>
-      </tr>
-      {% if one.description or one.bounds_text or one.default_text %}
-      <tr class="field-hint-row{% if one.shadowed %} shadowed{% endif %}">
-        <td colspan="4">
-          {% if one.description %}
-          <details class="field-hint-details"><summary>{{ one.description }}</summary>
-            <p class="field-hint">{{ one.description }}</p>
-          </details>
-          {% endif %}
-          {% if one.bounds_text %}<span class="field-hint">range {{ one.bounds_text }}</span>{% endif %}
-          <span class="field-hint">default <code>{{ one.default_text or "—" }}</code></span>
-        </td>
-      </tr>
-      {% endif %}
-      {% endfor %}
-      </tbody>
+      <tbody>{{ field_rows(shown, form, app) }}</tbody>
     </table>
   </section>
+  {% endif %}
   {% endfor %}
 
   <div class="field">
@@ -193,6 +238,36 @@ Each one below offers <em>save to the file instead</em>, which takes effect at t
 </form>
 {% elif not form.document_error %}
 {{ empty_state("This application's schema document describes no editable key.") }}
+{% endif %}
+
+{% if cards %}
+<h3>Add a provider profile</h3>
+<p class="muted">A new profile is one line in <code>{{ form.config_path }}</code> — its
+<code>kind</code>. Everything else appears above at its default, ready to edit. Adding one changes
+nothing about what runs.</p>
+<form method="post" action="/apps/{{ app }}/settings/provider-profile" id="add-provider-profile">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <input type="hidden" name="base_mtime" value="{{ form.base_mtime if form.base_mtime is not none else '' }}">
+  <div class="field">
+    <label for="profile-name">Name</label>
+    <input id="profile-name" name="profile_name" type="text" required
+           pattern="[a-z0-9][a-z0-9_-]{0,31}" autocomplete="off" spellcheck="false"
+           aria-describedby="profile-name-hint">
+    <span class="field-hint" id="profile-name-hint">Lower-case letters, digits, <code>-</code> and
+    <code>_</code>; up to 32 characters. Taken: {{ cards | map(attribute="name") | join(", ") }}.</span>
+  </div>
+  <div class="field">
+    <label for="profile-kind">Kind</label>
+    <select id="profile-kind" name="profile_kind" required>
+      {#- A select always posts its first option, and there is no kind worth choosing for the
+          operator: the blank one makes the choice deliberate, with the browser's own validation. -#}
+      <option value="" selected disabled>choose…</option>
+      {% for kind in profiles.kinds or [] %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}
+    </select>
+    <span class="field-hint">What {{ app | app_label }} says this build can construct.</span>
+  </div>
+  <button type="submit">Add profile</button>
+</form>
 {% endif %}
 
 {% if form.undescribed %}

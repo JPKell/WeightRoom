@@ -445,3 +445,48 @@ def test_weightroomgym_generates_its_own_page_from_its_own_verb(tmp_path: Path) 
     assert {section.name for section in form.sections} >= {"server", "tls", "auth", "storage"}
     assert "telemetry.interval_ms" in form.runtime_keys
     assert "server.host" in form.security_keys
+
+
+# --- Row WX13: provider profile cards -----------------------------------------------------
+
+
+def _with_profiles(document: dict[str, Any]) -> dict[str, Any]:
+    document["provider_profiles"] = {
+        "key": "provider.active",
+        "active": "served",
+        "kinds": ["fake", "llamacpp", "ollama"],
+        "profiles": [
+            {"name": "default", "prefix": "provider", "kind": "ollama"},
+            {"name": "served", "prefix": "providers.served", "kind": "llamacpp"},
+        ],
+    }
+    return document
+
+
+def test_a_card_carries_every_key_the_schema_gives_a_profile(tmp_path: Path) -> None:
+    """ADR-0144 rule 7: the prefixes are the application's; the keys are its schema's."""
+    document = _with_profiles(_document("freeweight"))
+    config = tmp_path / "freeweight.toml"
+    config.write_text('[provider]\nactive = "served"\n\n[providers.served]\nkind = "llamacpp"\n')
+    document["config_path"] = str(config)
+    form = settings_form(_settings(tmp_path), "freeweight", document=document, document_error=None)
+
+    cards = form.provider_cards()
+
+    assert [card.name for card in cards] == ["default", "served"]
+    assert [card.active for card in cards] == [False, True]
+    served = {one.key for one in cards[1].fields}
+    assert "providers.served.base_url" in served  # not in the file, and still editable
+    assert "providers.served.active" not in served  # a profile does not choose itself
+    assert form.field_for("providers.served.timeout_seconds") is not None
+    # The selecting key is a field (the radio posts it) but belongs to no card.
+    assert "provider.active" in form.provider_keys()
+    assert all("provider.active" not in {one.key for one in card.fields} for card in cards)
+
+
+def test_an_application_that_states_no_profiles_has_no_cards(tmp_path: Path) -> None:
+    form = _form("loadcoach", tmp_path)
+
+    assert form.provider_cards() == ()
+    assert form.provider_keys() == frozenset()
+    assert form.as_json()["provider_profiles"] is None

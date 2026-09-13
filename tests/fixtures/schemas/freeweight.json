@@ -10,6 +10,7 @@
     "calibration.n_holdout_target",
     "calibration.partition_seed",
     "calibration.target_samples",
+    "console.url",
     "evidence.capability_weights_path",
     "evidence.freshness_floor",
     "evidence.goal_contribution_weight",
@@ -32,6 +33,7 @@
     "goals.rule_timeout_ms",
     "judge.blind_candidate_identity",
     "judge.jury_size",
+    "judge.max_output_tokens",
     "judge.models",
     "judge.randomize_order",
     "judge.refuse_self_judging",
@@ -200,6 +202,23 @@
           }
         },
         "title": "CalibrationSettings",
+        "type": "object"
+      },
+      "ConsoleSettings": {
+        "additionalProperties": false,
+        "description": "Where WeightRoomGym is, when one fronts this application (row WM2).\n\nSet, the top bar gains the suite's tab strip: WeightRoomGym itself and the peer applications\nthrough it (``<url>/apps/<name>``), the way the console's own shell links back. Unset \u2014 the\ndefault \u2014 nothing is rendered, byte for byte as before: an application knows only its own\nport, and a strip pointing at loopback addresses another machine cannot reach would be a\nstrip of dead links.",
+        "properties": {
+          "url": {
+            "default": "",
+            "description": "WeightRoomGym's base URL (https://<host>:8769); empty renders no application tab strip.",
+            "examples": [
+              "https://jordan-main.local:8769"
+            ],
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "ConsoleSettings",
         "type": "object"
       },
       "EvidenceSettings": {
@@ -580,6 +599,23 @@
             "title": "Jury Size",
             "type": "integer"
           },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Output limit every juror is polled under. Null \u2014 the default \u2014 lets the provider decide, which is the served context. Set it to make a juror that reasons fail fast instead of spending the whole window; measured too tight at 2048, where a 12B instruct juror lost samples it had been answering (ADR-0141).",
+            "examples": [
+              4096
+            ],
+            "title": "Max Output Tokens"
+          },
           "models": {
             "default": [],
             "description": "Juror canonical IDs. Empty selects from the installed models. Comma-separated in the environment.",
@@ -679,8 +715,17 @@
       },
       "ProviderSettings": {
         "additionalProperties": false,
-        "description": "The default model provider FreeWeight talks to.\n\nOne provider, not a registry. FreeWeight measures one machine's models one run at a time: it\nhas no candidate pool and no scoring, so it has nothing to disambiguate between registrations\nand no use for LoadCoach's `[providers.<name>]` table\n(ADR-0077). That divergence is deliberate; a\nsecond provider here would be its own phase with its own evidence.\n\nThree keys serve ``kind = \"llamacpp\"`` and nothing else, because Ollama needs none of them:\nllama.cpp is a server FreeWeight launches and supervises over a directory of GGUF weights\n(ADR-0062), where Ollama is a\ndaemon that already knows where its models are.",
+        "description": "One provider profile \u2014 ``[provider]`` itself, or any ``[providers.<name>]`` (ADR-0144).\n\nOne provider *runs*, not a registry: FreeWeight measures one machine's models one run at a\ntime, so it has no candidate pool, no scoring and nothing to route between. It does have a\nswitch, and ADR-0144 is that switch \u2014 several saved profiles, of which ``[provider] active``\nnames exactly one. The ``[provider]`` block every existing file carries **is** the profile\nnamed ``default``, read where it has always been read; nothing about such a file changes.\nLoadCoach's identically-spelled ``[providers.<name>]`` blocks are registrations in a routing\npool (ADR-0077), which is a different meaning of the same shape.\n\nThree keys serve ``kind = \"llamacpp\"`` and nothing else, because Ollama needs none of them:\nllama.cpp is a server FreeWeight launches and supervises over a directory of GGUF weights\n(ADR-0062), where Ollama is a\ndaemon that already knows where its models are.",
         "properties": {
+          "active": {
+            "default": "default",
+            "description": "Which provider profile runs, on the [provider] block only (ADR-0144). 'default' is this block itself; any other name must be a [providers.<name>] table. Setting it inside a [providers.<name>] table is refused, because a profile does not choose itself.",
+            "examples": [
+              "default"
+            ],
+            "title": "Active",
+            "type": "string"
+          },
           "base_url": {
             "default": "http://127.0.0.1:11434",
             "description": "The provider's API endpoint. Ignored by kind='llamacpp'.",
@@ -775,8 +820,10 @@
         "type": "object"
       },
       "ProvidersSettings": {
-        "additionalProperties": false,
-        "description": "Cross-provider policy, distinct from the single default provider's own settings.",
+        "additionalProperties": {
+          "$ref": "#/$defs/ProviderSettings"
+        },
+        "description": "Cross-provider policy, plus the named provider profiles themselves (ADR-0144).\n\n``allow_remote`` is policy \u2014 may a remote provider be reached at all. Every *other* key under\n``[providers]`` is a profile, so this model allows extras and validates them itself rather\nthan forbidding them: ``[providers.fast]`` and ``[providers] allow_remote`` share one TOML\ntable and pydantic sees both in one mapping.",
         "properties": {
           "allow_remote": {
             "default": false,
@@ -786,6 +833,17 @@
             ],
             "title": "Allow Remote",
             "type": "boolean"
+          },
+          "profiles": {
+            "additionalProperties": {
+              "$ref": "#/$defs/ProviderSettings"
+            },
+            "description": "The saved provider profiles, keyed by their operator-chosen names (ADR-0144). Written as [providers.<name>] tables; 'default' is the [provider] block itself and is filled in by the loader, so it is never written here.",
+            "examples": [
+              {}
+            ],
+            "title": "Profiles",
+            "type": "object"
           }
         },
         "title": "ProvidersSettings",
@@ -1172,6 +1230,9 @@
       "calibration": {
         "$ref": "#/$defs/CalibrationSettings"
       },
+      "console": {
+        "$ref": "#/$defs/ConsoleSettings"
+      },
       "evidence": {
         "$ref": "#/$defs/EvidenceSettings"
       },
@@ -1216,6 +1277,22 @@
     "type": "object"
   },
   "problems": [],
+  "provider_profiles": {
+    "active": "default",
+    "key": "provider.active",
+    "kinds": [
+      "fake",
+      "llamacpp",
+      "ollama"
+    ],
+    "profiles": [
+      {
+        "kind": "llamacpp",
+        "name": "default",
+        "prefix": "provider"
+      }
+    ]
+  },
   "runtime_changeable": [
     {
       "description": "How often the machine telemetry sampler reads the host and the GPUs. Lower is more detail and more overhead; the overhead is measured and recorded on every run.",
@@ -1309,6 +1386,7 @@
     "goals.root",
     "judge.allow_remote",
     "logging.include_content",
+    "provider.active",
     "provider.base_url",
     "providers.allow_remote",
     "sandbox.tier",
@@ -1330,6 +1408,7 @@
     "calibration.n_holdout_target": "default",
     "calibration.partition_seed": "default",
     "calibration.target_samples": "default",
+    "console.url": "default",
     "evidence.capability_weights_path": "default",
     "evidence.freshness_floor": "default",
     "evidence.goal_contribution_weight": "default",
@@ -1362,6 +1441,7 @@
     "judge.allow_remote": "default",
     "judge.blind_candidate_identity": "default",
     "judge.jury_size": "default",
+    "judge.max_output_tokens": "default",
     "judge.models": "default",
     "judge.randomize_order": "default",
     "judge.refuse_self_judging": "default",
@@ -1370,8 +1450,9 @@
     "logging.format": "default",
     "logging.include_content": "default",
     "logging.level": "default",
+    "provider.active": "default",
     "provider.base_url": "default",
-    "provider.kind": "default",
+    "provider.kind": "file",
     "provider.memory_high_bytes": "default",
     "provider.memory_max_bytes": "default",
     "provider.model_directory": "default",
@@ -1381,7 +1462,7 @@
     "providers.allow_remote": "default",
     "runtime.batch_size": "default",
     "runtime.context_size": "file",
-    "runtime.fit_to_device": "default",
+    "runtime.fit_to_device": "file",
     "runtime.flash_attention": "default",
     "runtime.gpu_layers": "default",
     "runtime.keep_alive": "default",

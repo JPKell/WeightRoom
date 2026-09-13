@@ -770,3 +770,138 @@ def test_a_security_key_posted_unchanged_is_not_a_touched_security_key(tmp_path:
     newest = rows["items"][0] if isinstance(rows, dict) else rows[0]
     assert newest["params"]["touched_security"] is False
     assert newest["security"] is False
+
+
+# --- Row WX13: FreeWeight's provider profiles (ADR-0144) ---------------------------------------
+
+
+_PROFILE_TOML = """\
+[provider]
+active = "default"
+kind = "ollama"
+
+[providers.served]
+kind = "llamacpp"
+"""
+
+
+def _profile_document() -> dict[str, Any]:
+    """FreeWeight's own document as it reads with a second profile configured."""
+    document: dict[str, Any] = json.loads((SCHEMAS / "freeweight.json").read_text(encoding="utf-8"))
+    document["provider_profiles"] = {
+        "key": "provider.active",
+        "active": "default",
+        "kinds": ["fake", "llamacpp", "ollama"],
+        "profiles": [
+            {"name": "default", "prefix": "provider", "kind": "ollama"},
+            {"name": "served", "prefix": "providers.served", "kind": "llamacpp"},
+        ],
+    }
+    document["security_keys"] = sorted({*document["security_keys"], "providers.served.base_url"})
+    return document
+
+
+def test_every_profile_is_a_card_and_every_key_of_it_is_editable(tmp_path: Path) -> None:
+    """The file names one key of `served`; the schema describes the rest, so the card carries
+    them all (ADR-0144 rule 7, ADR-0127 rule 3)."""
+    console, _config = _console(
+        tmp_path, app="freeweight", config_toml=_PROFILE_TOML, document=_profile_document()
+    )
+    console.login()
+    page = console.client.get("/apps/freeweight/settings", headers={"Accept": "text/html"}).text
+
+    assert 'name="field:provider.active" value="default"' in page
+    assert 'name="field:provider.active" value="served"' in page
+    assert 'value="served"\n               checked' in page.replace("\r", "") or (
+        'value="default"' in page and "checked" in page
+    )
+    for leaf in ("kind", "base_url", "timeout_seconds", "model_directory", "server_path"):
+        assert f"field:providers.served.{leaf}" in page
+    # The selector is the radio, not a second text input beside it.
+    assert 'name="field:provider.active"\n           type="text"' not in page
+    # A profile does not choose itself.
+    assert "providers.served.active" not in page
+
+
+def test_an_application_that_states_no_profiles_renders_no_cards(tmp_path: Path) -> None:
+    console, _config = _console(tmp_path, config_toml="[execution]\nmax_attempts = 3\n")
+    console.login()
+    page = console.client.get("/apps/loadcoach/settings", headers={"Accept": "text/html"}).text
+
+    assert "Provider profiles" not in page
+    assert "Add a provider profile" not in page
+
+
+def test_switching_the_active_profile_is_a_security_key_write(tmp_path: Path) -> None:
+    console, config = _console(
+        tmp_path, app="freeweight", config_toml=_PROFILE_TOML, document=_profile_document()
+    )
+    console.login()
+    base = _base_mtime(console, "freeweight")
+
+    refused = console.post_form(
+        "/apps/freeweight/settings",
+        {"field:provider.active": "served", "base_mtime": str(base)},
+    )
+    assert refused.status_code == 200
+    assert tomllib.loads(config.read_text())["provider"]["active"] == "default"
+
+    response = console.post_form(
+        "/apps/freeweight/settings",
+        {"field:provider.active": "served", "base_mtime": str(base), "password": PASSWORD},
+    )
+    assert response.status_code == 200
+    assert tomllib.loads(config.read_text())["provider"]["active"] == "served"
+
+
+def test_adding_a_profile_writes_one_key_and_switches_nothing(tmp_path: Path) -> None:
+    console, config = _console(
+        tmp_path, app="freeweight", config_toml=_PROFILE_TOML, document=_profile_document()
+    )
+    console.login()
+    response = console.post_form(
+        "/apps/freeweight/settings/provider-profile",
+        {
+            "profile_name": "remote",
+            "profile_kind": "ollama",
+            "base_mtime": str(_base_mtime(console, "freeweight")),
+        },
+    )
+
+    assert response.status_code == 200
+    written = tomllib.loads(config.read_text())
+    assert written["providers"]["remote"] == {"kind": "ollama"}
+    assert written["provider"]["active"] == "default"
+    rows = console.client.get("/api/v1/audit?action=settings.write", headers=JSON_HEADERS).json()
+    newest = rows["items"][0] if isinstance(rows, dict) else rows[0]
+    assert newest["params"]["written"] == ["providers.remote.kind"]
+    assert newest["params"]["touched_security"] is False
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "reason"),
+    [
+        ("served", "ollama", "already a profile"),
+        ("Not A Name", "ollama", "is not a profile name"),
+        ("remote", "vllm", "is not a provider kind"),
+    ],
+)
+def test_a_profile_this_application_would_not_accept_is_refused_by_name(
+    tmp_path: Path, name: str, kind: str, reason: str
+) -> None:
+    console, config = _console(
+        tmp_path, app="freeweight", config_toml=_PROFILE_TOML, document=_profile_document()
+    )
+    console.login()
+    response = console.post_form(
+        "/apps/freeweight/settings/provider-profile",
+        {
+            "profile_name": name,
+            "profile_kind": kind,
+            "base_mtime": str(_base_mtime(console, "freeweight")),
+        },
+    )
+
+    assert response.status_code == 200
+    assert reason in response.text
+    assert config.read_text() == _PROFILE_TOML
