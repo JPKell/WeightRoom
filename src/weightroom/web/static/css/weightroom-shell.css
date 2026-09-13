@@ -358,3 +358,8 @@ h3.docs-folder-title {
 /* The llama.cpp page (row WX3): the found/expected checklist reuses the Ollama pane's table, and
    a discovered server's argv is a long single token that must wrap rather than scroll the page. */
 .llamacpp-argv { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* A page with an `app_page_header` (row WX3) already carries its docs link among the header's
+   actions; the standalone link `_app_state.html` adds for header-less pages (row WX2) would be
+   the second "Docs" on the same screen (found at WX14). Hidden where a header precedes it. */
+.app-page-intro ~ .app-docs-link { display: none; }
