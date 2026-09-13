@@ -50,7 +50,7 @@ workflow is a versioned JSON record a project pins, and the executor reads it.
 | | |
 |---|---|
 | **IdeaPress** `~/ai/worktrees/ideapress-wx12/.venv/bin/python`, **Python 3.14.4**, at `28602b7` | `ruff format --check .` 231 files · `ruff check .` clean · `mypy src tests` 226 files, 0 issues · `lint-imports` 4 kept, 0 broken · `pytest` **1408 passed, 7 skipped, 31 deselected** |
-| **WeightRoom** `~/ai/worktrees/weightroom-wx12/.venv/bin/python`, **Python 3.14.4**, at `WR_HEAD` | `ruff format --check .` 241 files · `ruff check .` clean · `mypy src tests` 234 files, 0 issues · `lint-imports` 5 kept, 0 broken · `pytest` **2003 passed, 3 skipped, 14 deselected** (2 of those deselections are §8's pre-existing `llamacpp.py` defect, live in this run's environment — see §8) |
+| **WeightRoom** `~/ai/worktrees/weightroom-wx12/.venv/bin/python`, **Python 3.14.4**, at `4383b65` | `ruff format --check .` 241 files · `ruff check .` clean · `mypy src tests` 234 files, 0 issues · `lint-imports` 5 kept, 0 broken · `pytest` **2003 passed, 3 skipped, 14 deselected** (2 of those deselections are §8's pre-existing `llamacpp.py` defect, live in this run's environment — see §8) |
 
 `git status --short` clean in both worktrees before and after.
 
@@ -278,7 +278,7 @@ pass added:
 4. **Ran the PostgreSQL leg for real** (§5) rather than leaving it as described-but-unrun, and fixed
    the wrong env var name in the process (see §5).
 5. **Committed the WeightRoom side** — it had been sitting as an uncommitted working tree; this
-   session made it the row's one WeightRoom commit, `WR_HEAD`.
+   session made it the row's one WeightRoom commit, `4383b65`.
 6. Screenshots (§6) were already complete and correct from the previous pass (30 PNGs, all seven
    pages × two widths × two themes, plus two stray duplicate-named files from an earlier naming
    attempt in the same directory that are not part of the required set — `workflow-refused-1440-light.png`
