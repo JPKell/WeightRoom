@@ -7,12 +7,13 @@ database facts by construction. The shape is LoadCoach's ``services/database.py`
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
+from typing import Final
 
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -35,7 +36,8 @@ from weightsdb import database_health as weightsdb_database_health
 from weightsdb import restore as weightsdb_restore
 from weightsdb.backup import BackupResult, RestoreResult, sqlite_path
 
-from weightroom.config import data_dir
+from weightroom.config import APPLICATIONS, data_dir
+from weightroom.domain.units import UNIT_APPLICATIONS, unit_name
 from weightroom.infrastructure.db.models import (
     AuditLog,
     KnownRevision,
@@ -58,6 +60,7 @@ __all__ = [
     "ensure_ready",
     "get_status",
     "migration_runner",
+    "postgres_bootstrap_script",
     "restore_database",
     "upgrade",
 ]
@@ -67,6 +70,87 @@ MIGRATIONS_LOCATION = str(
 )
 
 _APPLICATION_NAME = "weightroom"
+
+POSTGRES_DRIVER: Final = "psycopg"
+"""The DBAPI ``weightsdb``'s ``postgres`` extra pins (``py/WeightsDB/pyproject.toml``:
+``psycopg[binary]>=3.2,<4``) — the URL scheme it drives is ``postgresql+psycopg://``."""
+
+_POSTGRES_IMAGE: Final = "postgres:16"
+_POSTGRES_CONTAINER: Final = "suite-postgres"
+_POSTGRES_VOLUME: Final = "suite-pg"
+
+
+def postgres_bootstrap_script(config_paths: Mapping[str, Path]) -> str:
+    """Render the PostgreSQL bootstrap script the Databases page prints — and never runs.
+
+    Every fact in the script comes from the suite's own code, never a guess: the driver
+    ``weightsdb`` pins (:data:`POSTGRES_DRIVER`), each application's real ``config.toml`` path
+    (``config_paths``), the ``[storage]`` section and ``database_url`` key every one of the five
+    ``config.py`` modules declares alike (with the ``<PREFIX>STORAGE__DATABASE_URL`` environment
+    form each one's ``ENV_PREFIX`` produces), its ``db upgrade`` CLI verb, and its
+    ``systemd --user`` unit name (:data:`~weightroom.domain.units.UNIT_APPLICATIONS`). It never
+    invents or prints a password: ``${PG_PASSWORD}`` is a shell variable the operator sets first,
+    the same print-never-run precedent as ``templates/ollama.html``'s memory-safety fix (this
+    console is never a database administrator, ADR-0123 rule 2).
+
+    Args:
+        config_paths: Each of :data:`~weightroom.domain.units.UNIT_APPLICATIONS`'s
+            ``config.toml`` path, keyed by application name.
+
+    Returns:
+        The whole script as one string, section-commented and newline-terminated, ready for a
+        ``<pre>``. Names all five applications and every config path; contains no literal
+        password.
+    """
+    lines: list[str] = [
+        "#!/bin/sh",
+        "# PostgreSQL bootstrap for the suite's five databases.",
+        "# WeightRoomGym prints this script; it never runs it — this console is never a database",
+        "# administrator (ADR-0123 rule 2). Read every line before running any of it by hand.",
+        "#",
+        "# Set the password once, in your own shell — never in this script:",
+        "#   export PG_PASSWORD='...'",
+        "",
+        "# 1. A server. Skip this line if one is already running (the W7 local-PG leg used the",
+        "#    same image).",
+        f'docker run -d --name {_POSTGRES_CONTAINER} -e POSTGRES_PASSWORD="$PG_PASSWORD" \\',
+        f"  -p 5432:5432 -v {_POSTGRES_VOLUME}:/var/lib/postgresql/data {_POSTGRES_IMAGE}",
+        "",
+        "# 2. One role and one database per application, owner-scoped to it.",
+        'PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -U postgres <<SQL',
+    ]
+    for app in UNIT_APPLICATIONS:
+        lines.append(f"CREATE ROLE {app} WITH LOGIN PASSWORD '$PG_PASSWORD';")
+        lines.append(f"CREATE DATABASE {app} OWNER {app};")
+    lines += [
+        "SQL",
+        "",
+        "# 3. Each application's [storage] section (config.toml) or the equivalent environment",
+        "#    variable — not both.",
+    ]
+    for app in UNIT_APPLICATIONS:
+        url = f"postgresql+{POSTGRES_DRIVER}://{app}:$PG_PASSWORD@127.0.0.1:5432/{app}"
+        lines.append(f"# {app}: {config_paths[app]}")
+        lines.append("#   [storage]")
+        lines.append(f'#   database_url = "{url}"')
+        lines.append(f'#   or: {app.upper()}_STORAGE__DATABASE_URL="{url}"')
+    lines += [
+        "",
+        "# 4. Migrate. auto_migrate defaults off the moment a URL is not sqlite:// (database",
+        "#    standards §5.1), for every one of the five — so this step is not optional.",
+    ]
+    for app in APPLICATIONS:
+        lines.append(f"{app} db upgrade")
+    lines += [
+        "wr-gym db upgrade",
+        "",
+        "# 5. Restart every application against its new database.",
+    ]
+    for app in UNIT_APPLICATIONS:
+        lines.append(f"systemctl --user restart {unit_name(app)}")
+    return "\n".join(lines) + "\n"
+
+
 _ROW_COUNT_MODELS = (Operator, SessionRow, AuditLog, Setting, KnownRevision, TelemetrySample)
 
 

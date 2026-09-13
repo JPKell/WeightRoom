@@ -6,6 +6,22 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX15)
+- **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
+  never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker
+  server line (`postgres:16`, the W7 local-PG leg's image, commented as skippable when a server
+  already runs), one `psql` block creating an owner-scoped role and database per application, each
+  application's real `[storage]` section (`database_url`, and the `<APP>_STORAGE__DATABASE_URL`
+  environment form each one's `ENV_PREFIX` produces) beside its real `config.toml` path, the
+  `<app> db upgrade` / `wr-gym db upgrade` step every application needs once its URL is not
+  `sqlite://` (`auto_migrate` defaults off there for all five, not only two), and the five
+  `systemctl --user restart` lines. The driver is `psycopg` (`weightsdb`'s `postgres` extra). The
+  password is always `$PG_PASSWORD`, a shell variable the operator sets first — the script never
+  invents or prints one (ADR-0123 rule 2, the `templates/ollama.html` print-never-run precedent).
+  `databases.html` renders it in a `<pre>` with a `navigator.clipboard` Copy button.
+  **Correction to the row's own text:** the section is `[storage]` with key `database_url`, not
+  `[database] url`; the row's `<APP>_DATABASE__URL` env form was a guess.
+
 ### Added (row WX10)
 - **IdeaPress's Projects tab gets a top nav; Backends gets a LoadCoach-backed models table.**
   `ip_projects.html` and `ip_project.html` now carry a nav strip — the eight most recent projects
