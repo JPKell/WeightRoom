@@ -242,7 +242,7 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
 /* Inside a table cell `anywhere` also shrinks the column's min-content width, so auto table
    layout squeezes a metric key or model name to one character per line. `break-word` still
    breaks a token too long for the page, without lending auto layout that width. */
-.shell-main td .mono, .shell-main td code { overflow-wrap: break-word; }
+.shell-main td.mono, .shell-main td .mono, .shell-main td code { overflow-wrap: break-word; }
 
 @media (max-width: 900px) {
   .telemetry-sep { display: none; }
