@@ -24,12 +24,12 @@ from weightroom.services.health import health_report, system_status
 from weightroom.services.ollama import ollama_report
 from weightroom.services.telemetry import (
     FIGURE_COLUMNS,
-    echarts_line_option,
+    FIGURE_SCALES,
     format_heartbeat,
     history_rows,
     read_since,
     sample_frame,
-    sparkline_svg,
+    telemetry_panels,
 )
 from weightroom.web.routes.apps import render_shell_page, revision_pairs, views_for_request
 from weightroom.web.session import CurrentOperator, now_of
@@ -251,32 +251,36 @@ async def telemetry_stream(
     )
 
 
-@ui_router.get("/telemetry/history", summary="One figure's history", response_class=HTMLResponse)
+def _marked_figure(figure: str | None) -> str | None:
+    """The chart ``?figure=`` points at: the figure itself, or the chart its total is printed on."""
+    if figure is None or figure in FIGURE_SCALES:
+        return figure
+    return next((name for name, scale in FIGURE_SCALES.items() if scale.total == figure), None)
+
+
+@ui_router.get("/telemetry/history", summary="Every telemetry figure", response_class=HTMLResponse)
 def telemetry_history_page(
     request: Request,
     principal: CurrentOperator,
-    figure: str = "gpu_vram_used_bytes",
+    figure: str | None = None,
     hours: float = 24.0,
 ) -> HTMLResponse:
-    """What clicking a strip figure opens (Phase 3 acceptance criterion 1): a 24-hour line.
+    """Every figure on one page: live bars over a small multiple each (row WY4).
 
-    Row WX6 (ADR-0142): this is the one page that opts into MirrorWall's ECharts, alongside the
-    plain inline SVG (:func:`~weightroom.services.telemetry.sparkline_svg`) that stays its
-    accessible alternative — rendered whether or not the reader's browser draws the chart.
+    What clicking a strip figure opens (Phase 3 acceptance criterion 1): the strip still links
+    ``?figure=<name>``, which now marks that figure's chart and scrolls to it instead of choosing
+    the only one drawn. An unknown name marks nothing. One database read builds every chart
+    (:func:`~weightroom.services.telemetry.telemetry_panels`); the one page that opts into
+    MirrorWall's ECharts (ADR-0142).
     """
-    chosen = figure if figure in FIGURE_COLUMNS else "gpu_vram_used_bytes"
-    rows = history_rows(request.app.state.database, figure=chosen, hours=hours, now=now_of(request))
+    panels = telemetry_panels(request.app.state.database, hours=hours, now=now_of(request))
     return render_shell_page(
         request,
         "telemetry_history.html",
         page="telemetry",
         principal=principal,
-        figure=chosen,
-        figures=sorted(FIGURE_COLUMNS),
-        hours=hours,
-        svg=sparkline_svg(rows),
-        row_count=len(rows),
-        chart_option=echarts_line_option(rows, figure=chosen),
+        panels=panels,
+        marked=_marked_figure(figure),
         # ADR-0142: opt-in per page, unlike htmx's every-page default — most pages draw no chart.
         mirrorwall={"htmx": True, "echarts": True},
     )

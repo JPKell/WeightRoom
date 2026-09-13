@@ -9,16 +9,19 @@ than running a live ``TelemetryService``; that sampler's own behaviour is
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import anyio
+from sqlalchemy import event
 
 from tests.support import Console, build_console
 from weightroom.infrastructure.db.models import TelemetrySample
 from weightroom.services.database import Database
+from weightroom.services.telemetry import FIGURE_SCALES
 from weightroom.web.routes.system import _telemetry_frames
 
 NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
@@ -184,31 +187,75 @@ def test_resident_reports_a_source_and_an_error_for_each_unreachable_side(tmp_pa
     assert body["loadcoach"]["error"]
 
 
-def test_the_history_page_renders_an_inline_svg_clicking_the_strip_would_open(
+def _telemetry_page(console: Console, query: str = "") -> str:
+    response = console.client.get(f"/telemetry/history{query}", headers={"Accept": "text/html"})
+    assert response.status_code == 200
+    return str(response.text)
+
+
+def test_the_telemetry_page_draws_every_figure_from_one_read_with_no_svg_double(
     tmp_path: Path,
 ) -> None:
     console = _console(tmp_path)
     console.login()
     with console.database.write() as session:
         session.add(
-            TelemetrySample(at=NOW, interval_ms=1000, gpu_index=0, gpu_vram_used_bytes=1_000_000)
+            TelemetrySample(
+                at=NOW - timedelta(minutes=1),
+                interval_ms=1000,
+                cpu_percent=12.0,
+                ram_used_bytes=19_541_000_000,
+                ram_total_bytes=64 * 1024**3,
+                gpu_index=0,
+                gpu_vram_used_bytes=1_000_000,
+            )
         )
+    statements: list[str] = []
 
-    page = console.client.get(
-        "/telemetry/history?figure=gpu_vram_used_bytes", headers={"Accept": "text/html"}
-    ).text
-    assert "<svg" in page and "polyline" in page
-    assert "1 sample." in page
+    def record(*args: Any) -> None:  # noqa: ANN401 — SQLAlchemy's cursor-event signature
+        statements.append(str(args[2]))
+
+    event.listen(console.database.engine, "before_cursor_execute", record)
+    try:
+        page = _telemetry_page(console)
+    finally:
+        event.remove(console.database.engine, "before_cursor_execute", record)
+
+    assert len([s for s in statements if "telemetry_samples" in s]) == 1
+    for name in FIGURE_SCALES:
+        assert f'id="figure-{name}"' in page
+    assert page.count("data-echarts=") == 3  # CPU, RAM and VRAM measured; the rest print a dash
+    assert "<span data-value>18.2 G</span>" in page and "> / 64 G</span>" in page
+    content = page.split('class="shell-main"', 1)[1]
+    assert "<svg" not in content and "<h2" not in content and "<select" not in content
+    assert 'aria-label="RAM: now 18.2 G, minimum 18.2 G, maximum 18.2 G"' in page
 
 
-def test_the_history_page_falls_back_to_a_known_figure_for_a_bad_query(tmp_path: Path) -> None:
+def test_figure_marks_its_chart_and_a_total_marks_the_chart_it_is_printed_on(
+    tmp_path: Path,
+) -> None:
     console = _console(tmp_path)
     console.login()
-    response = console.client.get(
-        "/telemetry/history?figure=not-a-figure", headers={"Accept": "text/html"}
-    )
-    assert response.status_code == 200
-    assert "gpu_vram_used_bytes" in response.text
+    marked = re.compile(r'id="figure-([a-z_]+)"[^>]*data-marked')
+
+    assert marked.findall(_telemetry_page(console, "?figure=gpu_power_watts")) == [
+        "gpu_power_watts"
+    ]
+    assert marked.findall(_telemetry_page(console, "?figure=gpu_vram_total_bytes")) == [
+        "gpu_vram_used_bytes"
+    ]
+    assert marked.findall(_telemetry_page(console, "?figure=not-a-figure")) == []
+    assert marked.findall(_telemetry_page(console)) == []
+
+
+def test_an_empty_window_prints_a_dash_for_every_figure_and_draws_no_chart(
+    tmp_path: Path,
+) -> None:
+    console = _console(tmp_path)
+    console.login()
+    page = _telemetry_page(console)
+    assert "data-echarts=" not in page
+    assert page.count('<p class="tm-none">—</p>') == len(FIGURE_SCALES)
 
 
 def test_telemetry_routes_need_a_session(tmp_path: Path) -> None:

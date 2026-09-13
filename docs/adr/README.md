@@ -181,6 +181,7 @@ an ADR is superseded rather than edited.
 | [0144](0144-freeweight-keeps-several-provider-profiles-and-runs-one.md) | FreeWeight keeps several `[providers.<name>]` profiles and runs exactly one, named by `[provider] active`; a bare `[provider]` block is the profile `default`, so every existing file resolves unchanged (amends ADR-0077; row WX13) | Accepted |
 | [0145](0145-freeweight-drafts-an-adapter-manifest-and-still-trusts-nothing.md) | FreeWeight writes an adapter manifest *draft* on request — `data_classification: confidential`, reviewed by a person before it becomes a manifest — reversing ADR-0061 rule 4's "FreeWeight writes no drafts" (row WX7) | Accepted |
 | [0146](0146-the-console-has-no-catalog.md) | The console has no catalog: the `/catalog` page, its API, and the console's pull, drop-in and delete leave; enable/disable stays on the LoadCoach and FreeWeight tabs, and the `catalog.*` audit names and `catalog_pull` job-kind name stay readable (row WY1) | Accepted |
+| [0147](0147-a-chart-may-map-its-fill-to-value-coloured-from-tokens.md) | A chart may map its fill to its value: the option carries only the scale (`visualMap` with `min`, `max` and `mw_scale: "load"`) and a unit (`mw_unit`), and MirrorWall's `charts.js` colours the scale success → warning → danger from the tokens at draw time and prints values through one formatter; extends ADR-0142, supersedes nothing (row WY4) | Accepted |
 
 ## Writing a new ADR
 

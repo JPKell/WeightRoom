@@ -13,7 +13,7 @@ import re
 import statistics
 import time
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +34,7 @@ from tests.support import (
     mock_loadcoach,
 )
 from weightroom.config import APPLICATIONS, load_settings
+from weightroom.infrastructure.db.models import TelemetrySample
 from weightroom.services.chat import run_loadcoach_reply
 from weightroom.services.chat_loadcoach import stream_reply
 from weightroom.services.database import Database, ensure_ready
@@ -374,6 +375,45 @@ def test_javascript_per_page_stays_under_the_total_budget(console: Console) -> N
     print(f"\n  {htmx_pair / 1024:6.1f} KB  htmx + its SSE extension together")  # noqa: T201
     _report(f"JS in total on the heaviest page ({worst_path})", worst / 1024, 120, unit="KB")
     assert worst <= _TOTAL_BUDGET_BYTES, totals
+
+
+# --- The telemetry page over a day of samples, every figure from one read: ≤ 50 ms (row WY4) ---
+
+
+def test_the_telemetry_page_over_a_day_of_samples(console: Console) -> None:
+    """The shell-render budget, on the page that reads the most rows: a day at the sweep's shape
+    (an hour at one per second, then one per minute) is 4 980 rows, seven charts from them."""
+    offsets = [timedelta(seconds=s) for s in range(3600)]
+    offsets += [timedelta(minutes=m) for m in range(60, 24 * 60)]
+    with console.database.write() as session:
+        session.add_all(
+            TelemetrySample(
+                at=console.now - offset,
+                interval_ms=1000,
+                cpu_percent=float(index % 100),
+                cpu_temperature_c=40.0 + index % 30,
+                ram_used_bytes=(8 + index % 16) * 1024**3,
+                ram_total_bytes=64 * 1024**3,
+                gpu_index=0,
+                gpu_utilization_percent=float(index % 100),
+                gpu_temperature_c=35.0 + index % 40,
+                gpu_power_watts=20.0 + index % 300,
+                gpu_vram_used_bytes=(index % 16) * 1024**3,
+                gpu_vram_total_bytes=16 * 1024**3,
+            )
+            for index, offset in enumerate(offsets)
+        )
+    sizes: list[int] = []
+
+    def work() -> None:
+        page = console.client.get("/telemetry/history", headers={"Accept": "text/html"})
+        assert page.status_code == 200
+        sizes.append(len(page.content))
+
+    median = _median_ms(work)
+    _report(f"telemetry page over a day ({len(offsets)} rows)", median, 50)
+    print(f"\n  its HTML: {sizes[-1] / 1024:.1f} KB, not budgeted")  # noqa: T201
+    assert median <= 50
 
 
 # --- ECharts, named and budgeted by name, excluded from the 120 KB total above (ADR-0142) -------
