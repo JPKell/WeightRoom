@@ -1,5 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, pagination %}
+{% set db_section = "tables" %}
 {% block title %}{{ table_name }} — {{ app | app_label }} database — WeightRoom{% endblock %}
 {% block extra_head %}
 {# A cell is already cut at 160 characters; wrapping it too made every row as tall as its longest
@@ -7,6 +8,7 @@
 <style>#db-grid td { white-space: nowrap; }</style>
 {% endblock %}
 {% block page_content %}
+{% include "_database_bar.html" %}
 <h2><a href="/apps/{{ app }}/database">Database</a> / <code>{{ table_name }}</code></h2>
 
 {% if unavailable %}

@@ -116,7 +116,7 @@ _FREEWEIGHT_DELETION = TableOperation(
     "Delete stored results",
     "FreeWeight's own deletion by model, run, suite or date: previewed, confirmed with its token, "
     "backed up first at 1 000 rows, and never a model or machine row (ADR-0134).",
-    "/apps/freeweight/database#delete-results",
+    "/apps/freeweight/database/admin#delete-results",
 )
 _LOADCOACH_RETENTION = TableOperation(
     "Content retention",

@@ -12,6 +12,10 @@ names and the password.
 
 Every ``POST`` here leaves exactly one audit row whatever happens to it — ``db.query``,
 ``db.dry_run``, ``db.guarded_write`` or ``db.curated`` (spec §11 contract 2).
+
+An application's database is three pages behind one page bar (row WY9): Tables (``…/database``),
+Query (``…/database/query``) and Admin (``…/database/admin``, the curated operations, the delete
+preview and the backups). Each ``POST`` renders back onto the page it belongs to.
 """
 
 from __future__ import annotations
@@ -550,7 +554,9 @@ def _application_stats(request: Request, app: str) -> dict[str, Any]:
     return {"app_stats": stats, "app_stats_error": None}
 
 
-def _database_page(request: Request, principal: Principal, app: str, **extra: Any) -> HTMLResponse:
+def _database_page(
+    request: Request, principal: Principal, app: str, template: str, /, **extra: Any
+) -> HTMLResponse:
     context: dict[str, Any] = {
         "sql": "",
         "result": None,
@@ -563,7 +569,7 @@ def _database_page(request: Request, principal: Principal, app: str, **extra: An
         request,
         principal,
         app,
-        "database.html",
+        template,
         verbs=verbs_for(app),
         deletion_scopes=RESULTS_DELETION.get(app, ()),
         backups=list_backups(app),
@@ -609,19 +615,39 @@ def databases_page(request: Request, principal: CurrentOperator) -> HTMLResponse
 
 @ui_router.get(
     "/apps/{app}/database",
-    summary="An application's tables, its own operations and the console",
+    summary="An application's tables and their row counts",
     response_class=HTMLResponse,
 )
-def database_page(
+def database_page(request: Request, principal: CurrentOperator, app: str) -> HTMLResponse:
+    """The revision and the tables, with counts and locks."""
+    return _database_page(request, principal, require_app(app), "database_tables.html")
+
+
+@ui_router.get(
+    "/apps/{app}/database/query",
+    summary="The SQL console",
+    response_class=HTMLResponse,
+)
+def database_query_page(
     request: Request, principal: CurrentOperator, app: str, sql: str = Query(default="")
 ) -> HTMLResponse:
-    """The tables with counts and locks, the application's own ``db`` verbs, the SQL console.
+    """The SQL console and its last result.
 
-    ``sql`` seeds the console's textarea without running it — a table's own link on this page
-    (``…?sql=SELECT * FROM <t> LIMIT 100#db-query``) so one click both fills in and jumps to the
-    statement, leaving *Run* to the operator.
+    ``sql`` seeds the textarea without running it — a table's own link on the Tables page
+    (``…/database/query?sql=SELECT * FROM <t> LIMIT 100``) so one click both fills in the
+    statement and opens this page, leaving *Run* to the operator.
     """
-    return _database_page(request, principal, require_app(app), sql=sql)
+    return _database_page(request, principal, require_app(app), "database_query.html", sql=sql)
+
+
+@ui_router.get(
+    "/apps/{app}/database/admin",
+    summary="The application's own operations, the guard's backups, and deletion",
+    response_class=HTMLResponse,
+)
+def database_admin_page(request: Request, principal: CurrentOperator, app: str) -> HTMLResponse:
+    """The application's own statistics, its own ``db`` verbs, the delete preview, and backups."""
+    return _database_page(request, principal, require_app(app), "database_admin.html")
 
 
 @ui_router.post("/apps/{app}/database/query", summary="Run the console from the page")
@@ -631,7 +657,7 @@ def query_from_page(
     app: str,
     sql: Annotated[str, Form(max_length=_SQL_MAX_CHARS)] = "",
 ) -> HTMLResponse:
-    """The console's form post: the result, or the refusal in its own words, on the same page."""
+    """The console's form post: the result, or the refusal in its own words, on the Query page."""
     name = require_app(app)
     result: QueryResult | None = None
     error: SuiteError | None = None
@@ -639,7 +665,9 @@ def query_from_page(
         result = _audited_query(request, principal, name, sql)
     except SuiteError as exc:
         error = exc
-    return _database_page(request, principal, name, sql=sql, result=result, query_error=error)
+    return _database_page(
+        request, principal, name, "database_query.html", sql=sql, result=result, query_error=error
+    )
 
 
 @ui_router.post("/apps/{app}/database/curated", summary="Run one of the application's db verbs")
@@ -676,7 +704,9 @@ def curated_from_page(
         )
     except SuiteError as exc:
         error = exc
-    return _database_page(request, acting, name, curated=result, curated_error=error)
+    return _database_page(
+        request, acting, name, "database_admin.html", curated=result, curated_error=error
+    )
 
 
 def _grid_href(base: str, **params: Any) -> str:

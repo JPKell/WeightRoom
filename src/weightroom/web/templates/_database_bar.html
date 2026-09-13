@@ -1,0 +1,17 @@
+{#- The database page bar (row WY9): included by `database_tables.html`, `database_query.html`,
+    `database_admin.html` and `database_table.html`, each having `{% set db_section = "…" %}`
+    before including this. `app` is already in every one of their contexts (`_page()` in
+    `web/routes/databases.py`). -#}
+{% from "_app_page.html" import page_nav %}
+{{ page_nav(
+  links=[
+    {"label": "Tables", "href": "/apps/" ~ app ~ "/database", "current": db_section == "tables"},
+    {"label": "Query", "href": "/apps/" ~ app ~ "/database/query", "current": db_section == "query"},
+    {"label": "Admin", "href": "/apps/" ~ app ~ "/database/admin", "current": db_section == "admin"},
+  ],
+  actions=[
+    {"label": "JSON", "href": "/api/v1/apps/" ~ app ~ "/db/tables"},
+    {"label": "Revision", "href": "/api/v1/apps/" ~ app ~ "/db/revision"},
+    {"label": "Docs", "href": "/docs?section=apps#docs-apps-" ~ app},
+  ]
+) }}

@@ -141,30 +141,56 @@ def test_the_pages_list_tables_page_rows_and_show_a_query_or_its_refusal(tmp_pat
     assert index.status_code == 200 and "0009" in index.text and "not installed" in index.text
 
 
-def test_a_tables_name_seeds_the_query_and_the_page_has_a_three_anchor_nav(
+def test_a_tables_name_seeds_the_query_page_and_the_bar_links_all_three(
     tmp_path: Path,
 ) -> None:
-    """Row WX2: Tables / Query / Admin, and a table's own name is the seeded-query link — the
-    guarded row browser stays a separate ``Browse rows`` link beside it (api.md §3's only path
-    to a raw write)."""
+    """Row WY9: Tables / Query / Admin are real pages behind one bar, and a table's own name on
+    the Tables page is the seeded-query link — the guarded row browser stays a separate
+    ``Browse rows`` link beside it (api.md §3's only path to a raw write)."""
     console, path = _console(tmp_path)
     _three_samples(path)
     page = console.client.get("/apps/freeweight/database", headers=HTML).text
-    assert '<a href="#db-tables">Tables</a>' in page
-    assert '<a href="#db-query">Query</a>' in page
-    assert '<a href="#db-admin">Admin</a>' in page
-    assert 'id="db-tables"' in page and 'id="db-query"' in page and 'id="db-admin"' in page
+    assert '<a href="/apps/freeweight/database" aria-current="page">Tables</a>' in page
+    assert '<a href="/apps/freeweight/database/query">Query</a>' in page
+    assert '<a href="/apps/freeweight/database/admin">Admin</a>' in page
     assert (
-        'href="/apps/freeweight/database?sql=SELECT%20%2A%20FROM%20samples%20LIMIT%20100'
-        '#db-query"' in page
+        'href="/apps/freeweight/database/query?sql=SELECT%20%2A%20FROM%20samples%20LIMIT%20100"'
+        in page
     )
     assert 'href="/apps/freeweight/database/samples">Browse rows</a>' in page
+    assert "SQL console" not in page and "db-sql" not in page
+
+    query = console.client.get("/apps/freeweight/database/query", headers=HTML).text
+    assert '<a href="/apps/freeweight/database/query" aria-current="page">Query</a>' in query
+
+    admin = console.client.get("/apps/freeweight/database/admin", headers=HTML).text
+    assert '<a href="/apps/freeweight/database/admin" aria-current="page">Admin</a>' in admin
+    assert "db vacuum" in admin
 
     seeded = console.client.get(
-        "/apps/freeweight/database?sql=SELECT+%2A+FROM+samples+LIMIT+100", headers=HTML
+        "/apps/freeweight/database/query?sql=SELECT+%2A+FROM+samples+LIMIT+100", headers=HTML
     ).text
     assert '<textarea id="db-sql" name="sql"' in seeded
     assert "SELECT * FROM samples LIMIT 100</textarea>" in seeded
+
+
+def test_every_post_lands_on_its_own_subpage(tmp_path: Path) -> None:
+    """Row WY9: the query form renders back onto Query, the curated form onto Admin."""
+    console, path = _console(tmp_path)
+    _three_samples(path)
+    queried = console.post_form(
+        "/apps/freeweight/database/query", {"sql": "SELECT count(*) AS n FROM samples"}
+    )
+    assert '<a href="/apps/freeweight/database/query" aria-current="page">Query</a>' in (
+        queried.text
+    )
+    assert "db vacuum" not in queried.text
+    curated = console.post_form("/apps/freeweight/database/curated", {"verb": "vacuum"})
+    assert '<a href="/apps/freeweight/database/admin" aria-current="page">Admin</a>' in (
+        curated.text
+    )
+    assert "db vacuum --json</code> — done." in curated.text
+    assert "db-sql" not in curated.text
 
 
 def test_an_unknown_revision_degrades_the_pages_by_name_and_refuses_in_json(
@@ -184,17 +210,29 @@ def test_an_unknown_revision_degrades_the_pages_by_name_and_refuses_in_json(
     assert rows[0].outcome == "refused"
     revision = client.get("/api/v1/apps/loadcoach/db/revision", headers=JSON_HEADERS).json()
     assert (revision["alembic_version"], revision["known"]) == ("9999", False)
-    for path in ("/apps/loadcoach/database", "/apps/loadcoach/database/feedback"):
+    for path in (
+        "/apps/loadcoach/database",
+        "/apps/loadcoach/database/query",
+        "/apps/loadcoach/database/feedback",
+    ):
         page = client.get(path, headers=HTML)
         assert page.status_code == 200
         assert "Schema at revision 9999 is not known to" in page.text
-        assert "SQL console" not in page.text
+        assert "db-sql" not in page.text
+    # Admin's own operations do not need a known schema — only reading tables and rows does.
+    admin = client.get("/apps/loadcoach/database/admin", headers=HTML)
+    assert admin.status_code == 200 and "db backup" in admin.text
 
 
 def test_an_application_with_no_database_to_read_says_why(tmp_path: Path) -> None:
     console, _path = _console(tmp_path, app="ideapress", fixture=None)
-    page = console.client.get("/apps/ideapress/database", headers=HTML)
-    assert page.status_code == 200 and "No database to read." in page.text
+    for path in (
+        "/apps/ideapress/database",
+        "/apps/ideapress/database/query",
+        "/apps/ideapress/database/admin",
+    ):
+        page = console.client.get(path, headers=HTML)
+        assert page.status_code == 200 and "No database to read." in page.text
     grid = console.client.get("/apps/ideapress/database/units", headers=HTML)
     assert "No database to read." in grid.text
     tables = console.client.get("/api/v1/apps/ideapress/db/tables", headers=JSON_HEADERS)
@@ -217,3 +255,28 @@ def test_databases_page_prints_the_postgres_bootstrap_script(tmp_path: Path) -> 
     for line in text.splitlines():
         if "PASSWORD" in line:
             assert "PG_PASSWORD" in line
+
+
+_SUBPAGE_FIXTURE = {
+    "freeweight": "freeweight-0009",
+    "loadcoach": "loadcoach-0015",
+    "ideapress": "ideapress-0011",
+    "promptcadence": "promptcadence-0011",
+}
+
+
+def test_each_subpage_renders_its_own_section_and_not_the_others(tmp_path: Path) -> None:
+    """Row WY9: Tables, Query and Admin are separate pages, one per application."""
+    for app, fixture in _SUBPAGE_FIXTURE.items():
+        console, _path = _console(tmp_path / app, app=app, fixture=fixture)
+        client = console.client
+        tables = client.get(f"/apps/{app}/database", headers=HTML).text
+        query = client.get(f"/apps/{app}/database/query", headers=HTML).text
+        admin = client.get(f"/apps/{app}/database/admin", headers=HTML).text
+        assert "db-sql" in query
+        assert "db-sql" not in tables and "db-sql" not in admin
+        assert "own operations" in admin
+        assert "own operations" not in tables and "own operations" not in query
+        assert "Row counts as of this page" in tables
+        assert "Row counts as of this page" not in query
+        assert "Row counts as of this page" not in admin

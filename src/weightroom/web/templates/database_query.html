@@ -1,0 +1,43 @@
+{% extends "_shell.html" %}
+{% set db_section = "query" %}
+{% block title %}{{ app | app_label }} database query — WeightRoom{% endblock %}
+{% block extra_head %}
+<style>#db-query-results td { white-space: nowrap; }</style>
+{% endblock %}
+{% block page_content %}
+{% include "_database_bar.html" %}
+<h2>Query</h2>
+
+{% if unavailable %}
+<p class="notice" role="alert"><strong>No database to read.</strong> {{ unavailable }}</p>
+{% elif not revision.is_known %}
+{% include "_schema_unknown.html" %}
+{% else %}
+<form method="post" action="/apps/{{ app }}/database/query">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="db-sql">One <code>SELECT</code> <span class="field-hint">On a read-only connection,
+    30 s, {{ row_cap }} rows. A write goes through the guard, from a table's page.</span></label>
+    <textarea id="db-sql" name="sql" rows="4" class="mono" spellcheck="false" required>{{ sql }}</textarea>
+  </div>
+  <button type="submit">Run</button>
+</form>
+{% if query_error %}
+<p class="notice" role="alert"><strong><code>{{ query_error.code }}</code></strong> {{ query_error.message }}</p>
+{% endif %}
+{% if result %}
+<p class="muted">{{ result.rows | length }} row{{ "" if result.rows | length == 1 else "s" }}{{ ", cut at " ~ row_cap if result.truncated else "" }}
+in {{ "%.1f" | format(result.duration_ms) }} ms.</p>
+<div class="table-scroll">
+<table id="db-query-results" data-density="dense">
+  <thead><tr>{% for name in result.columns %}<th scope="col">{{ name }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in result.rows %}<tr>{% for cell in row %}<td class="mono">{{ cell | cell_text }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<p class="muted">From {{ app | app_label }}'s database at revision {{ revision.found or "none" }}, read-only.</p>
+{% endif %}
+{% endblock %}
