@@ -99,6 +99,22 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   from ADR-0024's own `provider_kind/name@digest` grammar — `baseaicore.ModelIdentity` builds a
   canonical ID but has no inverse of it, so this is the one place that grammar is hand-parsed
   rather than repeated per template.
+
+### Changed (row WY9)
+- **An application's database is now three pages behind one page bar** — Tables (`/apps/{app}/database`,
+  unchanged URL), Query (`/apps/{app}/database/query`, new) and Admin (`/apps/{app}/database/admin`,
+  new: the application's own statistics and `db` verbs, the delete preview, and the guarded-write
+  backups), each with `page_nav(links=[…], actions=[JSON, Revision, Docs])` as the first element of
+  `page_content`. `database.html` is split into `database_tables.html`, `database_query.html` and
+  `database_admin.html`, sharing the bar through a new `_database_bar.html` include;
+  `database_table.html` gets the same bar, Tables current. Every `POST` renders back onto its own
+  subpage — `…/database/query` onto Query, `…/database/curated` onto Admin — with its path, form
+  fields, CSRF and audit rows unchanged. The `#db-tables`/`#db-query`/`#db-admin` anchors are gone;
+  FreeWeight's `Delete stored results` table operation now links to
+  `/apps/{app}/database/admin#delete-results`. `test_page_nav.py`'s duplicate check now excludes a
+  page's own left-menu entry (the Tables page bar necessarily repeats the left menu's *Database*
+  link) — flagged for WY10 to reconcile with WY1's ownership of that file.
+
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

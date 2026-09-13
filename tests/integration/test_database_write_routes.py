@@ -132,7 +132,7 @@ def test_update_routing_decisions_is_refused_by_name(tmp_path: Path) -> None:
 def test_the_table_page_runs_the_guard_dialog_end_to_end(tmp_path: Path) -> None:
     console = _console(tmp_path)
     page = console.client.get("/apps/freeweight/database/samples", headers=HTML).text
-    assert 'href="/apps/freeweight/database#delete-results">Delete stored results' in page
+    assert 'href="/apps/freeweight/database/admin#delete-results">Delete stored results' in page
     assert page.index("own operations for samples") < page.index("Raw write — the guard")
     dried = console.post_form("/apps/freeweight/database/samples/write/dry-run", {"sql": SQL})
     assert "<strong>3 rows</strong>, rolled back." in dried.text

@@ -130,6 +130,19 @@ def _hrefs(page: str, css_class: str) -> set[str]:
     }
 
 
+_CURRENT_HREF = re.compile(r'href="([^"]*)" aria-current="page"')
+
+
+def _selected_href(page: str, css_class: str) -> str | None:
+    """The one ``href`` of ``css_class`` marked ``aria-current="page"``, or ``None``."""
+    for classes, body in _NAV.findall(page):
+        if css_class in classes.split():
+            match = _CURRENT_HREF.search(body)
+            if match:
+                return match.group(1)
+    return None
+
+
 def rendered_pages(console: Console) -> dict[str, str]:
     """Every renderable GET UI page, by path, as its HTML. Shared by the catalog's link test."""
     paths, unaccounted = _ui_paths(console)
@@ -148,7 +161,12 @@ def test_no_page_bar_link_repeats_the_left_menu(tmp_path: Path) -> None:
     for path, page in pages.items():
         side = _hrefs(page, "side-nav")
         assert side, f"{path} renders no left menu"
-        repeated = _hrefs(page, "page-nav") & side
+        # A bar link to the page's own (selected) left-menu entry is "you are here" twice, not a
+        # repeat — e.g. every database subpage selects the left menu's single Database entry
+        # (Tables' URL), so the bar's Tables link repeats it on Query and Admin too, not just on
+        # Tables itself (row WY9). Allowing exactly the selected entry is the one exception this
+        # rule needs. Flagged for WY10.
+        repeated = (_hrefs(page, "page-nav") & side) - {_selected_href(page, "side-nav")}
         assert not repeated, f"{path}: page bar repeats the left menu: {sorted(repeated)}"
 
 

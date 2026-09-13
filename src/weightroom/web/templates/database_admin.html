@@ -1,30 +1,14 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, empty_state, kv_list %}
-{% from "_app_page.html" import docs_link %}
-{% block title %}{{ app | app_label }} database — WeightRoom{% endblock %}
-{% block extra_head %}
-<style>#db-query-results td { white-space: nowrap; }</style>
-{% endblock %}
+{% from "mirrorwall/components.html" import kv_list %}
+{% set db_section = "admin" %}
+{% block title %}{{ app | app_label }} database admin — WeightRoom{% endblock %}
 {% block page_content %}
-<h2>Database</h2>
-<p class="muted">Every connection this page opens is read-only — <code>mode=ro</code> on SQLite,
-<code>default_transaction_read_only</code> on PostgreSQL — and closed when the page is done
-(ADR-0124). <a href="/api/v1/apps/{{ app }}/db/tables">JSON</a> ·
-<a href="/api/v1/apps/{{ app }}/db/revision">revision</a> · {{ docs_link(app) }}</p>
-<nav class="page-actions" aria-label="Sections">
-  <a href="#db-tables">Tables</a> · <a href="#db-query">Query</a> · <a href="#db-admin">Admin</a>
-</nav>
+{% include "_database_bar.html" %}
+<h2>Admin</h2>
 
 {% if unavailable %}
 <p class="notice" role="alert"><strong>No database to read.</strong> {{ unavailable }}</p>
 {% else %}
-{{ kv_list([
-  {"label": "Revision", "value": revision.found or "none"},
-  {"label": "Known to this console", "value": revision.known | join(", ") or "none"},
-  {"label": "Dialect", "value": revision.dialect},
-  {"label": "Database", "value": revision.database_url},
-]) }}
-
 {% if app_stats %}
 <h3>{{ app | app_label }}'s own statistics</h3>
 <p class="muted">What {{ app | app_label }}'s <code>GET /database/stats</code> adds to <code>db status</code>: the backups it has
@@ -41,7 +25,7 @@ taken and the artifacts beside its database.</p>
 <p class="notice" role="alert"><strong><code>{{ app_stats_error.details.get("app_code") or app_stats_error.code }}</code></strong> {{ app_stats_error.message }}</p>
 {% endif %}
 
-<h3 id="db-admin">{{ app | app_label }}'s own operations</h3>
+<h3>{{ app | app_label }}'s own operations</h3>
 <p class="muted">Offered before anything raw (ADR-0123 rule 5): each runs <code>{{ app }} db …</code>
 as an operator at the terminal would, so {{ app | app_label }}'s own checks apply.
 <a href="/api/v1/apps/{{ app }}/db/status">db status</a> ·
@@ -138,65 +122,6 @@ as an operator at the terminal would, so {{ app | app_label }}'s own checks appl
   {% for one in backups %}<li>{{ one.path }} <span class="muted">{{ one.size_bytes }} bytes</span></li>
   {% endfor %}
 </ul>
-{% endif %}
-
-{% if not revision.is_known %}
-{% include "_schema_unknown.html" %}
-{% else %}
-<h3 id="db-tables">Tables</h3>
-{% if tables %}
-<div class="table-scroll">
-<table data-density="dense">
-  <caption>Row counts as of this page. A locked table is never written from WeightRoom; any other
-  is written only through the guard, from its own page. A table's name seeds the query below;
-  <em>Browse rows</em> opens the guarded row browser, the only path to a raw write.</caption>
-  <thead><tr>
-    <th scope="col">Table</th><th scope="col" class="numeric">Rows</th><th scope="col">Raw writes</th>
-  </tr></thead>
-  <tbody>
-  {% for one in tables %}
-  <tr>
-    <th scope="row">
-      <a href="/apps/{{ app }}/database?sql={{ ('SELECT * FROM ' ~ one.name ~ ' LIMIT 100') | urlencode }}#db-query"><code>{{ one.name }}</code></a>
-      · <a href="/apps/{{ app }}/database/{{ one.name | urlencode }}">Browse rows</a>
-    </th>
-    <td class="numeric">{{ "—" if one.rows is none else one.rows }}</td>
-    <td>{% if one.writable %}{{ badge("under the guard", tone="neutral") }}{% else %}{{ badge("locked", tone="danger", title=one.reason) }} <span class="muted">{{ one.lock.name }}</span>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% else %}
-{{ empty_state("This database has no tables.") }}
-{% endif %}
-
-<h3 id="db-query">SQL console</h3>
-<form method="post" action="/apps/{{ app }}/database/query">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <div class="field">
-    <label for="db-sql">One <code>SELECT</code> <span class="field-hint">On a read-only connection,
-    30 s, {{ row_cap }} rows. A write goes through the guard, from a table's page.</span></label>
-    <textarea id="db-sql" name="sql" rows="4" class="mono" spellcheck="false" required>{{ sql }}</textarea>
-  </div>
-  <button type="submit">Run</button>
-</form>
-{% if query_error %}
-<p class="notice" role="alert"><strong><code>{{ query_error.code }}</code></strong> {{ query_error.message }}</p>
-{% endif %}
-{% if result %}
-<p class="muted">{{ result.rows | length }} row{{ "" if result.rows | length == 1 else "s" }}{{ ", cut at " ~ row_cap if result.truncated else "" }}
-in {{ "%.1f" | format(result.duration_ms) }} ms.</p>
-<div class="table-scroll">
-<table id="db-query-results" data-density="dense">
-  <thead><tr>{% for name in result.columns %}<th scope="col">{{ name }}</th>{% endfor %}</tr></thead>
-  <tbody>
-  {% for row in result.rows %}<tr>{% for cell in row %}<td class="mono">{{ cell | cell_text }}</td>{% endfor %}</tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% endif %}
 {% endif %}
 <p class="muted">From {{ app | app_label }}'s database at revision {{ revision.found or "none" }}, read-only.</p>
 {% endif %}

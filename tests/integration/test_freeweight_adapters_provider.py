@@ -352,7 +352,7 @@ def test_the_database_page_adds_freeweights_backups_and_artifacts_while_it_answe
     stats = fixture("database-stats")
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"database/stats": stats})
-        text = page(console, f"{BASE}/database")
+        text = page(console, f"{BASE}/database/admin")
     assert "FreeWeight's own statistics" in text
     assert stats["last_backup_path"] in text
     assert "no artifact directory configured" in text
@@ -361,7 +361,7 @@ def test_the_database_page_adds_freeweights_backups_and_artifacts_while_it_answe
 def test_a_stopped_freeweights_database_page_does_not_call_it(tmp_path: Path) -> None:
     console, _database = freeweight_console(tmp_path, state="inactive")
     with respx.mock(assert_all_called=False):  # any request would fail the page
-        text = page(console, f"{BASE}/database")
+        text = page(console, f"{BASE}/database/admin")
     assert "own statistics" not in text
 
 
