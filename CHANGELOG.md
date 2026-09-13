@@ -84,6 +84,21 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   form, now inline at the end of `.page-head`'s heading row (`display: inline-flex`) instead of
   on its own line below.
 
+
+### Changed (row WY8)
+- **Model tables name models, not identities.** FreeWeight's Models page drops its Canonical ID
+  column (the model link already carries it as `title`). FreeWeight's Results and Evidence show
+  the model's provider name instead of its full canonical ID, with the ID (and, for Evidence, the
+  adapter) kept as the cell's `title`; their Machine and Runtime profile columns carry
+  `"hidden": true` (UI standards §2.2) so `table.js` will start them hidden the moment row WY5
+  merges — until then MirrorWall renders every column, as the roadmap says it should. LoadCoach's
+  Models page cuts a long name to 29 characters plus an ellipsis on both lines of the cell (the
+  name and the muted canonical ID beneath it), full value in `title`. All four templates' link
+  strips are now `page_nav` bars, with every link that duplicated the left menu removed.
+  `weightroom.web.rendering` gains `canonical_name`, a filter that recovers a canonical ID's name
+  from ADR-0024's own `provider_kind/name@digest` grammar — `baseaicore.ModelIdentity` builds a
+  canonical ID but has no inverse of it, so this is the one place that grammar is hand-parsed
+  rather than repeated per template.
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

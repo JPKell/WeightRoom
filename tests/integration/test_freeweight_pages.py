@@ -157,6 +157,18 @@ def test_the_models_page_reads_freeweight_and_offers_refresh_and_the_switch(
     assert (params["has_results"], params["sort"]) == ("true", "-canonical_id")
 
 
+def test_the_models_page_has_no_canonical_id_column(tmp_path: Path) -> None:
+    """Row WY8: the model's link already carries the canonical ID as its title; a second column
+    repeating it in full was the operator's complaint.
+    """
+    console, _database = freeweight_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        text = page(console, f"{BASE}/models")
+    assert ">Canonical ID<" not in text
+    assert CANONICAL in text  # still the model link's title — the identity is one hover away
+
+
 def test_refresh_shows_freeweights_counts_and_writes_one_audit_row(tmp_path: Path) -> None:
     console, _database = freeweight_console(tmp_path, state="active")
     counts = {"added": 1, "updated": 2, "unchanged": 13, "total": 16}

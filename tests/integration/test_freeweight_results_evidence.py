@@ -13,11 +13,14 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import mirrorwall
+import pytest
 import respx
 
 from tests.integration.test_freeweight_pages import (
     API,
     BASE,
+    CANONICAL,
     FIXTURES,
     RUN,
     fixture,
@@ -32,6 +35,16 @@ from tests.support import fill_rows
 OTHER_RUN = "01M22D3SAJ5KE8XZ3H4NWVWZB8"
 MEMORY_RUN = "01M22J6XV0XES89J17QPATK89Q"
 MACHINE = "01M1B9PNA4BK4TEJ3T5EQTFQS4"
+
+_COMPONENTS = (
+    Path(mirrorwall.__file__).parent / "templates" / "mirrorwall" / "components.html"
+).read_text(encoding="utf-8")
+_TABLE_SUPPORTS_HIDDEN_COLUMNS = "data-default-hidden" in _COMPONENTS
+"""Row WY5's ``table()`` macro is what turns a column's ``"hidden": true`` head entry into
+``data-default-hidden="true"``; until that row's branch merges, this MirrorWall renders every
+column, which the roadmap (§2.2) says is expected. The two tests below skip themselves rather
+than fail against a dependency that has not landed, and start asserting the real markup the day
+WY10 installs a MirrorWall that has WY5 in it."""
 
 
 def gate_b_api(
@@ -80,6 +93,30 @@ def test_results_read_freeweights_metric_query_with_every_filter_and_its_cursor(
     )
     assert 'action="/apps/freeweight/results/export"' in text
     assert 'action="/apps/freeweight/results/compare"' in text
+
+
+def test_results_names_the_model_rather_than_its_full_canonical_id(tmp_path: Path) -> None:
+    """Row WY8: the Model column is the provider name; the full ID is the cell's title."""
+    console, _database = freeweight_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        gate_b_api(router)
+        text = page(console, f"{BASE}/results")
+    assert ">smollm2:135m<" in text
+    assert f'title="{CANONICAL}"' in text
+    assert ">Compare<" in text and ">Machines<" in text  # the page bar, not the left menu
+
+
+@pytest.mark.skipif(
+    not _TABLE_SUPPORTS_HIDDEN_COLUMNS,
+    reason="needs WY5's table() macro (data-default-hidden); this MirrorWall predates it",
+)
+def test_results_hides_runtime_profile_and_machine_by_default(tmp_path: Path) -> None:
+    console, _database = freeweight_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        gate_b_api(router)
+        text = page(console, f"{BASE}/results")
+    assert '<th scope="col" data-default-hidden="true">Machine</th>' in text
+    assert '<th scope="col" data-default-hidden="true">Runtime profile</th>' in text
 
 
 def test_compare_renders_each_verdict_its_reason_and_the_fields_that_separate(
@@ -262,6 +299,34 @@ def test_evidence_shows_each_record_and_a_user_records_goal_jury_and_calibration
     assert ">stale<" in text
     assert "measured 400 days ago; freshness 0.30 is below 0.50." in text
     assert "consistency_factor" in text and "0.800" in text and "0.179" in text
+
+
+def test_evidence_names_the_model_rather_than_its_full_canonical_id(tmp_path: Path) -> None:
+    """Row WY8: the Subject column is the provider name (+ adapter, if any); the full ID and the
+    adapter are the cell's title.
+    """
+    console, _database = freeweight_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        gate_b_api(router)
+        text = page(console, f"{BASE}/evidence")
+    subject = fixture("evidence")["items"][0]["payload"]["model"]["canonical_id"]
+    name = subject.rpartition("@")[0].partition("/")[2]
+    assert f">{name}<" in text
+    assert f'title="{subject}"' in text
+    assert ">LoadCoach&#39;s import<" in text  # the page bar's action, Results removed as a dupe
+
+
+@pytest.mark.skipif(
+    not _TABLE_SUPPORTS_HIDDEN_COLUMNS,
+    reason="needs WY5's table() macro (data-default-hidden); this MirrorWall predates it",
+)
+def test_evidence_hides_runtime_profile_and_machine_by_default(tmp_path: Path) -> None:
+    console, _database = freeweight_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        gate_b_api(router)
+        text = page(console, f"{BASE}/evidence")
+    assert '<th scope="col" data-default-hidden="true">Machine</th>' in text
+    assert '<th scope="col" data-default-hidden="true">Runtime profile</th>' in text
 
 
 def test_the_evidence_bundle_downloads_with_the_pages_filters(tmp_path: Path) -> None:

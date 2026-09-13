@@ -32,6 +32,7 @@ __all__ = [
     "PILL_TONES",
     "app_side_nav",
     "app_side_nav_stubs",
+    "canonical_name",
     "docs_action",
     "pill_status",
     "pill_tone",
@@ -331,6 +332,31 @@ def pill_status(pill: str) -> str:
     return APP_STATUS_DOT.get(pill, "unknown")
 
 
+def canonical_name(canonical_id: str | None) -> str:
+    """The provider model name out of a ``provider_kind/name@digest`` canonical ID (ADR-0024).
+
+    ``baseaicore.ModelIdentity`` builds a canonical ID but carries no inverse of it — its
+    docstring calls the ID lossy and says it is "never parsed back into its parts" — so this
+    recovers the name from the format's own fixed grammar instead: split once on the first ``/``
+    to drop ``provider_kind`` (never itself containing one), then once on the last ``@`` to drop
+    ``@digest`` (``provider_model_name`` may contain either character, per ADR-0024). The same
+    grammar already backs the ``rsplit``/``split`` pair in ``freeweight_pages.heatmap_option`` and
+    the ``partition``/``split`` pair the LoadCoach page tests use to build one (row WY8).
+
+    Args:
+        canonical_id: A full canonical ID, or ``None``.
+
+    Returns:
+        The name, or ``canonical_id`` unchanged when it does not fit the grammar (no ``/``), so a
+        malformed value still renders — truncated by the caller — rather than raising.
+    """
+    if not canonical_id or "/" not in canonical_id:
+        return canonical_id or ""
+    _kind, _, rest = canonical_id.partition("/")
+    name, _, _digest = rest.rpartition("@")
+    return name or rest
+
+
 @lru_cache(maxsize=1)
 def templates() -> Environment:
     """Return the process-wide Jinja environment, building it on first use."""
@@ -361,6 +387,7 @@ def templates() -> Environment:
     environment.filters["pill_status"] = pill_status
     environment.filters["app_label"] = app_label
     environment.filters["cell_text"] = cell_text
+    environment.filters["canonical_name"] = canonical_name
     return environment
 
 

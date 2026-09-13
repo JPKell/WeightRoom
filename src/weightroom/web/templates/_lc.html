@@ -17,6 +17,18 @@
 {%- else -%}<span class="mono">{{ canonical_id or "—" }}</span>{%- endif -%}
 {%- endmacro %}
 
+{% macro model_cell(model_ref, name, canonical_id, limit=30) -%}
+{#- Row WY8: the Models table's name cell, cut to `limit` characters (29 plus an ellipsis at the
+    default) on both its lines — the name and the muted canonical ID beneath it — each carrying
+    its full value in `title` so truncation never hides the identity. `name` wins when the
+    registration has one; the canonical ID stands in for a row that does not. -#}
+{% set shown = name or canonical_id or model_ref or "—" %}
+{%- if model_ref -%}
+<a class="mono" href="/apps/loadcoach/models/{{ model_ref | urlencode }}" title="{{ shown }}">{{ shown | cell_text(limit=limit) }}</a>
+{%- else -%}<span class="mono" title="{{ shown }}">{{ shown | cell_text(limit=limit) }}</span>{%- endif -%}
+<br><span class="muted mono kit-id" title="{{ canonical_id or '' }}">{{ (canonical_id or "") | cell_text(limit=limit) }}</span>
+{%- endmacro %}
+
 {% macro decision_link(decision_id) -%}
 {%- if decision_id -%}
 <a class="mono kit-id" href="/apps/loadcoach/routing/decisions/{{ decision_id | urlencode }}" title="{{ decision_id }}">{{ decision_id[:6] }}…{{ decision_id[-4:] }}</a>

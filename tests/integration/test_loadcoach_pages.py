@@ -168,6 +168,31 @@ def test_the_models_page_names_the_model_the_registration_and_the_context_that_f
     assert "capped" in text  # the 16k row is capped by configuration, and says so
 
 
+def test_a_long_model_name_is_cut_to_thirty_characters_with_the_full_name_in_title(
+    tmp_path: Path,
+) -> None:
+    """Row WY8: 29 characters plus an ellipsis on both lines of the name cell, the full text kept
+    as each line's own ``title`` so truncation never hides the identity.
+    """
+    console, _database = loadcoach_console(tmp_path, state="active")
+    models = fixture("models")
+    long_name = "a-very-long-provider-model-name-indeed-xy"  # 41 characters
+    assert len(long_name) == 41
+    long_canonical = f"ollama/{long_name}@sha256:0b34f914eac4"
+    row = next(one for one in models["models"] if one["model_ref"] == MODEL)
+    row["provider_model_name"] = long_name
+    row["canonical_id"] = long_canonical
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"models": models})
+        text = page(console, f"{BASE}/models")
+    truncated_name = long_name[:29] + "…"
+    truncated_canonical = long_canonical[:29] + "…"
+    assert truncated_name in text
+    assert f'title="{long_name}"' in text
+    assert truncated_canonical in text
+    assert f'title="{long_canonical}"' in text
+
+
 def test_context_fit_is_a_dash_and_a_reason_when_freeweight_does_not_answer(
     tmp_path: Path,
 ) -> None:
