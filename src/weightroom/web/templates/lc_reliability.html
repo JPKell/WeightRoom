@@ -1,23 +1,37 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_lc.html" import stat, num, measure, breaker_badge, profile_link %}
 {% block title %}Reliability — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Reliability {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/routing">Routing</a> · <a href="/apps/loadcoach/queue">Queue</a></div>
-</div>
+{% call app_page_header(view, "Reliability", "Reliability", "Production evidence per model and task profile: what happened when jobs ran. Below its minimum a value is a dash carrying the reason, never a number — hover a dash to read it.") %}
+  <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/routing">Routing</a> · <a href="/apps/loadcoach/queue">Queue</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">Production evidence per model and task profile: what happened when jobs ran. Below its
-minimum a value is a dash carrying the reason, never a number; hover a dash to read it.</p>
 <form class="filter-bar" action="/apps/loadcoach/reliability" method="get" role="search">
   <div class="field"><label for="lc-rel-task">Task profile</label>
-    <input id="lc-rel-task" name="task" value="{{ task }}" placeholder="general.chat"></div>
+    {% if profile_ids %}
+    <select id="lc-rel-task" name="task">
+      <option value="">any</option>
+      {% for one in profile_ids %}<option value="{{ one }}"{{ ' selected' if task == one else '' }}>{{ one }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <input id="lc-rel-task" name="task" value="{{ task }}" placeholder="general.chat">
+    {% endif %}</div>
   <div class="field"><label for="lc-rel-model">Model</label>
-    <input id="lc-rel-model" name="model" value="{{ model }}" placeholder="a canonical id"></div>
+    {% if model_ids %}
+    <select id="lc-rel-model" name="model">
+      <option value="">any</option>
+      {% for one in model_ids %}<option value="{{ one }}"{{ ' selected' if model == one else '' }}>{{ one }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <input id="lc-rel-model" name="model" value="{{ model }}" placeholder="a canonical id">
+    {% endif %}</div>
+  <div class="field"><label for="lc-rel-prefix">Starts with</label>
+    <input id="lc-rel-prefix" name="prefix" value="{{ prefix }}" placeholder="tools.agent.">
+    <span class="field-hint">Matched here, over this page's pairs: a whole family of task profiles or models at once.</span></div>
   <button type="submit">Filter</button>
-  {% if task or model %}<a href="/apps/loadcoach/reliability">Show all</a>{% endif %}
+  {% if task or model or prefix %}<a href="/apps/loadcoach/reliability">Show all</a>{% endif %}
 </form>
 {{ refusal(sourced.error) }}
 {% set data = sourced.data %}
@@ -81,7 +95,11 @@ in validated success against the model's own history, at z ≥ {{ minimums.get("
 </ul>
 {% endif %}
 {% else %}
+{% if prefix_hid %}
+{{ empty_state("No pair on this page starts with " ~ prefix ~ "; " ~ prefix_hid ~ " were hidden by it.", "Show all", "/apps/loadcoach/reliability") }}
+{% else %}
 {{ empty_state("No production evidence yet: statistics appear once jobs have run.") }}
+{% endif %}
 {% endif %}
 {% else %}
 <p class="notice">LoadCoach is not answering. These are the counts it persisted per window; the factor,

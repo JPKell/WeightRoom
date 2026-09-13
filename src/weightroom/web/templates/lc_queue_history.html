@@ -1,0 +1,58 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_lc.html" import job_link, measure %}
+{% block title %}Job history — LoadCoach — WeightRoom{% endblock %}
+{% block page_content %}
+{% call app_page_header(view, "Job history", "Queue", "Every job LoadCoach has taken, newest first — every transition persisted with a reason, never inferred from the last state seen.") %}
+  <a href="/apps/loadcoach/queue">Current</a> · <a href="/apps/loadcoach/queue/new">New job</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
+{% include "_app_state.html" %}
+<form class="filter-bar" action="/apps/loadcoach/queue/history#jobs" method="get" role="search">
+  <div class="field"><label for="lc-jobs-state">State</label>
+    <select id="lc-jobs-state" name="state">
+      <option value="">any</option>
+      {% for one in states %}<option value="{{ one }}"{{ ' selected' if filters.state == one else '' }}>{{ one }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="lc-jobs-class">Class</label>
+    <select id="lc-jobs-class" name="class">
+      <option value="">any</option>
+      {% for one in classes %}<option value="{{ one }}"{{ ' selected' if filters["class"] == one else '' }}>{{ one }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="lc-jobs-task">Task</label>
+    <input id="lc-jobs-task" name="task" value="{{ filters.task }}" placeholder="general.chat"></div>
+  <div class="field"><label for="lc-jobs-source">Source</label>
+    <input id="lc-jobs-source" name="source" value="{{ filters.source }}" placeholder="promptcadence"></div>
+  <button type="submit">Filter</button>
+  {% if filters.state or filters["class"] or filters.task or filters.source %}<a href="/apps/loadcoach/queue/history#jobs">Clear</a>{% endif %}
+</form>
+{{ refusal(jobs.error) }}
+<div id="jobs">
+{% if jobs.data is not none %}
+{% set found = jobs.data["items"] %}
+{% if found %}
+{% set rows = [] %}
+{% for one in found %}
+{% set task = one.get("task") or {} %}
+{% set model = one.get("model") or {} %}
+{% set _ = rows.append([
+  job_link(one.get("job_id")),
+  badge(one.get("state") or "—", tone="success" if one.get("state") == "completed" else ("danger" if one.get("state") == "failed" else "neutral"), title=one.get("state_reason")),
+  one.get("class") or "—",
+  (task.get("id") or "—") ~ " " ~ (task.get("version") or ""),
+  model.get("subject_canonical_id") or model.get("canonical_id") or "—",
+  one.get("source") or "—",
+  measure((one.get("priority") or {}).get("effective")),
+  (one.get("attempt") if one.get("attempt") is not none else "—") ~ "/" ~ (one.get("max_attempts") if one.get("max_attempts") is not none else "—"),
+  (one.get("timestamps") or {}).get("created_at") or "—"
+]) %}
+{% endfor %}
+{{ table([{"label": "Job"}, {"label": "State"}, {"label": "Class"}, {"label": "Task"}, {"label": "Model", "mono": true}, {"label": "Source"}, {"label": "Priority", "numeric": true}, {"label": "Attempts", "numeric": true}, {"label": "Created", "mono": true}], rows, caption="Newest first; every transition is persisted with a reason", density="dense", complete=false, row_count=rows | length) }}
+{{ pagination(next_href=next_href) }}
+{% else %}
+{{ empty_state("No job matches these filters.", "Every job", "/apps/loadcoach/queue/history#jobs") }}
+{% endif %}
+{% endif %}
+</div>
+{{ page_source(jobs) }}
+{% endblock %}

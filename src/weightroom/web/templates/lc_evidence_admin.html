@@ -1,0 +1,71 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_lc.html" import measure %}
+{% block title %}Evidence store — LoadCoach — WeightRoom{% endblock %}
+{% block page_content %}
+{% set data = sourced.data %}
+{% call app_page_header(view, "Evidence store", "Evidence", "What the store holds, where it came from, and how to put more in it.") %}
+  <a href="/apps/loadcoach/evidence">Records</a> · <a href="/apps/loadcoach/models">Models</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
+{% include "_app_state.html" %}
+{{ refusal(action_error) }}
+{% if imported %}
+<p class="notice" role="status">Imported from <code>{{ imported.get("source_id") or "—" }}</code>: {{ imported.get("imported") }} new,
+{{ imported.get("updated") }} updated, {{ imported.get("bound") }} bound, {{ imported.get("unmatched") }} unmatched,
+{{ imported.get("ambiguous_name_only") }} ambiguous, {{ imported.get("superseded") }} superseded, {{ (imported.get("rejected") or []) | length }} rejected.</p>
+{% if imported.get("rejected") %}
+{% set rows = [] %}
+{% for one in imported.get("rejected") %}{% set _ = rows.append([one.get("index"), one.get("canonical_id") or "—", one.get("capability_id") or "—", one.get("reason") or "—", one.get("detail") or "—"]) %}{% endfor %}
+{{ table([{"label": "#", "numeric": true}, {"label": "Subject", "mono": true}, {"label": "Capability", "mono": true}, {"label": "Reason", "mono": true}, {"label": "Detail"}], rows, caption="Rejected records, with why", density="dense", row_count=rows | length, table_id="lc-evidence-1", sortable=true) }}
+{% endif %}
+{% endif %}
+
+{% if sourced.live %}
+<section class="card kit-form">
+  <h3>Import evidence <span class="muted">— a bundle file, or LoadCoach pulling from FreeWeight</span></h3>
+  <form method="post" action="/apps/loadcoach/evidence/import" enctype="multipart/form-data">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <div class="field kit-wide"><label for="lc-bundle">A <code>benchmark.evidence_bundle</code> file</label>
+      <input id="lc-bundle" type="file" name="file" accept="application/json,.json"></div>
+    <div class="kit-wide kit-actions">
+      <button type="submit" name="origin" value="file" data-variant="primary">Import this file</button>
+      <button type="submit" name="origin" value="freeweight">Pull from FreeWeight at {{ freeweight_url }}</button>
+    </div>
+    <p class="field-hint kit-wide">The pull sends this console's FreeWeight address; LoadCoach's own fetch allowlist decides whether it may read it (<code>EVIDENCE_SOURCE_REFUSED</code> otherwise).</p>
+  </form>
+</section>
+{% endif %}
+
+{{ refusal(sourced.error) }}
+{% if data is not none %}
+{% set summary = data.get("summary") %}
+{% if summary %}
+<h3>The store</h3>
+<p>{{ badge(summary.get("status") or "—", tone="success" if summary.get("status") in ("ok", "not_configured") else ("neutral" if summary.get("status") == "none" else "warning")) }} {{ summary.get("note") or "" }}</p>
+{{ kv_list([
+  {"label": "Records", "value": (summary.get("total_records") if summary.get("total_records") is not none else "—") ~ " total · " ~ summary.get("bound_records", "—") ~ " bound · " ~ summary.get("unmatched_records", "—") ~ " unmatched · " ~ summary.get("ambiguous_records", "—") ~ " ambiguous · " ~ summary.get("stale_records", "—") ~ " stale"},
+  {"label": "Last import", "value": summary.get("imported_at") or "never"},
+  {"label": "Bundle produced at", "value": summary.get("generated_at") or "—"},
+  {"label": "Bundle schema · policy · vocabulary", "value": (summary.get("bundle_schema_version") or "—") ~ " · " ~ (summary.get("policy_version") or "—") ~ " · " ~ (summary.get("vocabulary_version") or "—")},
+  {"label": "Measured between", "value": (summary.get("oldest_measured_at") or "—") ~ " and " ~ (summary.get("newest_measured_at") or "—")},
+  {"label": "Configured source", "value": data.get("configured_url") or "none ([evidence] freeweight_url is empty)"},
+]) }}
+{% else %}
+<p class="muted">The store's overview is LoadCoach's own arithmetic and waits for its API; the
+sources below are its database.</p>
+{% endif %}
+
+<h3>Sources</h3>
+{% if data.get("sources") %}
+{% set rows = [] %}
+{% for one in data.get("sources") %}
+{% set _ = rows.append([one.get("source_id") or "—", one.get("kind") or "—", one.get("url") or "—", one.get("last_import_at") or "never", badge(one.get("last_status") or "unknown", tone="success" if one.get("last_status") == "ok" else "danger"), measure(one.get("rows") if one.get("rows") is not none else one.get("record_count")), measure(one.get("stale_rows")), one.get("error_text") or "—"]) %}
+{% endfor %}
+{{ table([{"label": "Source", "mono": true}, {"label": "Kind"}, {"label": "URL", "mono": true}, {"label": "Last import", "mono": true}, {"label": "Status"}, {"label": "Records", "numeric": true}, {"label": "Stale", "numeric": true}, {"label": "Error"}], rows, density="dense", row_count=rows | length, table_id="lc-evidence-2", sortable=true) }}
+{% else %}
+{{ empty_state("No evidence source has been imported from.", "Records", "/apps/loadcoach/evidence") }}
+{% endif %}
+{% endif %}
+{{ page_source(sourced) }}
+{% endblock %}

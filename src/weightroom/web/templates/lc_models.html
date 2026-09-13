@@ -37,7 +37,7 @@ under the runtime profile the cell names: one number per model would be a lie.</
 </form>
 {% endif %}
 {% if context_fit_error %}
-<p class="muted">Context fit is empty: FreeWeight {{ context_fit_error.message }}</p>
+<p class="muted">Context fit is empty — {{ context_fit_error.message }}</p>
 {% endif %}
 
 {{ refusal(sourced.error) }}

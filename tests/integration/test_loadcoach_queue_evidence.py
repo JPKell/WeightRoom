@@ -85,12 +85,16 @@ def test_the_queue_page_reads_the_report_and_the_jobs_and_offers_the_controls(
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies=_queue_bodies())
         text = page(console, f"{BASE}/queue")
+        history = page(console, f"{BASE}/queue/history")
+        new = page(console, f"{BASE}/queue/new")
+    # Row WX9: current / new job / history are three pages, and only the first one streams.
     assert "0 of at most 1000" in text
     assert "ollama/deepseek-coder-v2:latest@sha256:63fb193b3a9b" in text  # its breaker
-    assert f'href="{BASE}/queue/jobs/{JOB}"' in text
     assert f'sse-connect="{BASE}/queue/stream"' in text
     assert text.count(f'action="{BASE}/queue/control"') == 3
-    assert f'action="{BASE}/queue/jobs"' in text
+    assert f'href="{BASE}/queue/jobs/{JOB}"' in history
+    assert f'sse-connect="{BASE}/queue/stream"' not in history
+    assert f'action="{BASE}/queue/jobs"' in new
     assert "From the API" in text
 
 
@@ -178,11 +182,12 @@ def test_a_stopped_queue_lists_jobs_from_the_database_and_offers_no_control(
         ],
     )
     text = page(console, f"{BASE}/queue")
-    assert STOPPED_JOB in text
-    assert "recorded.task" in text
+    history = page(console, f"{BASE}/queue/history")
+    assert STOPPED_JOB in history
+    assert "recorded.task" in history
     assert "reads only from its running API" in text
     assert f'action="{BASE}/queue/control"' not in text
-    assert "From the database at revision 0015" in text
+    assert "From the database at revision 0015" in history
 
 
 # --- Jobs -----------------------------------------------------------------------------------------
@@ -453,12 +458,36 @@ def test_evidence_reads_each_match_state_the_summary_and_the_sources(tmp_path: P
         mock_api(router, bodies={"evidence/sources": fixture("evidence-sources")})
         router.get(f"{API}/evidence").mock(side_effect=by_state)
         text = page(console, f"{BASE}/evidence")
+        admin = page(console, f"{BASE}/evidence/admin")
+    # Row WX9: the records are one page, the store and Import another.
     assert "capability_bound" in text
     assert "capability_ambiguous_name_only" in text
     assert "ollama/qwen3.5:9b-q8_0" in text
-    assert "not_configured" in text
-    assert 'enctype="multipart/form-data"' in text
-    assert "Pull from FreeWeight at http://127.0.0.1:8765" in text
+    assert 'name="min_confidence"' in text
+    assert "not_configured" in admin
+    assert 'enctype="multipart/form-data"' in admin
+    assert "Pull from FreeWeight at http://127.0.0.1:8765" in admin
+
+
+def test_the_records_filters_are_loadcoachs_own_query_parameters(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=fixture("evidence"))
+
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"evidence/sources": fixture("evidence-sources")})
+        router.get(f"{API}/evidence").mock(side_effect=record)
+        page(
+            console,
+            f"{BASE}/evidence?capability=structured_output&model=ollama%2Fx&min_confidence=0.5",
+        )
+    params = seen[0].url.params
+    assert params["capability"] == "structured_output"
+    assert params["model"] == "ollama/x"
+    assert params["min_confidence"] == "0.5"
 
 
 def test_import_uploads_a_bundle_and_renders_loadcoachs_counts(tmp_path: Path) -> None:

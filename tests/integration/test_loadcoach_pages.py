@@ -178,7 +178,7 @@ def test_context_fit_is_a_dash_and_a_reason_when_freeweight_does_not_answer(
             side_effect=httpx.ConnectError("refused")
         )
         text = page(console, f"{BASE}/models")
-    assert "Context fit is empty: FreeWeight" in text
+    assert "Context fit is empty —" in text
     assert CANONICAL in text  # the registry is the page; the column is not
 
 
@@ -239,9 +239,12 @@ def test_routing_lists_decisions_and_profiles_and_a_decision_names_every_rejecti
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
         routing = page(console, f"{BASE}/routing")
+        history = page(console, f"{BASE}/routing/decisions")
         one = page(console, f"{BASE}/routing/decisions/{decision['decision_id']}")
         profile = page(console, f"{BASE}/routing/task-profiles/general.chat")
-    assert f'href="{BASE}/routing/decisions/{decision["decision_id"]}"' in routing
+    # Row WX9: the history is its own page, linked from the one carrying the form.
+    assert f'href="{BASE}/routing/decisions"' in routing
+    assert f'href="{BASE}/routing/decisions/{decision["decision_id"]}"' in history
     assert f'href="{BASE}/routing/task-profiles/general.chat"' in routing
     assert f'action="{BASE}/routing"' in routing
     assert "insufficient_vram" in one
@@ -268,8 +271,39 @@ def test_routing_decisions_says_first_n_of_more_when_the_api_hands_back_its_own_
     assert len(decisions["decisions"]) == 50, "the fixture already is LoadCoach's own cap"
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"routing-decisions": decisions})
-        routing = page(console, f"{BASE}/routing")
-    assert "First 50 of more" in routing
+        history = page(console, f"{BASE}/routing/decisions")
+    assert "First 50 of more" in history
+
+
+def test_reliability_offers_the_lists_it_already_fetched_as_selects(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        text = page(console, f"{BASE}/reliability")
+    assert '<select id="lc-rel-task" name="task">' in text
+    assert '<option value="general.chat"' in text
+    assert '<select id="lc-rel-model" name="model">' in text
+    assert f'<option value="{CANONICAL}"' in text
+    assert 'name="prefix"' in text
+
+
+def test_a_prefix_matches_a_family_of_task_profiles_here_not_at_loadcoach(
+    tmp_path: Path,
+) -> None:
+    """Row WX9: `startswith` over the pairs the page already fetched — LoadCoach's own `task`
+    filter is exact, and a prefix parameter on its API for a browser control is the wrong place.
+    """
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        routes = mock_api(router)
+        matched = page(console, f"{BASE}/reliability?prefix=tools.agent.")
+        missed = page(console, f"{BASE}/reliability?prefix=nothing.starts.with.this")
+    table = matched.split("<table", 1)[1].split("</table>", 1)[0]
+    assert "tools.agent.local_fast" in table
+    assert "general.chat" not in table
+    assert "No pair on this page starts with nothing.starts.with.this" in missed
+    # Nothing about the prefix reaches LoadCoach.
+    assert "prefix" not in routes["reliability"].calls.last.request.url.params
 
 
 def test_reliability_pages_by_ui_page_rows_and_the_next_link_walks_every_pair(
@@ -386,7 +420,7 @@ def test_stopped_pages_read_the_database_with_a_start_beside_them(tmp_path: Path
     assert "/warm" not in models  # API-only actions are off
     assert "reasoning_recorded" in page(console, f"{BASE}/models/{STOPPED_MODEL}")
     routing = page(console, f"{BASE}/routing")
-    assert STOPPED_DECISION in routing
+    assert STOPPED_DECISION in page(console, f"{BASE}/routing/decisions")
     assert "a profile recorded before the stop" in routing
     assert f'action="{BASE}/routing"' not in routing
     assert "insufficient_vram" in page(console, f"{BASE}/routing/decisions/{STOPPED_DECISION}")

@@ -1,0 +1,37 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import table, empty_state %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_lc.html" import decision_link, job_link, num %}
+{% block title %}Decision history — LoadCoach — WeightRoom{% endblock %}
+{% block page_content %}
+{% call app_page_header(view, "Decision history", "Routing", "Every routing decision LoadCoach has made, persisted rather than sampled — what it chose, what it scored, and the job it became.") %}
+  <a href="/apps/loadcoach/routing">Explain</a> · <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
+{% include "_app_state.html" %}
+{{ refusal(decisions.error) }}
+{% if decisions.data is not none %}
+{% if decisions.data %}
+{% set rows = [] %}
+{% for one in decisions.data %}
+{% set profile = one.get("task_profile") or {} %}
+{% set _ = rows.append([
+  decision_link(one.get("decision_id")),
+  (profile.get("id") or "—") ~ " " ~ (profile.get("version") or ""),
+  one.get("selected") or "—",
+  num(one.get("final_score")),
+  (one.get("flags") or []) | join(" ") or "none",
+  (one.get("duration_ms") ~ " ms") if one.get("duration_ms") is not none else "—",
+  one.get("requested_at") or "—",
+  job_link(one.get("job_id"))
+]) %}
+{% endfor %}
+{{ table([{"label": "Decision"}, {"label": "Task profile"}, {"label": "Selected", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Flags"}, {"label": "Took", "numeric": true}, {"label": "Requested", "mono": true}, {"label": "Job"}], rows, caption="Newest first", density="dense", complete=false, row_count=rows | length) }}
+{% if decisions_capped %}
+<p class="muted">First {{ rows | length }} of more: LoadCoach's own <code>GET /routing-decisions</code> takes no <code>limit</code>, so this is as far as the console can ask for.</p>
+{% endif %}
+{% else %}
+{{ empty_state("No routing decision has been made yet.", "Explain a route", "/apps/loadcoach/routing") }}
+{% endif %}
+{% endif %}
+{{ page_source(decisions) }}
+{% endblock %}

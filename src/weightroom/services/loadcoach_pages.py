@@ -47,6 +47,7 @@ __all__ = [
     "decisions_db",
     "evidence_api",
     "evidence_db",
+    "evidence_store_api",
     "job_api",
     "job_db",
     "job_log_frames",
@@ -943,8 +944,38 @@ def speed_api(client: httpx.Client, settings: Settings) -> dict[str, dict[str, A
     return fastest
 
 
-def evidence_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
+def evidence_store_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
+    """``GET /evidence/sources``: the store's overview, its sources and its configured URL.
+
+    One call, not four: LoadCoach attaches the same ``summary`` to this route that it attaches to
+    ``GET /evidence``, so the Evidence *admin* page — which shows no records — never reads them
+    (row WX9 split the records off onto ``/evidence``).
+
+    Raises:
+        AppRefused: LoadCoach refused.
+        AppUnreachable: It did not answer.
+    """
+    body = _document(call(client, settings, APP, "GET", "evidence/sources"))
+    return {
+        "summary": _document(body.get("summary")) or None,
+        "sources": _listed(body, "sources"),
+        "configured_url": body.get("configured_url"),
+    }
+
+
+def evidence_api(
+    client: httpx.Client,
+    settings: Settings,
+    *,
+    capability: str | None = None,
+    model: str | None = None,
+    min_confidence: str | None = None,
+) -> dict[str, Any]:
     """``GET /evidence`` once per ``match_state``, and ``GET /evidence/sources``.
+
+    ``capability``, ``model`` and ``min_confidence`` are LoadCoach's own query parameters, passed
+    through rather than filtered here (row WX9): the store is LoadCoach's, and a console-side
+    filter over a capped page would hide records the filter should have reached.
 
     The records are the producer's own ``capability.evidence`` payloads, which carry no binding:
     ``match_state`` is LoadCoach's, so each state is read by its own filter and the record labelled
@@ -967,7 +998,10 @@ def evidence_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
     for state in MATCH_STATES:
         body = call(
             client, settings, APP, "GET", "evidence",
-            params={"match_state": state, "limit": EVIDENCE_PAGE},
+            params={
+                "match_state": state, "limit": EVIDENCE_PAGE, "capability": capability or None,
+                "model": model or None, "min_confidence": min_confidence or None,
+            },
         )  # fmt: skip
         summary = _document(_document(body).get("summary")) or summary
         items = _listed(body, "items")
