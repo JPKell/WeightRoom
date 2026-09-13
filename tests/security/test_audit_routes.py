@@ -1129,6 +1129,19 @@ EXERCISES.update(
             {"mode": "ollama"},
             reply=("POST", "backends/test", 200, {"mode": "ollama", "status": "ok"}),
         ),
+        # Row WX12. Saving a workflow: a create, and a new version of one that exists. The form's
+        # repeated `kind` fields are what the editor ticks; a single-valued mapping is enough for
+        # the audit row, which is what this suite measures.
+        ("POST", "/apps/ideapress/workflows"): _ip_form(
+            "/apps/ideapress/workflows",
+            {"id": "audit-exercise", "title": "An audit exercise.", "kind": "draft"},
+            reply=("POST", "workflows", 201, {"id": "audit-exercise", "version": "1.0"}),
+        ),
+        ("POST", "/apps/ideapress/workflows/{workflow_id}"): _ip_form(
+            "/apps/ideapress/workflows/standard",
+            {"title": "An audit exercise.", "kind": "draft"},
+            reply=("PUT", "workflows/standard", 200, {"id": "standard", "version": "1.1"}),
+        ),
     }
 )
 

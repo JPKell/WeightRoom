@@ -1,0 +1,25 @@
+{
+  "id": "fast-draft",
+  "stages": [
+    {
+      "kind": "requirements",
+      "max_revision_rounds": null,
+      "model_hint": null,
+      "prompt_id": null
+    },
+    {
+      "kind": "outline",
+      "max_revision_rounds": null,
+      "model_hint": null,
+      "prompt_id": null
+    },
+    {
+      "kind": "draft",
+      "max_revision_rounds": null,
+      "model_hint": "ollama/gemma4:12b",
+      "prompt_id": null
+    }
+  ],
+  "title": "Draft and stop",
+  "version": "1.0"
+}

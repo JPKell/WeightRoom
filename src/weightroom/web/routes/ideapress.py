@@ -21,6 +21,7 @@ from urllib.parse import urlencode
 from baseaicore import SuiteError
 from fastapi import APIRouter, Form, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from weightroom.services import ideapress_actions as actions
 from weightroom.services import ideapress_pages as ip
@@ -33,6 +34,8 @@ from weightroom.web.routes.apps import app_view, read_app_page, render_app_page
 from weightroom.web.session import CurrentOperator, now_of
 
 if TYPE_CHECKING:
+    from starlette.datastructures import FormData
+
     from weightroom.services.app_pages import Sourced
     from weightroom.services.apps import AppView
     from weightroom.services.auth import Principal
@@ -402,7 +405,7 @@ def delete_from_page(
 
 @ui_router.get(f"{BASE}/workflows", summary="Workflows", response_class=HTMLResponse)
 def workflows_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """Every workflow's stage order and gates, with the limits and bindings a run would use."""
+    """Every stored workflow, and the limits a run uses when its workflow states none."""
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
@@ -411,28 +414,132 @@ def workflows_page(request: Request, principal: CurrentOperator) -> HTMLResponse
     defaults = _optional(lambda: ip.settings_api(client, settings)) if sourced.live else None
     return render_app_page(
         request, principal, APP, "ip_workflows.html", selected="Workflows", view=view,
-        sourced=sourced, defaults=defaults, workflow_id=None,
+        sourced=sourced, defaults=defaults,
     )  # fmt: skip
 
 
-@ui_router.get(
-    f"{BASE}/workflows/{{workflow_id}}", summary="One workflow", response_class=HTMLResponse
-)
-def workflow_page(request: Request, principal: CurrentOperator, workflow_id: str) -> HTMLResponse:
-    """One workflow: its stages in order, which use a model and its binding, and its gates."""
+def _workflow(  # noqa: PLR0913 — the workflow, the version, and what the last save left
+    request: Request,
+    principal: Principal,
+    workflow_id: str | None,
+    *,
+    version: str | None = None,
+    saved: str | None = None,
+    save_error: SuiteError | None = None,
+    form: Mapping[str, Any] | None = None,
+) -> HTMLResponse:
+    """The editor, for a stored workflow or for one being created.
+
+    ``workflow_id`` is ``None`` on the create page, where the record is read from ``GET /workflows``
+    for its vocabulary alone — an editor has to offer the kinds and the prompt records IdeaPress
+    will accept, and it never derives either.
+    """
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
         request,
         view,
-        api=lambda: {"workflows": [ip.workflow_api(client, settings, workflow_id)["workflow"]]},
+        api=(
+            (lambda: ip.workflow_api(client, settings, workflow_id, version=version))
+            if workflow_id is not None
+            else (lambda: {"workflow": None, "versions": [], **ip.workflows_api(client, settings)})
+        ),
         database=None,
     )
-    defaults = _optional(lambda: ip.settings_api(client, settings)) if sourced.live else None
+    definition = (sourced.data or {}).get("workflow") if sourced.data else None
     return render_app_page(
-        request, principal, APP, "ip_workflows.html", selected="Workflows", view=view,
-        sourced=sourced, defaults=defaults, workflow_id=workflow_id,
+        request, principal, APP, "ip_workflow.html", selected="Workflows", view=view,
+        sourced=sourced, workflow_id=workflow_id, version=version, saved=saved,
+        save_error=save_error, stages=ip.workflow_form(definition), form=dict(form or {}),
     )  # fmt: skip
+
+
+@ui_router.get(f"{BASE}/workflows/new", summary="New workflow", response_class=HTMLResponse)
+def workflow_new_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The editor with nothing selected — registered before ``/workflows/{id}`` so ``new`` is
+    never read as a workflow's name."""
+    return _workflow(request, principal, None)
+
+
+@ui_router.get(
+    f"{BASE}/workflows/{{workflow_id}}", summary="One workflow", response_class=HTMLResponse
+)
+def workflow_page(
+    request: Request,
+    principal: CurrentOperator,
+    workflow_id: str,
+    version: str | None = None,
+    saved: str | None = None,
+) -> HTMLResponse:
+    """One workflow: its stages, what each overrides, the record itself, and its versions."""
+    return _workflow(request, principal, workflow_id, version=version or None, saved=saved or None)
+
+
+@ui_router.post(f"{BASE}/workflows", summary="Create a workflow from the page")
+async def create_workflow_from_page(request: Request, principal: CurrentOperator) -> Response:
+    """``POST /workflows``: a new workflow at version ``1.0``, then its editor."""
+    kinds, fields = _form_fields(await request.form())
+    return await run_in_threadpool(_save, request, principal, None, kinds, fields)
+
+
+@ui_router.post(f"{BASE}/workflows/{{workflow_id}}", summary="Save a workflow version")
+async def save_workflow_from_page(
+    request: Request, principal: CurrentOperator, workflow_id: str
+) -> Response:
+    """``PUT /workflows/{id}``: the next version, then its editor. The earlier ones stay."""
+    kinds, fields = _form_fields(await request.form())
+    return await run_in_threadpool(_save, request, principal, workflow_id, kinds, fields)
+
+
+def _form_fields(form: FormData) -> tuple[list[str], dict[str, str]]:
+    """The ticked kinds, in the form's own order, and every other input beside them.
+
+    Read from the raw form rather than declared as parameters: one form carries three inputs per
+    stage for twelve kinds, and naming thirty-six parameters would put IdeaPress's stage list in
+    this file — the one thing the console must never hold a second copy of. The order is the
+    form's, which is the order IdeaPress's own ``vocabulary`` rendered them in.
+    """
+    kinds = [str(value) for value in form.getlist("kind") if isinstance(value, str)]
+    fields = {key: str(value) for key, value in form.items() if isinstance(value, str)}
+    return kinds, fields
+
+
+def _save(
+    request: Request,
+    principal: Principal,
+    target: str | None,
+    kinds: list[str],
+    fields: dict[str, str],
+) -> Response:
+    """Build the body, send it, and render the refusal back onto the editor when there is one."""
+    workflow_id = (fields.get("id") or target or "").strip()
+    title = fields.get("title") or ""
+    client, settings = _clients(request)
+    params = {"workflow_id": workflow_id, "stages": len(kinds)}
+    try:
+        body = actions.workflow_body(
+            workflow_id=workflow_id, title=title, kinds=kinds, fields=fields
+        )
+        saved = actions.save_workflow(client, settings, body, workflow_id=target)
+    except SuiteError as exc:
+        _audit(
+            request, principal, "ideapress.workflow_save", target=workflow_id or None,
+            outcome=outcome_of(exc), params=params, message=exc.message,
+        )  # fmt: skip
+        return _workflow(
+            request, principal, target, save_error=exc,
+            form={**fields, "kinds": kinds},
+        )  # fmt: skip
+    version = str(saved.get("version") or "")
+    _audit(
+        request, principal, "ideapress.workflow_save", target=workflow_id or None, outcome="ok",
+        params={**params, "version": version},
+    )  # fmt: skip
+    stored = str(saved.get("id") or workflow_id)
+    return RedirectResponse(
+        _href(f"{BASE}/workflows/{ip.segment(stored)}", saved=version),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 # --- Backends -------------------------------------------------------------------------------------

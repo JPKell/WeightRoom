@@ -19,7 +19,7 @@ same standard as the others, but no other application in the suite depends on it
 
 | Endpoint | Notes |
 |---|---|
-| `POST /projects` | `{title, content_type, workflow_id, brief, author_material}` → project |
+| `POST /projects` | `{title, content_type, workflow_id, brief, author_material}` → project. `workflow_id` is resolved against the `workflows` table and the **newest version of it is pinned**; an unknown id is `400 VALIDATION_ERROR` naming the ids that exist |
 | `GET /projects` | `?status`, `?content_type`, `?include_archived`, `?limit` (1–200); newest activity first. `?cursor` is the previous page's `page.next_cursor`; a cursor this endpoint did not issue is `400 VALIDATION_ERROR` naming `cursor`. `?offset` is still accepted |
 | `GET /projects/{id}` | The project, plus `plan` (`units`, `requirements`, `blocking` counts; `null` before a plan exists), `units` (§4's unit list), `stages` (the newest 50 stage runs, newest first, each with its state, counts, `error_code`/`error_text`, the `options` it ran with and its `stream_url`) and `running_task_id` (`null` when nothing runs) |
 | `PUT /projects/{id}` | Update brief, author material or configuration; recompiles requirements on demand, never silently |
@@ -46,7 +46,7 @@ WP5; until then every key was recorded and none applied):
 | Key | Stages | What it does |
 |---|---|---|
 | `model_hint` | `draft`, `revise`, `project_review` | The model every call of the run uses, over each stage's `[models.stages]` binding (a hint to a routing backend, ADR-0040) |
-| `max_revision_rounds` | `draft`, `revise` | The review loop's round limit for the run, within `workflow.max_revision_rounds`'s own bounds (0–100) |
+| `max_revision_rounds` | `draft`, `revise` | The review loop's round limit for the run, within `workflow.max_revision_rounds`'s own bounds (0–100). It wins over the bound workflow's own `revise` bound, which wins over the setting |
 | `instructions` | `revise` | The author's words for the reviser, at most 4 000 characters |
 
 A key the stage does not read, or a value outside those bounds, is `400 VALIDATION_ERROR` naming
@@ -80,7 +80,10 @@ Only one stage task runs per project at a time; a second returns 409 `STAGE_ALRE
 
 | Endpoint | Notes |
 |---|---|
-| `GET /workflows` · `GET /workflows/{id}` | Definitions, stage order, gates, defaults, versions |
+| `GET /workflows` | Every workflow's newest version, plus `vocabulary`: the kinds a workflow may contain, the four gate kinds it may never, each stage's shipped prompt and the records that may replace it |
+| `GET /workflows/{id}` | One definition — the newest version, or `?version=` — plus `versions` (every version stored, oldest first) and the same `vocabulary` |
+| `POST /workflows` | `{id, title, stages: [{kind, prompt_id, max_revision_rounds, model_hint}]}` → `201` at version `1.0`. An id that exists is `400`: saving is a `PUT` |
+| `PUT /workflows/{id}` | The same body → `200` at the **next minor version**. A definition is never edited in place, and a project pinned to an earlier version keeps it ([ADR-0143](../../adr/0143-a-workflow-is-a-stored-versioned-record-a-project-pins.md)) |
 | `GET /backends` | Configured backends with mode, reachability, capabilities, and an egress flag for remote ones |
 | `POST /backends/test` | Round-trip test against a backend; returns latency, model list and any version mismatch |
 

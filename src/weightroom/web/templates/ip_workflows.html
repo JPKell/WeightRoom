@@ -1,43 +1,60 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
-{% block title %}{{ workflow_id or "Workflows" }} — IdeaPress — WeightRoom{% endblock %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% from "_ip.html" import workflow_link %}
+{% block title %}Workflows — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>{% if workflow_id %}Workflow {{ workflow_id }}{% else %}Workflows{% endif %} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">{% if workflow_id %}<a href="/apps/ideapress/workflows">All workflows</a> · {% endif %}<a href="/apps/ideapress/projects">Projects</a> · <a href="/apps/ideapress/settings">Change a limit or a binding</a></div>
-</div>
+{% call app_page_header(view, "Workflows", "Workflows", "A workflow is the stages a project runs, stored and versioned in IdeaPress. It never carries the four gates Python decides, and a project keeps the version it was created on.") %}
+<a href="/apps/ideapress/workflows/new">New workflow</a> · <a href="/apps/ideapress/projects">Projects</a> · <a href="/apps/ideapress/settings">Change a limit or a binding</a>
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">A workflow is IdeaPress's stage table, in order: which stages use a model, which are gates
-Python decides, and the model bound to each. It lives in IdeaPress's running process, so this page
-reads only its API.</p>
 {{ refusal(sourced.error) }}
 {% set values = (defaults or {}).get("settings") or {} %}
 {% set definitions = (defaults or {}).get("definitions") or {} %}
 {% if sourced.data is not none %}
-{% for wf in sourced.data["workflows"] %}
-<section class="card">
-  <h3>{% if workflow_id %}{{ wf.get("id") }}{% else %}<a href="/apps/ideapress/workflows/{{ wf.get('id') | urlencode }}">{{ wf.get("id") }}</a>{% endif %}
-    <span class="muted">version {{ wf.get("version") or "—" }}</span></h3>
-  {% set rows = [] %}
-  {% for st in wf.get("stages") or [] %}
-  {% set binding = values.get("models.stages." ~ st.get("stage")) %}
-  {% set _ = rows.append([
-    st.get("ordinal") if st.get("ordinal") is not none else "—",
-    st.get("stage") or "—",
-    "a model" if st.get("uses_model") else "Python",
-    (badge(st.get("gate") if st.get("gate") is string else "gate", tone="warning") if st.get("gate") else "—"),
-    (binding if binding else "—") if st.get("uses_model") else "—"
-  ]) %}
-  {% endfor %}
-  {{ table([
-    {"label": "#", "mono": true}, {"label": "Stage", "mono": true}, {"label": "Done by"},
-    {"label": "Gate"}, {"label": "Bound model", "mono": true}
-  ], rows, caption="Stages, in the order they run", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-1", sortable=true) }}
-</section>
-{% else %}
-{{ empty_state("IdeaPress ships no workflow.") }}
+{% set workflows = sourced.data["workflows"] %}
+{% if workflows %}
+{% set rows = [] %}
+{% for wf in workflows %}
+{% set kinds = (wf.get("stages") or []) | map(attribute="kind") | list %}
+{% set _ = rows.append([
+  workflow_link(wf.get("id")),
+  wf.get("version") or "—",
+  wf.get("title") or "—",
+  kinds | length,
+  ", ".join(kinds) or "—"
+]) %}
 {% endfor %}
+{{ table([
+  {"label": "Workflow", "mono": true}, {"label": "Newest version", "mono": true},
+  {"label": "Title"}, {"label": "Stages"}, {"label": "Stages it runs", "mono": true}
+], rows, caption="Workflows, newest version of each", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-list", sortable=true) }}
+{% else %}
+{{ empty_state("IdeaPress holds no workflow.") }}
+{% endif %}
+
+{% set vocabulary = sourced.data.get("vocabulary") or {} %}
+<h3>The stage vocabulary</h3>
+<p class="muted">The kinds a workflow may contain, in the order they run. The gates below are never
+in a workflow: they always run, and a saved document naming one is refused.</p>
+{% set rows = [] %}
+{% for one in vocabulary.get("kinds") or [] %}
+{% set binding = values.get("models.stages." ~ one.get("kind")) %}
+{% set _ = rows.append([
+  one.get("ordinal") if one.get("ordinal") is not none else "—",
+  one.get("kind") or "—",
+  "a model" if one.get("uses_model") else "Python",
+  (badge(one.get("gate"), tone="warning") if one.get("gate") else "—"),
+  (binding if binding else "—") if one.get("uses_model") else "—",
+  (vocabulary.get("default_prompts") or {}).get(one.get("kind")) or "—"
+]) %}
+{% endfor %}
+{{ table([
+  {"label": "#", "mono": true}, {"label": "Kind", "mono": true}, {"label": "Done by"},
+  {"label": "Gate"}, {"label": "Bound model", "mono": true}, {"label": "Shipped prompt", "mono": true}
+], rows, caption="Stage kinds a workflow may contain", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-kinds", sortable=true) }}
+<p class="muted">Gates Python decides, never in a workflow:
+{% for gate in vocabulary.get("gate_kinds") or [] %}<code>{{ gate }}</code>{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}.</p>
 
 <h3>The limits a run uses</h3>
 {% if defaults %}
@@ -50,9 +67,10 @@ reads only its API.</p>
 {{ table([
   {"label": "Setting", "mono": true}, {"label": "Effective value", "mono": true}, {"label": "From"},
   {"label": "Applies"}
-], rows, caption="Workflow limits, as IdeaPress resolves them now", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-2", sortable=true) }}
-<p class="muted">A value stored on the Settings page applies as the next stage starts; a stage run can
-override <code>max_revision_rounds</code> and the model for that run alone.</p>
+], rows, caption="Workflow limits, as IdeaPress resolves them now", density="dense", complete=true, row_count=rows | length, table_id="ip-workflows-limits", sortable=true) }}
+<p class="muted">A value stored on the Settings page applies as the next stage starts. A workflow's
+own <code>max_revision_rounds</code> on its <code>revise</code> stage overrides it for projects on
+that workflow, and a stage run's own override wins over both.</p>
 {% else %}
 <p class="muted">IdeaPress's runtime settings could not be read.</p>
 {% endif %}

@@ -39,6 +39,22 @@ def _page(console: Console, path: str) -> str:
     return str(response.text)
 
 
+def _post_pairs(console: Console, path: str, pairs: list[tuple[str, str]]) -> Any:  # noqa: ANN401
+    """POST a form whose fields repeat — the workflow editor sends one ``kind`` per ticked stage.
+
+    ``Console.post_form`` takes a mapping, which collapses them; this is the same double-submit
+    token attached to a list of pairs instead, and nothing in ``tests/support.py`` changes.
+    """
+    from urllib.parse import urlencode
+
+    return console.client.post(
+        path,
+        content=urlencode([*pairs, ("csrf_token", console.csrf_token())]),
+        headers={**HTML, "Content-Type": "application/x-www-form-urlencoded"},
+        follow_redirects=False,
+    )
+
+
 def _rows(console: Console, action: str) -> list[AuditLog]:
     with console.database.read() as session:
         found = session.scalars(select(AuditLog).where(AuditLog.action == action)).all()
@@ -299,19 +315,164 @@ def test_delete_previews_first_then_deletes_only_the_typed_title_archiving_first
 # --- Workflows and backends -----------------------------------------------------------------------
 
 
-def test_workflows_show_stage_order_gates_bindings_and_limits(tmp_path: Path) -> None:
+def test_workflows_list_the_stored_definitions_the_vocabulary_and_the_limits(
+    tmp_path: Path,
+) -> None:
     console, _database = ideapress_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
         mock_loadcoach(router)
         mock_ideapress(router)
         listing = _page(console, f"{BASE}/workflows")
-        one = _page(console, f"{BASE}/workflows/standard")
     assert f'href="{BASE}/workflows/standard"' in listing
+    assert f'href="{BASE}/workflows/fast-draft"' in listing, "every stored workflow, not one"
     assert "research_synthesis" in listing
     assert "ollama/qwen3.5:9b-q8_0" in listing, "a stage's bound model from GET /settings"
+    assert "stages.draft.write" in listing, "the shipped prompt, from IdeaPress's own vocabulary"
     assert "workflow.max_revision_rounds" in listing
     assert "next_stage" in listing
-    assert "Workflow standard" in one
+    # ADR-0143 §2: the gates are named as what a workflow may never contain, not as rows in one.
+    assert "<code>validate</code>" in listing
+    assert 'data-table="ip-workflows-kinds"' in listing
+
+
+def test_the_editor_renders_one_row_per_kind_with_the_records_own_values(tmp_path: Path) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(
+            router, bodies={"workflows/fast-draft": ideapress_fixture("workflow-fast-draft")}
+        )
+        page = _page(console, f"{BASE}/workflows/fast-draft")
+    assert 'name="kind" value="draft" checked' in page
+    assert 'name="kind" value="critique" checked' not in page, "a kind it does not run is unticked"
+    assert 'value="ollama/gemma4:12b"' in page, "the stage's own model hint"
+    assert 'name="prompt_id.draft"' in page
+    assert '<option value="stages.draft.write"' in page, "the pack's records for that stage"
+    assert 'name="max_revision_rounds.revise"' in page
+    assert "The record, as IdeaPress stores it" in page, "the whole record in a collapsed details"
+    assert "Save as a new version" in page
+
+
+def test_the_new_workflow_page_offers_the_vocabulary_with_nothing_ticked(tmp_path: Path) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(router)
+        page = _page(console, f"{BASE}/workflows/new")
+    assert 'name="id"' in page
+    assert "checked" not in page
+    assert "Create workflow" in page
+    assert "project_review" in page
+
+
+def test_saving_a_workflow_sends_the_ticked_stages_and_audits_the_version(tmp_path: Path) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(router)
+        saved = router.put(f"{API}/workflows/fast-draft").mock(
+            return_value=httpx.Response(200, json=ideapress_fixture("workflow-saved"))
+        )
+        response = _post_pairs(
+            console,
+            f"{BASE}/workflows/fast-draft",
+            [
+                ("title", "Draft and stop"),
+                ("kind", "requirements"),
+                ("kind", "outline"),
+                ("kind", "draft"),
+                ("prompt_id.draft", "stages.draft.write"),
+                ("model_hint.draft", " ollama/gemma4:12b "),
+                ("model_hint.critique", "never sent"),
+                ("max_revision_rounds.revise", ""),
+            ],
+        )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{BASE}/workflows/fast-draft?saved=1.0"
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(
+            router, bodies={"workflows/fast-draft": ideapress_fixture("workflow-fast-draft")}
+        )
+        landed = _page(console, f"{BASE}/workflows/fast-draft?saved=1.0")
+    assert "Saved as version 1.0" in landed
+    assert json.loads(saved.calls.last.request.content) == {
+        "id": "fast-draft",
+        "title": "Draft and stop",
+        "stages": [
+            {"kind": "requirements"},
+            {"kind": "outline"},
+            {"kind": "draft", "prompt_id": "stages.draft.write", "model_hint": "ollama/gemma4:12b"},
+        ],
+    }, "an unticked stage's fields are never sent, and a blank value is no value"
+    (row,) = _rows(console, "ideapress.workflow_save")
+    assert (row.outcome, row.target) == ("ok", "fast-draft")
+    assert json.loads(json.dumps(row.params))["version"] == "1.0"
+
+
+def test_a_refused_workflow_renders_ideapresss_own_words_and_keeps_the_form(
+    tmp_path: Path,
+) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(
+            router, bodies={"workflows/fast-draft": ideapress_fixture("workflow-fast-draft")}
+        )
+        router.put(f"{API}/workflows/fast-draft").mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "stages: must include 'draft'.",
+                        "details": {"fields": [{"path": "stages", "problem": "no draft"}]},
+                        "request_id": "r",
+                        "timestamp": "2026-09-12T00:00:00Z",
+                    }
+                },
+            )
+        )
+        response = _post_pairs(
+            console,
+            f"{BASE}/workflows/fast-draft",
+            [("title", "Draft and stop"), ("kind", "requirements"), ("kind", "outline")],
+        )
+    assert response.status_code == 200
+    assert "must include" in response.text
+    assert "VALIDATION_ERROR" in response.text
+    assert 'name="kind" value="requirements" checked' in response.text, "what was ticked is kept"
+    assert 'name="kind" value="draft" checked' not in response.text
+    assert _rows(console, "ideapress.workflow_save")[-1].outcome == "refused"
+
+
+def test_a_round_that_is_not_a_number_is_refused_by_the_console_and_nothing_is_sent(
+    tmp_path: Path,
+) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(
+            router, bodies={"workflows/fast-draft": ideapress_fixture("workflow-fast-draft")}
+        )
+        sent = router.put(f"{API}/workflows/fast-draft").mock(
+            return_value=httpx.Response(200, json=ideapress_fixture("workflow-saved"))
+        )
+        response = _post_pairs(
+            console,
+            f"{BASE}/workflows/fast-draft",
+            [
+                ("title", "t"),
+                ("kind", "draft"),
+                ("kind", "critique"),
+                ("kind", "revise"),
+                ("max_revision_rounds.revise", "two"),
+            ],
+        )
+    assert response.status_code == 200
+    assert "whole number" in response.text
+    assert not sent.called, "nothing reached IdeaPress"
+    assert _rows(console, "ideapress.workflow_save")[-1].outcome == "refused"
 
 
 LOADCOACH_MODELS = Path(__file__).resolve().parents[1] / "fixtures" / "loadcoach" / "models.json"

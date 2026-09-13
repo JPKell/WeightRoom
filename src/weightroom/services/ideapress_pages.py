@@ -44,6 +44,7 @@ __all__ = [
     "segment",
     "settings_api",
     "workflow_api",
+    "workflow_form",
     "workflows_api",
     "RUN_STAGES",
     "TaskNotRecorded",
@@ -303,27 +304,71 @@ def project_db(handle: AppDatabase, project_id: str) -> dict[str, Any]:
 
 
 def workflows_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
-    """``GET /workflows``: every definition — stage order, gates, which stages use a model.
+    """``GET /workflows``: every workflow's newest version, and the editor's vocabulary.
+
+    Returns:
+        ``workflows`` — each stored definition at its newest version — and ``vocabulary``: the
+        stage kinds a workflow may contain, the four gate kinds it may never, each stage's shipped
+        prompt and the records that may replace it (ADR-0143). The console never derives any of
+        that: IdeaPress's stage list is IdeaPress's.
 
     Raises:
         AppRefused: IdeaPress refused.
         AppUnreachable: It did not answer.
     """
-    return {"workflows": _items(call(client, settings, APP, "GET", "workflows"), "workflows")}
+    body = _document(call(client, settings, APP, "GET", "workflows"))
+    vocabulary = body.get("vocabulary")
+    return {
+        "workflows": _items(body, "workflows"),
+        "vocabulary": dict(vocabulary) if isinstance(vocabulary, Mapping) else {},
+    }
 
 
-def workflow_api(client: httpx.Client, settings: Settings, workflow_id: str) -> dict[str, Any]:
-    """``GET /workflows/{id}``: one definition.
+def workflow_api(
+    client: httpx.Client, settings: Settings, workflow_id: str, *, version: str | None = None
+) -> dict[str, Any]:
+    """``GET /workflows/{id}``: one definition, its stored versions and the vocabulary.
+
+    Args:
+        client, settings: The shared client and this console's settings.
+        workflow_id: Which workflow.
+        version: A stored version, or ``None`` for the newest.
+
+    Returns:
+        ``workflow`` — the record — ``versions`` and ``vocabulary``.
 
     Raises:
-        AppRefused: An unknown workflow is IdeaPress's ``STAGE_PRECONDITION_FAILED``.
+        AppRefused: An unknown workflow, or an unknown version of one, is IdeaPress's
+            ``STAGE_PRECONDITION_FAILED``.
         AppUnreachable: It did not answer.
     """
+    path = f"workflows/{segment(workflow_id)}"
+    body = _document(
+        call(client, settings, APP, "GET", path, params={"version": version} if version else None)
+    )
+    vocabulary = body.get("vocabulary")
     return {
-        "workflow": _document(
-            call(client, settings, APP, "GET", f"workflows/{segment(workflow_id)}")
-        )
+        "workflow": {key: value for key, value in body.items() if key != "vocabulary"},
+        "versions": [str(one) for one in body.get("versions") or []],
+        "vocabulary": dict(vocabulary) if isinstance(vocabulary, Mapping) else {},
     }
+
+
+def workflow_form(definition: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """One definition's stages keyed by kind, so the editor can look a row up by name.
+
+    Args:
+        definition: ``workflow_api``'s ``workflow``, or ``None`` for a workflow being created.
+
+    Returns:
+        ``kind -> the stage's own fields``. A kind the definition does not contain is simply
+        absent, which is what the editor's checkbox reads as *off*.
+    """
+    rows: dict[str, dict[str, Any]] = {}
+    for stage in (definition or {}).get("stages") or []:
+        if isinstance(stage, Mapping) and stage.get("kind"):
+            rows[str(stage["kind"])] = dict(stage)
+    return rows
 
 
 def backends_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:

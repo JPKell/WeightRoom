@@ -18,6 +18,8 @@ from weightroom.services.app_api import text as fetch_text
 from weightroom.services.ideapress_pages import APP, segment
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     import httpx
 
     from weightroom.config import Settings
@@ -38,6 +40,8 @@ __all__ = [
     "start_stage",
     "test_backend",
     "update_project",
+    "save_workflow",
+    "workflow_body",
     "write_export",
 ]
 
@@ -351,3 +355,68 @@ def read_export(
         client, settings, APP, f"projects/{segment(project_id)}/export",
         params={"format": fmt}, timeout_seconds=ACTION_TIMEOUT_SECONDS,
     )  # fmt: skip
+
+
+WORKFLOW_FIELDS: Final[tuple[str, ...]] = ("prompt_id", "max_revision_rounds", "model_hint")
+"""What the editor may set on a stage beside its kind (ADR-0143 §5). Read from the form as
+``prompt_id.<kind>`` and so on, because one HTML form carries every stage's fields at once."""
+
+
+def workflow_body(
+    *, workflow_id: str, title: str, kinds: Sequence[str], fields: Mapping[str, str]
+) -> dict[str, Any]:
+    """The editor's form as IdeaPress's ``POST``/``PUT /workflows`` body.
+
+    Args:
+        workflow_id: The id typed (a new workflow) or the one the page is editing.
+        title: The one-line title.
+        kinds: The stage kinds ticked, in the order the form listed them — which is IdeaPress's
+            own ordinal order, since the form is generated from its ``vocabulary``.
+        fields: Every other input, keyed ``"<field>.<kind>"``. A blank value is no value.
+
+    Returns:
+        The body. The console checks only what HTML cannot express — a round that is not a whole
+        number — and leaves every workflow rule to IdeaPress, which refuses with the field's own
+        path (ADR-0143 §3) and whose refusal this page renders verbatim.
+
+    Raises:
+        IdeaPressFormInvalid: A revision bound that is not a whole number; nothing was sent.
+    """
+    stages: list[dict[str, Any]] = []
+    for kind in kinds:
+        stage: dict[str, Any] = {"kind": kind}
+        for field in WORKFLOW_FIELDS:
+            raw = (fields.get(f"{field}.{kind}") or "").strip()
+            if not raw:
+                continue
+            if field == "max_revision_rounds":
+                stage[field] = _whole("A revision bound", f"{field}.{kind}", raw)
+            else:
+                stage[field] = raw
+        stages.append(stage)
+    return {"id": workflow_id.strip(), "title": title.strip(), "stages": stages}
+
+
+def save_workflow(
+    client: httpx.Client, settings: Settings, body: dict[str, Any], *, workflow_id: str | None
+) -> dict[str, Any]:
+    """Store a workflow: a new one, or the next version of ``workflow_id``.
+
+    Args:
+        client, settings: The shared client and this console's settings.
+        body: :func:`workflow_body`'s document.
+        workflow_id: The workflow being saved, or ``None`` to create the one ``body`` names.
+
+    Returns:
+        The stored definition, carrying the version IdeaPress gave it.
+
+    Raises:
+        AppRefused: IdeaPress refused the document, naming the field in its details, or refused to
+            create an id that already exists. Nothing was stored.
+        AppUnreachable: It did not answer.
+    """
+    if workflow_id is None:
+        answer = call(client, settings, APP, "POST", "workflows", body=body)
+    else:
+        answer = call(client, settings, APP, "PUT", f"workflows/{segment(workflow_id)}", body=body)
+    return dict(answer) if isinstance(answer, dict) else {}

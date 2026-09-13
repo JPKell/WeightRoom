@@ -37,7 +37,8 @@
 {{ kv_list([
   {"label": "Status", "value": p.get("status") or "—"},
   {"label": "Content type", "value": (p.get("content_type") or "—") ~ " " ~ (p.get("content_type_version") or "")},
-  {"label": "Workflow", "value": (p.get("workflow_id") or "—") ~ " " ~ (p.get("workflow_version") or "")},
+  {"label": "Workflow", "value": (p.get("workflow_id") or "—") ~ " " ~ (p.get("workflow_version") or ""),
+   "href": ("/apps/ideapress/workflows/" ~ (p.get("workflow_id") | urlencode) ~ "?version=" ~ (p.get("workflow_version") | urlencode)) if p.get("workflow_id") else none},
   {"label": "Slug", "value": p.get("slug") or "—"},
   {"label": "Id", "value": p.get("id") or project_id},
   {"label": "Created", "value": p.get("created_at") or "—"},

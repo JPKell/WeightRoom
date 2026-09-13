@@ -42,3 +42,12 @@
 <span class="muted" title="not reported; not the same as zero">—</span>
 {%- else -%}{{ value }}{% if unit %} {{ unit }}{% endif %}{%- endif -%}
 {%- endmacro %}
+
+{% macro workflow_link(workflow_id, version=None) -%}
+{#- Row WX12: a workflow's name as a link into its editor, optionally pinned to a version. A macro
+    rather than a `| safe` string because a macro escapes its own interpolations — building the
+    anchor by concatenation escapes the tags instead of the name when any part is already Markup. -#}
+{%- if workflow_id -%}
+<a href="/apps/ideapress/workflows/{{ workflow_id | urlencode }}{% if version %}?version={{ version | urlencode }}{% endif %}">{{ workflow_id }}</a>
+{%- else -%}—{%- endif -%}
+{%- endmacro %}

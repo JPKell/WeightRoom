@@ -1,105 +1,233 @@
 {
+  "vocabulary": {
+    "default_prompts": {
+      "audit_deep": "stages.audit_deep.review",
+      "audit_fast": "stages.audit_fast.review",
+      "critique": "stages.critique.judge",
+      "draft": "stages.draft.write",
+      "fact_check": "stages.fact_check.verify",
+      "outline": "stages.outline.plan",
+      "project_review": "stages.project_review.consistency",
+      "repair": "stages.repair.fix",
+      "requirements": "stages.requirements.compile",
+      "revise": "stages.revise.improve"
+    },
+    "gate_kinds": [
+      "commit",
+      "coverage",
+      "export",
+      "validate"
+    ],
+    "kinds": [
+      {
+        "gate": "Every requirement has an ID and a checkable statement",
+        "kind": "requirements",
+        "ordinal": 1,
+        "uses_model": true
+      },
+      {
+        "gate": "Every note cites an available source",
+        "kind": "research",
+        "ordinal": 2,
+        "uses_model": false
+      },
+      {
+        "gate": "Structure valid; no uncited claim",
+        "kind": "research_synthesis",
+        "ordinal": 3,
+        "uses_model": true
+      },
+      {
+        "gate": "Every blocking requirement assigned to >= 1 unit",
+        "kind": "outline",
+        "ordinal": 4,
+        "uses_model": true
+      },
+      {
+        "gate": "Non-empty; length band; structure",
+        "kind": "draft",
+        "ordinal": 5,
+        "uses_model": true
+      },
+      {
+        "gate": "Re-validated",
+        "kind": "repair",
+        "ordinal": 7,
+        "uses_model": true
+      },
+      {
+        "gate": "Runs to completion",
+        "kind": "audit_fast",
+        "ordinal": 8,
+        "uses_model": true
+      },
+      {
+        "gate": "Runs to completion",
+        "kind": "audit_deep",
+        "ordinal": 9,
+        "uses_model": true
+      },
+      {
+        "gate": "Every unsupported claim becomes a finding",
+        "kind": "fact_check",
+        "ordinal": 10,
+        "uses_model": true
+      },
+      {
+        "gate": "Runs to completion",
+        "kind": "critique",
+        "ordinal": 11,
+        "uses_model": true
+      },
+      {
+        "gate": "Re-validated and re-audited",
+        "kind": "revise",
+        "ordinal": 12,
+        "uses_model": true
+      },
+      {
+        "gate": "Runs to completion",
+        "kind": "project_review",
+        "ordinal": 15,
+        "uses_model": true
+      }
+    ],
+    "prompt_choices": {
+      "audit_deep": [
+        "stages.audit_deep.review"
+      ],
+      "audit_fast": [
+        "stages.audit_fast.review"
+      ],
+      "critique": [
+        "stages.critique.judge"
+      ],
+      "draft": [
+        "stages.draft.write"
+      ],
+      "fact_check": [
+        "stages.fact_check.verify"
+      ],
+      "outline": [
+        "stages.outline.plan"
+      ],
+      "project_review": [
+        "stages.project_review.consistency"
+      ],
+      "repair": [
+        "stages.repair.fix"
+      ],
+      "requirements": [
+        "stages.requirements.compile"
+      ],
+      "revise": [
+        "stages.revise.improve"
+      ]
+    }
+  },
   "workflows": [
+    {
+      "id": "fast-draft",
+      "stages": [
+        {
+          "kind": "requirements",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
+        },
+        {
+          "kind": "outline",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
+        },
+        {
+          "kind": "draft",
+          "max_revision_rounds": null,
+          "model_hint": "ollama/gemma4:12b",
+          "prompt_id": null
+        }
+      ],
+      "title": "Draft and stop",
+      "version": "1.0"
+    },
     {
       "id": "standard",
       "stages": [
         {
-          "gate": "Every requirement has an ID and a checkable statement",
-          "ordinal": 1,
-          "stage": "requirements",
-          "uses_model": true
+          "kind": "requirements",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Every note cites an available source",
-          "ordinal": 2,
-          "stage": "research",
-          "uses_model": false
+          "kind": "research",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Structure valid; no uncited claim",
-          "ordinal": 3,
-          "stage": "research_synthesis",
-          "uses_model": true
+          "kind": "research_synthesis",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Every blocking requirement assigned to >= 1 unit",
-          "ordinal": 4,
-          "stage": "outline",
-          "uses_model": true
+          "kind": "outline",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Non-empty; length band; structure",
-          "ordinal": 5,
-          "stage": "draft",
-          "uses_model": true
+          "kind": "draft",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Deterministic checks pass",
-          "ordinal": 6,
-          "stage": "validate",
-          "uses_model": false
+          "kind": "repair",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Re-validated",
-          "ordinal": 7,
-          "stage": "repair",
-          "uses_model": true
+          "kind": "audit_fast",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Runs to completion",
-          "ordinal": 8,
-          "stage": "audit_fast",
-          "uses_model": true
+          "kind": "audit_deep",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Runs to completion",
-          "ordinal": 9,
-          "stage": "audit_deep",
-          "uses_model": true
+          "kind": "fact_check",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Every unsupported claim becomes a finding",
-          "ordinal": 10,
-          "stage": "fact_check",
-          "uses_model": true
+          "kind": "critique",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Runs to completion",
-          "ordinal": 11,
-          "stage": "critique",
-          "uses_model": true
+          "kind": "revise",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         },
         {
-          "gate": "Re-validated and re-audited",
-          "ordinal": 12,
-          "stage": "revise",
-          "uses_model": true
-        },
-        {
-          "gate": "Every blocking requirement satisfied",
-          "ordinal": 13,
-          "stage": "coverage",
-          "uses_model": false
-        },
-        {
-          "gate": "Atomic write",
-          "ordinal": 14,
-          "stage": "commit",
-          "uses_model": false
-        },
-        {
-          "gate": "Runs to completion",
-          "ordinal": 15,
-          "stage": "project_review",
-          "uses_model": true
-        },
-        {
-          "gate": "Deterministic render",
-          "ordinal": 16,
-          "stage": "export",
-          "uses_model": false
+          "kind": "project_review",
+          "max_revision_rounds": null,
+          "model_hint": null,
+          "prompt_id": null
         }
       ],
+      "title": "The standard pipeline",
       "version": "1.0"
     }
   ]

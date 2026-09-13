@@ -1,20 +1,8 @@
 {
-  "id": "standard",
+  "id": "fast-draft",
   "stages": [
     {
       "kind": "requirements",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "research",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "research_synthesis",
       "max_revision_rounds": null,
       "model_hint": null,
       "prompt_id": null
@@ -28,53 +16,11 @@
     {
       "kind": "draft",
       "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "repair",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "audit_fast",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "audit_deep",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "fact_check",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "critique",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "revise",
-      "max_revision_rounds": null,
-      "model_hint": null,
-      "prompt_id": null
-    },
-    {
-      "kind": "project_review",
-      "max_revision_rounds": null,
-      "model_hint": null,
+      "model_hint": "ollama/gemma4:12b",
       "prompt_id": null
     }
   ],
-  "title": "The standard pipeline",
+  "title": "Draft and stop",
   "version": "1.0",
   "versions": [
     "1.0"
