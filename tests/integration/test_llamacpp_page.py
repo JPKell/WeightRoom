@@ -283,3 +283,13 @@ def test_the_page_is_reachable_from_the_console_menu_and_needs_a_session(tmp_pat
     console.login()
     page = console.client.get("/", headers={"Accept": "text/html"}).text
     assert '<a href="/llamacpp">llama.cpp</a>' in page
+
+
+def test_served_context_reads_a_live_props_body() -> None:
+    """A running server's ``/props`` is read at runtime — ``Mapping`` must exist there, not only
+    under ``TYPE_CHECKING`` (WX14 found the page 500 the first time a llama-server was up)."""
+    from weightroom.services.llamacpp import _served_context
+
+    assert _served_context({"default_generation_settings": {"n_ctx": 8192}}) == 8192
+    assert _served_context({"default_generation_settings": "no"}) is None
+    assert _served_context({}) is None

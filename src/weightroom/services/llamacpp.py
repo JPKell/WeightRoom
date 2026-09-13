@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 import shutil
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from pathlib import Path
@@ -43,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Final
 from weightroom.services.processes import child_environment, run_command
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Sequence
 
     from weightroom.config import Settings
     from weightroom.services.doctor import Finding
