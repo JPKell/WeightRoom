@@ -24,14 +24,19 @@ from mirrorwall import Event, format_frame
 from tests.integration.test_db_guard import _rig
 from tests.security.test_chat_isolation import _loadcoach_stream
 from tests.support import (
+    FREEWEIGHT_URL,
     JSON_HEADERS,
+    LOADCOACH_URL,
+    PROMPTCADENCE_URL,
     Console,
     api_routes,
     build_console,
     fake_application,
     fill_rows,
     fixture_database,
+    mock_freeweight,
     mock_loadcoach,
+    mock_promptcadence,
 )
 from weightroom.config import APPLICATIONS, load_settings
 from weightroom.infrastructure.db.models import TelemetrySample
@@ -118,6 +123,59 @@ def test_shell_render_on_a_warm_process(console: Console) -> None:
     median = _median_ms(work)
     _report("shell render", median, 50)
     assert median <= 50
+
+
+@pytest.fixture
+def three_app_console(tmp_path: Path) -> Console:
+    """LoadCoach, PromptCadence and FreeWeight all installed and active — row WY3's `/` cards."""
+    lines = []
+    for app in ("loadcoach", "promptcadence", "freeweight"):
+        executable, _config, _document = fake_application(tmp_path, app)
+        lines.append(f'[apps.{app}]\nexecutable = "{executable}"\n')
+    console = build_console(
+        tmp_path / "console",
+        extra_toml="".join(lines),
+        systemd=FakeSystemdController(
+            states={
+                "loadcoach.service": "active",
+                "promptcadence.service": "active",
+                "freeweight.service": "active",
+            }
+        ),
+    )
+    console.login()
+    return console
+
+
+def test_the_overview_cards_read_three_applications_concurrently_not_in_series(
+    three_app_console: Console, respx_mock: Any
+) -> None:
+    """Row WY3: a sequential read of three status calls would take three times as long as one —
+    the WPF6 lesson is that the fake must cost what the real call does, so each of the three sleeps
+    a deliberately unrealistic 300 ms; the assertion is that the render stays far below 3 × that,
+    which only a concurrent read can manage."""
+    delay_seconds = 0.3
+
+    def _slow(request: httpx.Request) -> httpx.Response:
+        time.sleep(delay_seconds)
+        return httpx.Response(
+            200, json={"active": 0, "oldest_queued_age_seconds": None, "starving": 0}
+        )
+
+    mock_loadcoach(respx_mock)
+    mock_promptcadence(respx_mock)
+    mock_freeweight(respx_mock)
+    for base_url in (LOADCOACH_URL, PROMPTCADENCE_URL, FREEWEIGHT_URL):
+        respx_mock.get(f"{base_url}/api/v1/system/status").mock(side_effect=_slow)
+
+    def work() -> None:
+        page = three_app_console.client.get("/", headers={"Accept": "text/html"})
+        assert page.status_code == 200
+
+    median = _median_ms(work, measured=5)
+    budget_ms = delay_seconds * 1000 * 2  # well under 3x serial, comfortably above 1x concurrent
+    _report("shell overview cards (three apps, concurrent)", median, budget_ms)
+    assert median < budget_ms
 
 
 # --- Application Overview page, application running: ≤ 300 ms -----------------------------------

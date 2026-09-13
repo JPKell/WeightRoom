@@ -6,12 +6,34 @@ claims the brief's artboard makes, not the pixels MirrorWall's own snapshot test
 
 from __future__ import annotations
 
+import json
 import re
+import time
 from pathlib import Path
+from typing import Any
 
-from tests.support import Console, build_console
+import httpx
+
+from tests.support import (
+    FREEWEIGHT_URL,
+    LOADCOACH_URL,
+    PROMPTCADENCE_URL,
+    Console,
+    build_console,
+    mock_freeweight,
+    mock_loadcoach,
+    mock_promptcadence,
+)
 from weightroom.__about__ import __version__
 from weightroom.services.processes import FakeSystemdController
+
+STATUS_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "status"
+
+
+def _status_body(app: str) -> dict[str, Any]:
+    body: dict[str, Any] = json.loads((STATUS_FIXTURES / f"{app}.json").read_text(encoding="utf-8"))
+    return body
+
 
 SHELL_CSS = (
     Path(__file__).resolve().parents[2] / "src/weightroom/web/static/css/weightroom-shell.css"
@@ -251,3 +273,100 @@ def test_only_the_page_header_is_sticky(tmp_path: Path) -> None:
     css = SHELL_CSS.read_text(encoding="utf-8")
     assert "body > header { position: sticky" in css
     assert not re.search(r"(?m)^\s*header \{ position: sticky", css)
+
+
+def test_the_overview_shows_loadcoach_promptcadence_and_freeweights_live_figures(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    """Row WY3: the same figures ``_STATUS_FIGURES`` names for the per-application Overview,
+    reused on ``/`` — one card row per application, linking to its tab, no database read."""
+    mock_loadcoach(respx_mock)
+    mock_promptcadence(respx_mock)
+    mock_freeweight(respx_mock)
+    for app, base_url in (
+        ("loadcoach", LOADCOACH_URL),
+        ("promptcadence", PROMPTCADENCE_URL),
+        ("freeweight", FREEWEIGHT_URL),
+    ):
+        respx_mock.get(f"{base_url}/api/v1/system/status").mock(
+            return_value=httpx.Response(200, json=_status_body(app))
+        )
+    console = _console(
+        tmp_path,
+        systemd=FakeSystemdController(
+            states={
+                "loadcoach.service": "active",
+                "promptcadence.service": "active",
+                "freeweight.service": "active",
+            }
+        ),
+    )
+    console.login()
+    page = console.client.get("/", headers={"Accept": "text/html"}).text
+    for label, value in (
+        ("Active", "0"),
+        ("Starving", "0"),
+        ("Executing", "0"),
+        ("Pending approvals", "0"),
+        ("Queue depth", "0"),
+        ("Disk headroom", "482.0 GiB"),
+    ):
+        assert f">{label}<" in page and f">{value}<" in page, label
+    assert '<a href="/apps/loadcoach">LoadCoach</a>' in page
+    assert '<a href="/apps/promptcadence">PromptCadence</a>' in page
+    assert '<a href="/apps/freeweight">FreeWeight</a>' in page
+    # IdeaPress is out of scope for this row's cards (roadmap §3).
+    assert "Active stage runs" not in page
+
+
+def test_a_stopped_applications_card_dashes_every_figure_with_a_reason(tmp_path: Path) -> None:
+    """ADR-0016: unsupported is not zero — a stopped application's card is ``—``, not ``0``, with
+    the reason available on hover rather than silently guessed at."""
+    executable = tmp_path / "loadcoach"
+    executable.write_text("#!/bin/sh\nexit 0\n")
+    executable.chmod(0o755)
+    console = _console(
+        tmp_path,
+        systemd=FakeSystemdController(states={"loadcoach.service": "inactive"}),
+        extra_toml=f'[apps.loadcoach]\nexecutable = "{executable}"\n',
+    )
+    console.login()
+    page = console.client.get("/", headers={"Accept": "text/html"}).text
+    cards = page[page.index("<h2>Overview</h2>") : page.index("<h3>Applications</h3>")]
+    group = cards[cards.index(">LoadCoach<") : cards.index(">PromptCadence<")]
+    assert 'title="stopped."' in group
+    assert group.count(">—<") == 3
+
+
+def test_the_console_overview_cards_render_in_under_the_shell_budget(
+    tmp_path: Path, respx_mock: Any
+) -> None:
+    """The three status reads run concurrently: a sequential read of three 100 ms calls would
+    take ~300 ms; concurrent, the whole page renders in well under that."""
+    delay_seconds = 0.1
+
+    def _slow(request: httpx.Request) -> httpx.Response:
+        time.sleep(delay_seconds)
+        return httpx.Response(200, json=_status_body("loadcoach"))
+
+    for base_url in (LOADCOACH_URL, PROMPTCADENCE_URL, FREEWEIGHT_URL):
+        respx_mock.get(f"{base_url}/api/v1/system/status").mock(side_effect=_slow)
+    mock_loadcoach(respx_mock)
+    mock_promptcadence(respx_mock)
+    mock_freeweight(respx_mock)
+    console = _console(
+        tmp_path,
+        systemd=FakeSystemdController(
+            states={
+                "loadcoach.service": "active",
+                "promptcadence.service": "active",
+                "freeweight.service": "active",
+            }
+        ),
+    )
+    console.login()
+    started = time.perf_counter()
+    response = console.client.get("/", headers={"Accept": "text/html"})
+    elapsed = time.perf_counter() - started
+    assert response.status_code == 200
+    assert elapsed < delay_seconds * 2, f"took {elapsed:.2f}s — the three reads were not concurrent"
