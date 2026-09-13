@@ -7,10 +7,6 @@
   {{ badge(("safe: " ~ report.passing ~ "/" ~ report.total) if report.safe else (report.passing ~ "/" ~ report.total ~ " memory-safety checks"),
            tone="success" if report.safe else "danger") }}
 </h2>
-<p class="muted">Ollama is a <strong>system</strong> unit its own installer wrote. WeightRoom
-reads it — <code>systemctl show {{ report.unit }}</code>, <code>/api/ps</code> through ModelRack,
-and the journal where the operator's groups permit it — and restarts it only through a polkit
-rule a root user installed (ADR-0125 rules 4–5). <a href="/api/v1/ollama">JSON</a></p>
 
 <h3>Memory safety — <code>MEMORY_SAFETY.md</code> §2.1</h3>
 {% if report.state == "unsupported" %}
@@ -18,7 +14,6 @@ rule a root user installed (ADR-0125 rules 4–5). <a href="/api/v1/ollama">JSON
 works (ADR-0125 rule 7).</p>
 {% endif %}
 <table id="memory-safety">
-  <caption>Each line of the checklist, with what this unit actually says.</caption>
   <thead><tr><th scope="col"></th><th scope="col">Setting</th><th scope="col">Found</th>
              <th scope="col">Expected</th><th scope="col">Protects against</th></tr></thead>
   <tbody>
@@ -74,6 +69,7 @@ honest probe (row W2).{% endif %}</p>
   <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
   <button type="submit" {% if report.state == "unsupported" %}disabled{% endif %}>Restart Ollama</button>
 </form>
+<br />
 <details>
   <summary>The polkit rule, if it is refused</summary>
   <p>A <strong>unit and a verb</strong> are granted, not a command — a sudoers line would grant

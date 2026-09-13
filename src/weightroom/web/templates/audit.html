@@ -3,8 +3,6 @@
 {% block title %}Audit — WeightRoom{% endblock %}
 {% block page_content %}
 <h2>Audit trail</h2>
-<p class="muted">Every action the console took: who, when, what, the outcome. Secrets are redacted
-before a row is written. <a href="/api/v1/audit">JSON</a></p>
 <form method="get" action="/audit" class="filter-bar">
   <label class="field">Application
     <select name="app">

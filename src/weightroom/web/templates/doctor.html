@@ -6,10 +6,7 @@
 <h2>Doctor
   {{ badge(report.worst, tone=tones.get(report.worst, "neutral")) }}
 </h2>
-<p class="muted">Every rule comes from one of the suite's own documents, shows what it actually
-read, and — where there is a fix — <strong>prints the command rather than running it</strong>.
-This console is never root and never elevates (ADR-0125 rules 4–5).
-<a href="/api/v1/doctor">JSON</a> · <code>wr-gym doctor</code></p>
+<p class="muted"><code>wr-gym doctor</code></p>
 
 <ul class="card-grid">
   {% for severity in ("failure", "warning", "notice", "unknown", "ok") %}
@@ -24,7 +21,6 @@ This console is never root and never elevates (ADR-0125 rules 4–5).
 
 {% if report.findings %}
 <table id="doctor-findings" data-density="dense">
-  <caption>One line per rule, worst first.</caption>
   <thead><tr>
     <th scope="col"></th><th scope="col">Rule</th><th scope="col">What it found</th>
     <th scope="col">Evidence</th><th scope="col">Document</th>

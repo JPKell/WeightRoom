@@ -2,8 +2,6 @@
 {% block title %}Logs — WeightRoom{% endblock %}
 {% block page_content %}
 <h2>Logs</h2>
-<p class="muted">One pane over every unit's journal at once — the four applications and
-WeightRoom itself. Each line names the application it came from.</p>
 <p>Per application: {% for app in applications %}<a href="/apps/{{ app }}">{{ app }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% with stream_url = "/api/v1/logs/stream", max_lines = 1000 %}
   {% include "_log_pane.html" %}
