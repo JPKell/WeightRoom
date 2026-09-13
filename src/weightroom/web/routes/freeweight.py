@@ -15,10 +15,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Final
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from baseaicore import SuiteError
-from fastapi import APIRouter, Form, Request, status
+from fastapi import APIRouter, Form, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 
 from weightroom.services import freeweight_actions as actions
@@ -99,6 +99,27 @@ def _href(path: str, **query: Any) -> str:
 # --- Models ---------------------------------------------------------------------------------------
 
 
+_PARAMETERS_PER_BILLION: Final = 1_000_000_000
+"""`params_b` shows `7.6B`, so the filter is typed in billions and sent in parameters."""
+
+
+def _parameters(value: str | None, *, field: str) -> str | None:
+    """``value`` billions of parameters as a whole number of parameters, or ``None`` when blank.
+
+    Raises:
+        ModelRefInvalid: It is not a number. Nothing is sent: a filter the console cannot read is
+            not a filter FreeWeight should be asked to interpret.
+    """
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        return str(int(float(text) * _PARAMETERS_PER_BILLION))
+    except ValueError as exc:
+        message = f"{text!r} is not a number of billions of parameters, such as 7.6."
+        raise ModelRefInvalid(message, details={"field": field, "value": text}) from exc
+
+
 def _models(
     request: Request,
     principal: Principal,
@@ -109,13 +130,41 @@ def _models(
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
-    has_results, sort = filters.get("has_results") or None, filters.get("sort") or None
+    sort = filters.get("sort") or None
+    shown = {key: filters.get(key) or "" for key in (*fw.MODEL_FILTERS, "sort")}
+    wanted: dict[str, str | None] = dict.fromkeys(fw.MODEL_FILTERS)
+    try:
+        for key in fw.MODEL_FILTERS:
+            wanted[key] = (
+                _parameters(filters.get(key), field=key)
+                if key in {"min_parameters", "max_parameters"}
+                else (filters.get(key) or None)
+            )
+    except SuiteError as exc:
+        action_error = action_error or exc
+        wanted = dict.fromkeys(fw.MODEL_FILTERS)
     sourced = read_app_page(
         request,
         view,
-        api=lambda: fw.models_api(client, settings, has_results=has_results, sort=sort),
+        api=lambda: fw.models_api(client, settings, sort=sort, filters=wanted),
         database=lambda handle: fw.models_db(handle, sort=sort),
     )
+    # The three selects offer what FreeWeight *has*, which a filtered list no longer shows — pick
+    # `family` and the families of every other provider vanish from the select that would undo it.
+    # So a filtered page reads the list once more, unfiltered, for the vocabulary alone; an
+    # unfiltered one already holds it.
+    narrowed = any(value for key, value in wanted.items() if key != "has_results")
+    vocabulary = sourced.data or []
+    if narrowed and sourced.live:
+        vocabulary = (
+            read_app_page(
+                request,
+                view,
+                api=lambda: fw.models_api(client, settings, sort=sort, filters=None),
+                database=None,
+            ).data
+            or []
+        )
     return render_app_page(
         request,
         principal,
@@ -124,21 +173,39 @@ def _models(
         selected="Models",
         view=view,
         sourced=sourced,
-        filters={"has_results": has_results or "", "sort": sort or ""},
+        filters=shown,
+        facets=fw.model_facets(vocabulary),
         action_error=action_error,
         scanned=scanned,
     )
 
 
 @ui_router.get(f"{BASE}/models", summary="Models", response_class=HTMLResponse)
-def models_page(
+def models_page(  # noqa: PLR0913 — one parameter per filter FreeWeight's models listing takes
     request: Request,
     principal: CurrentOperator,
     has_results: str | None = None,
+    provider_kind: str | None = None,
+    family: str | None = None,
+    quantization: str | None = None,
+    min_parameters: str | None = None,
+    max_parameters: str | None = None,
     sort: str | None = None,
 ) -> HTMLResponse:
     """Every model identity with its latest descriptor, whether it has results, and its switch."""
-    return _models(request, principal, filters={"has_results": has_results, "sort": sort})
+    return _models(
+        request,
+        principal,
+        filters={
+            "has_results": has_results,
+            "provider_kind": provider_kind,
+            "family": family,
+            "quantization": quantization,
+            "min_parameters": min_parameters,
+            "max_parameters": max_parameters,
+            "sort": sort,
+        },  # fmt: skip
+    )
 
 
 @ui_router.post(f"{BASE}/models/discover", summary="Scan for models from the page")
@@ -285,6 +352,7 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
     benchmarks: list[dict[str, Any]] = []
     models: list[dict[str, Any]] = []
     adapters: list[dict[str, Any]] = []
+    machines: list[dict[str, Any]] = []
     if runs.live:
         benchmarks = (
             read_app_page(
@@ -296,7 +364,7 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
             read_app_page(
                 request,
                 view,
-                api=lambda: fw.models_api(client, settings, has_results=None, sort="canonical_id"),
+                api=lambda: fw.models_api(client, settings, sort="canonical_id"),
                 database=None,
             ).data
             or []
@@ -305,6 +373,14 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
             read_app_page(
                 request, view, api=lambda: fw.adapters_api(client, settings), database=None
             ).data
+        )
+        # The filter bar's Machine select (row WX7). A fingerprint is not a name anyone types,
+        # and the Runs page was asking for one in a text box.
+        machines = (
+            read_app_page(
+                request, view, api=lambda: fw.machines_api(client, settings), database=None
+            ).data
+            or []
         )
     return render_app_page(
         request,
@@ -319,6 +395,17 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
         next_href=next_href,
         benchmarks=benchmarks,
         models=[one for one in models if one.get("enabled")],
+        # The Start form offers what may be measured (ADR-0118); the filter bar offers every
+        # model, because a run of a since-disabled model is still a run somebody wants to find.
+        model_options=models,
+        machines=machines,
+        # A run names its machine by fingerprint, which is not a name anyone recognises; this is
+        # how the table shows the operator's own label without a second read per row (row WX7).
+        machine_names={
+            str(one.get("machine_fingerprint")): one.get("display_name")
+            for one in machines
+            if one.get("machine_fingerprint")
+        },
         adapters=adapters,
         start_error=start_error,
         form=dict(form or {}),
@@ -719,17 +806,28 @@ def results_page(  # noqa: PLR0913 — one parameter per filter FreeWeight's met
 
 
 @ui_router.get(f"{BASE}/results/compare", summary="Compare", response_class=HTMLResponse)
-def compare_page(
+def compare_page(  # noqa: PLR0913 — the two subject forms, the guard, and what to chart
     request: Request,
     principal: CurrentOperator,
     subjects: str | None = None,
+    subject: Annotated[list[str] | None, Query()] = None,
+    metric: Annotated[list[str] | None, Query()] = None,
     suite: str | None = None,
 ) -> HTMLResponse:
     """``GET /results/compare``: every comparability verdict, the reason for each separation, and a
-    refused comparison's reason in FreeWeight's words rather than an empty table."""
+    refused comparison's reason in FreeWeight's words rather than an empty table.
+
+    Two ways in, joined into the one list FreeWeight takes: ``subjects``, the free-text box that
+    accepts run IDs and prefixes, and repeated ``subject`` parameters, which is what the model
+    picker's checkboxes post. ``metric`` names which of the comparison's rows to draw as a bar
+    chart, and is read after the answer comes back — the metrics are not known until then.
+    """
     view = app_view(request, APP)
     client, settings = _clients(request)
-    wanted, guard = (subjects or "").strip(), (suite or "").strip() or None
+    typed = [one.strip() for one in (subjects or "").split(",") if one.strip()]
+    picked = [one.strip() for one in (subject or []) if one.strip()]
+    chosen = list(dict.fromkeys(typed + picked))
+    wanted, guard = ",".join(chosen), (suite or "").strip() or None
     sourced = (
         read_app_page(
             request,
@@ -740,6 +838,18 @@ def compare_page(
         if wanted
         else None
     )
+    models = (
+        read_app_page(
+            request,
+            view,
+            api=lambda: fw.models_api(client, settings, sort="canonical_id"),
+            database=None,
+        ).data
+        or []
+        if view.reachable
+        else []
+    )
+    metrics = [one.strip() for one in (metric or []) if one.strip()]
     return render_app_page(
         request,
         principal,
@@ -748,8 +858,14 @@ def compare_page(
         selected="Results",
         view=view,
         sourced=sourced,
-        subjects=wanted,
+        subjects=subjects or "",
+        picked=picked,
+        chosen=chosen,
+        metrics=metrics,
+        charts=fw.compare_bar_options(sourced.data or {}, metrics) if sourced else [],
+        models=[one for one in models if one.get("enabled")],
         suite=guard or "",
+        mirrorwall={"htmx": True, "echarts": True},
     )
 
 
@@ -913,7 +1029,16 @@ def machines_page(
     f"{BASE}/machines/{{machine_id}}", summary="One machine", response_class=HTMLResponse
 )
 def machine_page(request: Request, principal: CurrentOperator, machine_id: str) -> HTMLResponse:
-    """One machine's static profile and the runs measured on it."""
+    """One machine's static profile, the name the operator gave it, and the runs measured on it."""
+    return _machine(request, principal, machine_id)
+
+
+def _machine(
+    request: Request,
+    principal: Principal,
+    machine_id: str,
+    action_error: SuiteError | None = None,
+) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
@@ -943,6 +1068,40 @@ def machine_page(request: Request, principal: CurrentOperator, machine_id: str) 
         sourced=sourced,
         runs=runs,
         machine_id=machine_id,
+        action_error=action_error,
+    )
+
+
+@ui_router.post(f"{BASE}/machines/{{machine_id}}/nickname", summary="Name a machine")
+def nickname_from_page(
+    request: Request,
+    principal: CurrentOperator,
+    machine_id: str,
+    nickname: Annotated[str, Form()] = "",
+) -> Response:
+    """``PATCH /machines/{id}`` (row WX7): the operator's own label for this machine.
+
+    Audited like any other write the console makes through an application, and **not** security-
+    relevant: a nickname identifies nothing — FreeWeight attributes every measurement to the
+    fingerprint — so naming a machine cannot misdirect a measurement the way a provider's base URL
+    can (`freeweight_actions.SECURITY_FIELDS`).
+    """
+    client, settings = _clients(request)
+    params = {"app": APP, "machine_id": machine_id, "nickname": nickname.strip()}
+    try:
+        actions.set_machine_nickname(client, settings, machine_id, nickname=nickname)
+    except SuiteError as exc:
+        _audit(
+            request, principal, "freeweight.machine_nickname", target=machine_id,
+            outcome=outcome_of(exc), params=params, message=exc.message,
+        )  # fmt: skip
+        return _machine(request, principal, machine_id, action_error=exc)
+    _audit(
+        request, principal, "freeweight.machine_nickname", target=machine_id, outcome="ok",
+        params=params,
+    )  # fmt: skip
+    return RedirectResponse(
+        f"{BASE}/machines/{quote(machine_id, safe='')}", status_code=status.HTTP_303_SEE_OTHER
     )
 
 

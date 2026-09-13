@@ -1,13 +1,13 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_fw.html" import run_link, status_badge, machine_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_fw.html" import filter_styles, run_link, status_badge, machine_link %}
 {% block title %}Runs — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Runs {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/models">Models</a> · <a href="/jobs">Jobs</a></div>
-</div>
+{{ filter_styles() }}
+{% call app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded, and the form that starts another.") %}
+  <a href="/apps/freeweight/models">Models</a> · <a href="/apps/freeweight/machines">Machines</a> · <a href="/jobs">Jobs</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
 
 {% if runs.live %}
@@ -58,9 +58,26 @@
       <option value="">any</option>
       {% for one in statuses %}<option value="{{ one }}"{{ " selected" if filters.status == one else "" }}>{{ one }}</option>{% endfor %}
     </select></div>
-  <div class="field"><label for="fw-runs-model">Model</label><input id="fw-runs-model" name="model" value="{{ filters.model }}" placeholder="canonical ID or name"></div>
-  <div class="field"><label for="fw-runs-suite">Suite</label><input id="fw-runs-suite" name="suite" value="{{ filters.suite }}" placeholder="native.performance"></div>
-  <div class="field"><label for="fw-runs-machine">Machine fingerprint</label><input id="fw-runs-machine" name="machine" value="{{ filters.machine }}"></div>
+  {%- macro chooser(name, label, rows, value_key, text_key, chosen, hint="") -%}
+  {#- Row WX7: a select over what FreeWeight lists, falling back to the text box it used to be
+      when FreeWeight is not answering and there is no list to offer. A value being filtered by
+      that the list does not hold — a since-deleted model, a machine that was retired — stays an
+      option, or applying a second filter would drop the first. -#}
+  {%- set values = rows | map(attribute=value_key) | select | list -%}
+  <div class="field"><label for="fw-runs-{{ name }}">{{ label }}</label>
+    {% if rows %}
+    <select id="fw-runs-{{ name }}" name="{{ name }}">
+      <option value="">any</option>
+      {% for row in rows %}{% if row.get(value_key) %}<option value="{{ row.get(value_key) }}"{{ " selected" if chosen == row.get(value_key) else "" }}>{{ row.get(text_key) or row.get(value_key) }}</option>{% endif %}{% endfor %}
+      {% if chosen and chosen not in values %}<option value="{{ chosen }}" selected>{{ chosen }}</option>{% endif %}
+    </select>
+    {% else %}
+    <input id="fw-runs-{{ name }}" name="{{ name }}" value="{{ chosen }}"{% if hint %} placeholder="{{ hint }}"{% endif %}>
+    {% endif %}</div>
+  {%- endmacro -%}
+  {{ chooser("model", "Model", model_options, "canonical_id", "display_name", filters.model, "canonical ID or name") }}
+  {{ chooser("suite", "Suite", benchmarks, "key", "key", filters.suite, "native.performance") }}
+  {{ chooser("machine", "Machine", machines, "machine_fingerprint", "display_name", filters.machine, "fingerprint") }}
   <div class="field"><label for="fw-runs-label">Label</label><input id="fw-runs-label" name="label" value="{{ filters.label }}"></div>
   <div class="field"><label for="fw-runs-adapter">Adapter</label><input id="fw-runs-adapter" name="adapter" value="{{ filters.adapter }}" placeholder="name or digest"></div>
   <div class="field"><label for="fw-runs-since">Since (RFC 3339)</label><input id="fw-runs-since" name="since" value="{{ filters.since }}" placeholder="2026-09-01T00:00:00Z"></div>
@@ -86,7 +103,7 @@
   run.get("model") or "—",
   run.get("adapter") or "—",
   run.get("label") or "—",
-  machine_link(run.get("machine_fingerprint")),
+  machine_link(run.get("machine_fingerprint"), machine_names.get(run.get("machine_fingerprint"))),
   run.get("created_at") or "—",
   run.get("completed_at") or "—"
 ]) %}

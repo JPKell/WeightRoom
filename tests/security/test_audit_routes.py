@@ -919,6 +919,7 @@ def _fw_form(
 
 _FW_MODEL = "01M26MN12V1DGS767ENPN75HMB"
 _FW_RUN = "01M26MTEM1SGTMWVB3PR6EXY8F"
+_FW_MACHINE = "01M1B9PNA4BK4TEJ3T5EQTFQS4"
 
 EXERCISES.update(
     {
@@ -943,6 +944,13 @@ EXERCISES.update(
             f"/apps/freeweight/runs/{_FW_RUN}/repeat",
             {"label": "an audit exercise"},
             reply=("POST", f"runs/{_FW_RUN}/repeat", 201, {"id": "01AUDITREPEAT"}),
+        ),
+        # Naming a machine is not security-relevant: a nickname identifies nothing, and every
+        # measurement stays attributed to the fingerprint (row WX7).
+        ("POST", "/apps/freeweight/machines/{machine_id}/nickname"): _fw_form(
+            f"/apps/freeweight/machines/{_FW_MACHINE}/nickname",
+            {"nickname": "the workstation"},
+            reply=("PATCH", f"machines/{_FW_MACHINE}", 200, {"id": _FW_MACHINE}),
         ),
         # Changing kind and base_url re-authenticates: the password rides along, and the redaction
         # sweep proves it reaches no row and no log line.

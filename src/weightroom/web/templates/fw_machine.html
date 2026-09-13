@@ -1,20 +1,33 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_fw.html" import run_link, status_badge %}
 {% block title %}Machine — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set machine = sourced.data %}
-<div class="page-head">
-  <h2>Machine {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/machines">Every machine</a></div>
-</div>
+{% call app_page_header(view, (machine.get("display_name") if machine else None) or "Machine", "Runs", "One machine's static profile, and the runs measured on it. Every figure measured here is comparable only within this machine.") %}
+  <a href="/apps/freeweight/machines">Every machine</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}
+{{ refusal(action_error) }}
 {% if machine %}
 <p class="mono">{{ machine.get("machine_fingerprint") }}</p>
+{% if sourced.live %}
+<form method="post" action="/apps/freeweight/machines/{{ (machine.get('id') or machine_id) | urlencode }}/nickname" class="kit-form">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <div class="field"><label for="fw-machine-nickname">Name</label>
+    <input id="fw-machine-nickname" name="nickname" value="{{ machine.get('nickname') or '' }}" maxlength="120" placeholder="the workstation">
+    <span class="field-hint">Your own label for this machine, shown wherever it is named. It identifies nothing — every
+    measurement is attributed to the fingerprint above — and clearing the box removes it.</span></div>
+  <div class="kit-wide"><button type="submit">Save the name</button></div>
+</form>
+{% else %}
+<p class="muted">Naming a machine is a write, and goes through FreeWeight's API; it is not offered while FreeWeight is stopped.</p>
+{% endif %}
 {{ kv_list([
   {"label": "Reference", "value": machine.get("id") or machine_id},
+  {"label": "Name", "value": machine.get("nickname") or "— not named"},
   {"label": "Hostname", "value": machine.get("hostname") or "—"},
   {"label": "OS", "value": ((machine.get("os_name") or "—") ~ " " ~ (machine.get("os_version") or ""))},
   {"label": "CPU", "value": machine.get("cpu_model") or "—"},
