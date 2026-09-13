@@ -6,7 +6,7 @@
 {% block page_content %}
 {{ filter_styles() }}
 {% call app_page_header(view, "Models", "Models", "Every model identity FreeWeight's discovery has recorded, with its latest descriptor.") %}
-  <a href="/apps/freeweight/runs">Runs</a> · <a href="/apps/freeweight/provider">Provider</a> · <a href="/catalog">Catalog</a> · {{ docs_link("freeweight") }}
+  <a href="/apps/freeweight/runs">Runs</a> · <a href="/apps/freeweight/provider">Provider</a> · {{ docs_link("freeweight") }}
   <form method="post" action="/apps/freeweight/models/discover" class="kit-inline">
     <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
     <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="FreeWeight is not answering"{% endif %}>Refresh from provider</button>

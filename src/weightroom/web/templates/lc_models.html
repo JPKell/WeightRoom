@@ -5,7 +5,7 @@
 {% block title %}Models — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% call app_page_header(view, "Models", "Models", "Every model discovery has seen, available or not — what it is, what it has been measured to do, and how fast it has actually been.") %}
-  <a href="/apps/loadcoach/reliability">Reliability</a> · <a href="/apps/loadcoach/providers">Providers</a> · <a href="/catalog">Catalog</a> · {{ docs_link("loadcoach") }}
+  <a href="/apps/loadcoach/reliability">Reliability</a> · <a href="/apps/loadcoach/providers">Providers</a> · {{ docs_link("loadcoach") }}
   <form method="post" action="/apps/loadcoach/models/discover" class="kit-inline">
     <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
     <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="LoadCoach is not answering"{% endif %}>Scan for models</button>

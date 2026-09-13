@@ -57,7 +57,6 @@ CONSOLE_PAGES: tuple[dict[str, str], ...] = (
     {"label": "Chat", "href": "/chat"},
     {"label": "Docs", "href": "/docs"},
     {"label": "Database", "href": "/database"},
-    {"label": "Catalog", "href": "/catalog"},
     {"label": "Costs", "href": "/costs"},
     {"label": "Backups", "href": "/backups"},
     {"label": "Jobs", "href": "/jobs"},

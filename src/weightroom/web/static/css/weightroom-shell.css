@@ -214,6 +214,22 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
 .page-actions a { color: var(--mw-text-muted); text-decoration: none; }
 .page-actions a:hover { color: var(--mw-text); }
 
+/* The page bar (`_app_page.html` `page_nav`, row WY1): a page's own subsections on the left, its
+   JSON/Docs actions muted at the right, one rule under both. It wraps rather than scrolls. */
+.page-nav {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--mw-space-1, 4px) var(--mw-space-4, 16px);
+  margin: 0 0 var(--mw-space-3, 12px); padding-bottom: var(--mw-space-2, 8px);
+  border-bottom: 1px solid var(--mw-border);
+}
+.page-nav ul { display: flex; flex-wrap: wrap; gap: var(--mw-space-1, 4px); margin: 0; padding: 0; list-style: none; }
+.page-nav .page-nav-actions { margin-left: auto; font-size: var(--mw-font-size-sm, 12px); }
+.page-nav a {
+  display: block; padding: 4px var(--mw-space-2, 8px); border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-muted); text-decoration: none;
+}
+.page-nav a:hover { color: var(--mw-text); background: var(--mw-surface); }
+.page-nav-links a[aria-current="page"] { color: var(--mw-text); background: var(--mw-accent-soft); font-weight: 600; }
+
 .shell-menu > summary { display: none; }
 /* A config path or a command is one unbroken token; on a phone it would push the page sideways
    rather than wrap, since `code` has no break opportunity of its own. `.mono` is the same token

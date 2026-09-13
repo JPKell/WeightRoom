@@ -33,6 +33,39 @@
 </header>
 {%- endmacro %}
 
+{% macro page_nav(links=(), actions=()) -%}
+{#- The page bar (row WY1; WY roadmap §2.1): the first element of `page_content`, above the
+    page's heading, and the one place a page links to its own subsections.
+
+    Args:
+      links: `{"label", "href", "current"?}` mappings — the sibling views of this page's own
+        subject (*Queue · History · New job*). The current one carries `aria-current="page"`.
+      actions: `{"label", "href"}` mappings — *JSON*, *Docs*, an API link — rendered muted at the
+        bar's right-hand end.
+
+    Renders nothing when both are empty: a page with no subsections has no bar. It refuses
+    nothing itself; `tests/integration/test_page_nav.py` fails any page whose bar repeats an
+    `href` of that page's left menu. -#}
+{% if links or actions %}
+<nav class="page-nav" aria-label="Page sections">
+  {% if links %}
+  <ul class="page-nav-links">
+    {% for link in links %}
+    <li><a href="{{ link.href }}"{% if link.get("current") %} aria-current="page"{% endif %}>{{ link.label }}</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if actions %}
+  <ul class="page-nav-actions">
+    {% for action in actions %}
+    <li><a href="{{ action.href }}">{{ action.label }}</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
+
 {% macro page_source(sourced) -%}
 {#- Spec §7.3: every page names its source in the footer — from the API, from the database at a
     revision, or why neither answered. -#}
