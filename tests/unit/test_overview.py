@@ -22,15 +22,16 @@ from weightroom.services.overview import overview_for
 
 APP = "loadcoach"
 BASE_URL = "http://127.0.0.1:8766"
+PC_BASE_URL = "http://127.0.0.1:8768"
 
 
-def _fake_cli(tmp_path: Path, *, database_url: str) -> Path:
-    """A one-file ``loadcoach`` stand-in that answers ``config show --json`` and nothing else.
+def _fake_cli(tmp_path: Path, *, database_url: str, name: str = "loadcoach") -> Path:
+    """A one-file application stand-in that answers ``config show --json`` and nothing else.
 
     Every ``config show`` appends a line to ``tmp_path/show.calls``: the launch is what row WPF6
     is about, so a test counts them rather than trusting the cache's own bookkeeping.
     """
-    script = tmp_path / "loadcoach"
+    script = tmp_path / name
     script.write_text(
         textwrap.dedent(f"""\
             #!/bin/sh
@@ -76,26 +77,34 @@ def _console_database(tmp_path: Path) -> Database:
     return database
 
 
-def _view(*, installed: bool, running: bool, reachable: bool, executable: str | None) -> AppView:
+def _view(
+    *,
+    installed: bool,
+    running: bool,
+    reachable: bool,
+    executable: str | None,
+    app: str = APP,
+    base_url: str = BASE_URL,
+) -> AppView:
     return AppView(
-        name=APP,
+        name=app,
         installed=installed,
         executable=executable,
-        unit="loadcoach.service",
+        unit=f"{app}.service",
         unit_state="active" if running else "inactive",
         uptime_seconds=120.0 if running else None,
         restarts=0,
-        base_url=BASE_URL,
+        base_url=base_url,
         version="1.3.1" if reachable else None,
         api_version="v1" if reachable else None,
         verdict="ok" if reachable else "unreadable",
     )
 
 
-def _settings(tmp_path: Path, *, executable: Path | None):  # type: ignore[no-untyped-def]
+def _settings(tmp_path: Path, *, executable: Path | None, app: str = APP, base_url: str = BASE_URL):  # type: ignore[no-untyped-def]
     text = ""
     if executable is not None:
-        text = f'[apps.loadcoach]\nexecutable = "{executable}"\nbase_url = "{BASE_URL}"\n'
+        text = f'[apps.{app}]\nexecutable = "{executable}"\nbase_url = "{base_url}"\n'
     config = tmp_path / "console.toml"
     config.write_text(text)
     return load_settings(config_path=config).settings
@@ -136,6 +145,52 @@ def test_running_and_reachable_reads_figures_from_the_api_and_the_table_from_the
     assert figures["Starving"] == "False"
     assert overview.table.caption == "models"
     assert len(overview.table.rows) == 2
+    # Row WX11's PromptCadence-only section stays empty for the other three applications.
+    assert overview.promptcadence_figures == ()
+
+
+@respx.mock
+def test_promptcadence_overview_gains_its_own_section(tmp_path: Path) -> None:
+    """Row WX11: Active, Pending approvals and Spending today, read off the same status body —
+    ``ledger.day`` is what ``ledger_view(trajectory=None).as_json()`` already puts there."""
+    status_body = {
+        "active_trajectories": [
+            {"trajectory_id": "a", "state": "executing"},
+            {"trajectory_id": "b", "state": "planning"},
+        ],
+        "pending_approvals": [{"request_id": "r1"}],
+        "ledger": {"day": {"money_remaining_display": "at most 20 USD", "exceeded": False}},
+    }
+    respx.get(f"{PC_BASE_URL}/api/v1/system/status").mock(
+        return_value=httpx.Response(200, json=status_body)
+    )
+    database_url = _synthetic_db(tmp_path, revision="0015")
+    executable = _fake_cli(tmp_path, database_url=database_url, name="promptcadence")
+    settings = _settings(tmp_path, executable=executable, app="promptcadence", base_url=PC_BASE_URL)
+    console_db = _console_database(tmp_path)
+    view = _view(
+        installed=True,
+        running=True,
+        reachable=True,
+        executable=str(executable),
+        app="promptcadence",
+        base_url=PC_BASE_URL,
+    )
+
+    overview = overview_for(
+        "promptcadence",
+        view,
+        settings=settings,
+        database=console_db,
+        client=httpx.Client(),
+        urls=DatabaseUrlCache(),
+        now=0.0,
+    )
+
+    figures = {f.label: (f.value, f.note) for f in overview.promptcadence_figures}
+    assert figures["Active"] == ("2", None)
+    assert figures["Pending approvals"] == ("1", None)
+    assert figures["Spending today"] == ("at most 20 USD", None)
 
 
 def test_stopped_reads_both_figures_and_the_table_from_the_database_at_a_known_revision(

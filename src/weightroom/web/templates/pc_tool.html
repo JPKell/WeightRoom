@@ -1,0 +1,46 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import badge, kv_list, table, empty_state %}
+{% from "_app_page.html" import app_page_header, page_source, refusal %}
+{% block title %}Tool {{ tool_name }} — PromptCadence — WeightRoom{% endblock %}
+{% block page_content %}
+{% call app_page_header(view, tool_name, "Tools", "One tool's registry entry: what it does, its risk and egress class, and the argument schema PromptCadence gives the model.") %}
+<a href="/apps/promptcadence/tools">All tools</a>
+{% endcall %}
+{% include "_app_state.html" %}
+
+{% if sourced.error and sourced.error.details.get("app_code") == "TOOL_NOT_FOUND" %}
+{{ empty_state("No tool named " ~ tool_name ~ " is configured.", "All tools", "/apps/promptcadence/tools") }}
+{% else %}
+{{ refusal(sourced.error) }}
+{% endif %}
+
+{% if sourced.data is not none %}
+{% set t = sourced.data %}
+<p class="muted">{{ t.get("description") or "—" }}</p>
+{% set items = [
+  {"label": "Registered", "value": badge("registered", tone="success") if t.get("registered") else badge("withheld", tone="warning")},
+  {"label": "Risk class", "value": t.get("risk_class") or "—"},
+  {"label": "Egress", "value": t.get("egress") or "—"},
+  {"label": "Requires isolation", "value": "yes" if t.get("requires_isolation") else "no"},
+  {"label": "Arguments redacted", "value": "yes" if t.get("redact_args") else "no"},
+] %}
+{% if not t.get("registered") %}
+{% set _ = items.append({"label": "Withheld cause", "value": t.get("withheld_cause") or "—"}) %}
+{% endif %}
+{{ kv_list(items) }}
+
+<h3>Arguments</h3>
+{% set schema = t.get("parameters") %}
+{% if schema and schema.get("properties") %}
+{% set required = schema.get("required") or [] %}
+{% set rows = [] %}
+{% for pname, prop in schema.get("properties").items() %}
+{% set _ = rows.append([pname, prop.get("type") or "—", "yes" if pname in required else "no", prop.get("description") or "—"]) %}
+{% endfor %}
+{{ table([{"label": "Argument", "mono": true}, {"label": "Type"}, {"label": "Required"}, {"label": "Description"}], rows, caption="Argument schema", density="dense", table_id="pc-tool-args", sortable=true) }}
+{% else %}
+{{ empty_state("No argument schema — this tool is not registered, or takes no arguments.") }}
+{% endif %}
+{% endif %}
+{{ page_source(sourced) }}
+{% endblock %}

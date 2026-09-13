@@ -1,16 +1,17 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "mirrorwall/components.html" import table, empty_state, pagination %}
+{% from "_app_page.html" import app_page_header, page_source, refusal %}
 {% from "_pc.html" import trajectory_link, state_badge %}
 {% block title %}Trajectories — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Trajectories {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/approvals">Approvals</a> · <a href="/apps/promptcadence/ledger">Ledger</a> · <a href="/chat">Chat</a></div>
-</div>
+{% call app_page_header(view, "Trajectories", "Trajectories", "Newest first. Each row opens the whole record — the plan, every turn, every tool call, every debit and every egress verdict — as PromptCadence itself explains it.") %}
+<a href="/apps/promptcadence/approvals">Approvals</a> · <a href="/apps/promptcadence/ledger">Ledger</a> · <a href="/chat">Chat</a>
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">Newest first. Each row opens the whole record — the plan, every turn, every tool
-call, every debit and every egress verdict — as PromptCadence itself explains it.</p>
+<nav class="page-actions" aria-label="Trajectories views">
+  <a href="/apps/promptcadence/trajectories" aria-current="page">History</a> ·
+  <a href="/apps/promptcadence/trajectories/new">New</a>
+</nav>
 
 <form class="filter-bar" action="/apps/promptcadence/trajectories" method="get" role="search">
   <div class="field">
@@ -22,74 +23,6 @@ call, every debit and every egress verdict — as PromptCadence itself explains 
   </div>
   <button type="submit">Filter</button>
 </form>
-
-{% if sourced.live %}
-<style>
-  .pc-check { display: inline-flex; align-items: center; gap: 4px; margin: 0 12px 4px 0; }
-  .pc-check input { width: auto; height: auto; margin: 0; }
-  .pc-submit { margin: 0 0 var(--mw-space-4, 16px); }
-  .pc-submit form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; }
-  .pc-submit .pc-wide { grid-column: 1 / -1; }
-</style>
-<details class="card pc-submit"{% if submit_error %} open{% endif %}>
-  <summary><strong>New trajectory</strong> <span class="muted">— PromptCadence plans it, runs every model call through LoadCoach, and asks a person where its policy says so</span></summary>
-  {{ refusal(submit_error) }}
-  <form method="post" action="/apps/promptcadence/trajectories">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <div class="field pc-wide"><label for="pc-task">Task</label>
-      <textarea id="pc-task" name="task" rows="4" required>{{ form.get("task", "") }}</textarea></div>
-    <div class="field"><label for="pc-classification">Data classification</label>
-      <select id="pc-classification" name="data_classification">
-        {% for one in classifications %}<option value="{{ one }}"{{ ' selected' if (form.get('data_classification') or 'confidential') == one else '' }}>{{ one }}</option>{% endfor %}
-      </select>
-      <span class="field-hint">Unclassified data is treated as confidential (ADR-0046).</span></div>
-    <div class="field"><label for="pc-tier">Tier</label>
-      {% if options.tiers is not none %}
-      <select id="pc-tier" name="tier">
-        <option value="">The policy's choice</option>
-        {% for one in options.tiers %}<option value="{{ one }}"{{ ' selected' if form.get('tier') == one else '' }}>{{ one }}</option>{% endfor %}
-      </select>
-      {% else %}
-      <input id="pc-tier" name="tier" value="{{ form.get('tier', '') }}" placeholder="a configured tier, or blank">
-      {% endif %}</div>
-    <div class="field"><label for="pc-project">Project</label>
-      <input id="pc-project" name="project" value="{{ form.get('project', '') }}" placeholder="a [budget.projects] name, or blank"></div>
-    <div class="field"><label for="pc-planning">Planning</label>
-      <select id="pc-planning" name="bypass_planning">
-        <option value=""{{ ' selected' if not form.get('bypass_planning') else '' }}>PromptCadence decides</option>
-        <option value="false"{{ ' selected' if form.get('bypass_planning') == 'false' else '' }}>Plan first</option>
-        <option value="true"{{ ' selected' if form.get('bypass_planning') == 'true' else '' }}>Bypass planning</option>
-      </select></div>
-    <div class="field"><label for="pc-steps">Max steps</label>
-      <input id="pc-steps" name="max_steps" inputmode="numeric" value="{{ form.get('max_steps', '') }}"></div>
-    <div class="field"><label for="pc-turns">Max turns</label>
-      <input id="pc-turns" name="max_turns" inputmode="numeric" value="{{ form.get('max_turns', '') }}"></div>
-    <div class="field"><label for="pc-budget-tokens">Token budget</label>
-      <input id="pc-budget-tokens" name="budget_tokens" inputmode="numeric" value="{{ form.get('budget_tokens', '') }}"></div>
-    <div class="field"><label for="pc-budget-money">Money budget</label>
-      <input id="pc-budget-money" name="budget_money" inputmode="decimal" placeholder="5.00" value="{{ form.get('budget_money', '') }}"></div>
-    <div class="field"><label for="pc-currency">Currency</label>
-      <input id="pc-currency" name="currency" maxlength="3" value="{{ form.get('currency') or 'USD' }}"></div>
-    <div class="field"><label for="pc-partial">A partial price</label>
-      <select id="pc-partial" name="partial_pricing">
-        <option value="">The configured default</option>
-        <option value="floor"{{ ' selected' if form.get('partial_pricing') == 'floor' else '' }}>binds as a floor</option>
-        <option value="strict"{{ ' selected' if form.get('partial_pricing') == 'strict' else '' }}>refuses (strict)</option>
-      </select>
-      <span class="field-hint">ADR-0069</span></div>
-    <fieldset class="field pc-wide"><legend>Tools</legend>
-      {% if options.tools is not none %}
-      {% for name in options.tools %}<label class="pc-check"><input type="checkbox" name="tools" value="{{ name }}"{{ ' checked' if name in form.get('tools', []) else '' }}> <code>{{ name }}</code></label>{% else %}<span class="muted">No tool is registered.</span>{% endfor %}
-      <span class="field-hint">None ticked means none: PromptCadence would otherwise grant every configured tool.</span>
-      {% else %}
-      <input name="tools" value="{{ form.get('tools', []) | join(', ') }}" placeholder="read_file, list_dir">
-      <span class="field-hint">The registry could not be read; name the tools, comma-separated, or none.</span>
-      {% endif %}
-    </fieldset>
-    <div class="pc-wide"><button type="submit" data-variant="primary">Submit</button></div>
-  </form>
-</details>
-{% endif %}
 
 {{ refusal(sourced.error) }}
 {% if sourced.data is not none %}

@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from weightroom.services.overview import _figures_from_status
+from weightroom.services.overview import _figures_from_status, _promptcadence_figures
 
 STATUS = Path(__file__).resolve().parents[1] / "fixtures" / "status"
 
@@ -67,3 +67,29 @@ def test_a_missing_field_or_a_shape_it_cannot_count_stays_a_dash_never_a_zero() 
         "Planning": "—",
         "Pending approvals": "—",
     }
+
+
+def test_promptcadence_section_reads_active_pending_and_the_embedded_ledger_view() -> None:
+    """Row WX11: the PromptCadence-only Overview section, from the same status body — no second
+    call — its ``ledger.day`` is ``ledger_view(trajectory=None).as_json()["day"]`` verbatim."""
+    body = _body("promptcadence")
+    body["active_trajectories"] = [
+        {"trajectory_id": "a", "state": "executing"},
+        {"trajectory_id": "b", "state": "planning"},
+    ]
+    body["pending_approvals"] = [{"request_id": "r1"}]
+    figures = {figure.label: (figure.value, figure.note) for figure in _promptcadence_figures(body)}
+    assert figures["Active"] == ("2", None)
+    assert figures["Pending approvals"] == ("1", None)
+    assert figures["Spending today"] == ("at most 20 USD", None)
+
+
+def test_promptcadence_section_names_an_exceeded_ceiling_and_dashes_a_missing_ledger() -> None:
+    body = _body("promptcadence")
+    body["ledger"]["day"]["exceeded"] = True
+    figures = {figure.label: figure for figure in _promptcadence_figures(body)}
+    assert figures["Spending today"].note == "ceiling exceeded"
+    del body["ledger"]
+    figures = {figure.label: figure for figure in _promptcadence_figures(body)}
+    assert figures["Spending today"].value == "—"
+    assert figures["Spending today"].note is None

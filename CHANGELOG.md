@@ -24,6 +24,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   This page still writes nothing. `ip_projects.html`, `ip_project.html`, `ip_backends.html` and
   `ip_project_new.html` are the first pages to call `_app_page.html`'s `app_page_header` (row
   WP1's kit macro, built with no caller until now).
+### Added (row WX11)
+- **PromptCadence's tab reshaped** — Trajectories, its detail page and Tools. Trajectories'
+  submission form moves off the listing onto its own page (`GET /trajectories/new`), so the
+  listing (renamed *History* beside the new *New* nav link) is the table alone and a validation
+  refusal redisplays the New page rather than the History one; `POST /trajectories` is unchanged.
+  A trajectory's detail page gets a jump nav of its section ids at the top — the same ids
+  (`#pc-request`, `#pc-tool-calls`, `#pc-debits`, `#pc-egress`, `#pc-approvals`, `#pc-events`, …)
+  whichever branch renders, live explanation document or the stopped database read — and its
+  request block becomes one two-column (Field, Value) sortable table in place of the definition
+  list. Tools gets a *Registry* / *Create a tool* anchor nav (the latter explaining what a tool
+  is, with no console form — a tool is code); each tool's name in the registry table links to its
+  own page (`GET /apps/promptcadence/tools/{name}`, reading PromptCadence's own `GET
+  /tools/{name}`), which shows its description, risk class, egress and its argument schema as a
+  table; a `422 TOOL_NOT_FOUND` renders the page's not-found empty state, while a withheld tool
+  (found, not registered) still renders with its cause. The per-row `json_viewer` argument dump
+  leaves the Tools listing. Every reshaped page adopts `app_page_header` (row WX3's macro, its
+  first callers). The Overview gains a PromptCadence-only section — Active, Pending approvals,
+  Spending today — read off the same `GET /system/status` body the generic figures already fetch
+  (its embedded `ledger.day`, the same document `GET /ledger` answers), so it costs no second
+  call and is empty for the other three applications.
 
 ### Added (row WX6)
 - **The telemetry history page draws an ECharts line chart** beside its existing accessible SVG

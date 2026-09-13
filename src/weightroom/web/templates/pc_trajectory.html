@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, kv_list, table, empty_state, json_viewer %}
-{% from "_app_page.html" import page_source, refusal, rows_table %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, json_viewer %}
+{% from "_app_page.html" import app_page_header, page_source, refusal, rows_table %}
 {% from "_pc.html" import short, measure, money, state_badge, verdict_badge, outcome_badge, content_cell, approval_forms with context %}
 {% block title %}Trajectory {{ trajectory_id }} — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
@@ -10,17 +10,33 @@
   .pc-actions { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: end; }
   .pc-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 </style>
-<div class="page-head">
-  <h2>Trajectory {{ short(trajectory_id) }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/promptcadence/trajectories">All trajectories</a> ·
-    <a href="/apps/promptcadence/ledger?trajectory_id={{ trajectory_id | urlencode }}">Debits</a> ·
-    <a href="/apps/promptcadence/egress?trajectory_id={{ trajectory_id | urlencode }}">Egress</a>
-  </div>
-</div>
+{% call app_page_header(view, "Trajectory " ~ trajectory_id, "Trajectories", "Its whole record: the request, the plan, every envelope, turn, tool call, debit and egress verdict — as PromptCadence itself explains it, or its database while it does not answer.") %}
+<a href="/apps/promptcadence/trajectories">All trajectories</a> ·
+<a href="/apps/promptcadence/ledger?trajectory_id={{ trajectory_id | urlencode }}">Debits</a> ·
+<a href="/apps/promptcadence/egress?trajectory_id={{ trajectory_id | urlencode }}">Egress</a>
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {{ refusal(sourced.error) }}
+
+{% if sourced.data is not none %}
+{# The jump nav's ids are written once here, and reused verbatim as each branch's own heading
+   ids below — the record either branch renders shares the same section names (WX11): a bare
+   trajectory's "The request" is `#pc-request` whichever source answered it. #}
+{% set sections = (
+  [("pc-request", "The request"), ("pc-plan", "Plan"), ("pc-envelopes", "Envelopes"),
+   ("pc-timeline", "Timeline"), ("pc-tool-calls", "Tool calls"), ("pc-compactions", "Compactions"),
+   ("pc-debits", "Debits"), ("pc-egress", "Egress decisions"), ("pc-deviations", "Deviations"),
+   ("pc-approvals", "Approvals"), ("pc-events", "Events")]
+  if sourced.live else
+  [("pc-request", "The request"), ("pc-turns", "Turns"), ("pc-tool-calls", "Tool calls"),
+   ("pc-debits", "Debits"), ("pc-egress", "Egress decisions"), ("pc-approvals", "Approvals"),
+   ("pc-events", "Events")]
+) %}
+<nav class="page-actions" aria-label="Sections">
+  {% for anchor, label in sections %}<a href="#{{ anchor }}">{{ label }}</a>{{ " · " if not loop.last }}{% endfor %}
+</nav>
+{% endif %}
 
 {% if sourced.data is not none and sourced.live %}
 {% set doc = sourced.data["explanation"] %}
@@ -49,26 +65,27 @@ cancels any LoadCoach job in flight.</p>
   {{ "bypassed" if t.get("bypass_planning") else "planned" }} · PromptCadence's
   <code>{{ doc.get("schema") }}</code> {{ doc.get("version") }}, the document its own timeline renders.</p>
 
-<h3>The request</h3>
-{{ kv_list([
-  {"label": "Trajectory", "value": t.get("trajectory_id") or trajectory_id},
-  {"label": "State", "value": t.get("state") or "—"},
-  {"label": "Cause", "value": t.get("cause") or "—"},
-  {"label": "Error code", "value": t.get("error_code") or "—"},
-  {"label": "Approver", "value": t.get("approver") or "—"},
-  {"label": "Project", "value": t.get("project") or "—"},
-  {"label": "Tier pin", "value": t.get("tier") or "—"},
-  {"label": "Tools", "value": (t.get("tools") or []) | join(", ") or "none"},
-  {"label": "Token budget", "value": budget.get("tokens") if budget.get("tokens") is not none else "—"},
-  {"label": "Money budget", "value": money(budget.get("money")) | striptags},
-  {"label": "Partial pricing", "value": budget.get("partial_pricing") or "the configured default"},
-  {"label": "Created", "value": t.get("created_at") or "—"},
-  {"label": "Completed", "value": t.get("completed_at") or "—"},
-]) }}
+<h3 id="pc-request">The request</h3>
+{% set request_rows = [
+  ["Trajectory", t.get("trajectory_id") or trajectory_id],
+  ["State", t.get("state") or "—"],
+  ["Cause", t.get("cause") or "—"],
+  ["Error code", t.get("error_code") or "—"],
+  ["Approver", t.get("approver") or "—"],
+  ["Project", t.get("project") or "—"],
+  ["Tier pin", t.get("tier") or "—"],
+  ["Tools", (t.get("tools") or []) | join(", ") or "none"],
+  ["Token budget", budget.get("tokens") if budget.get("tokens") is not none else "—"],
+  ["Money budget", money(budget.get("money")) | striptags],
+  ["Partial pricing", budget.get("partial_pricing") or "the configured default"],
+  ["Created", t.get("created_at") or "—"],
+  ["Completed", t.get("completed_at") or "—"],
+] %}
+{{ table([{"label": "Field"}, {"label": "Value"}], request_rows, caption="The request", density="dense", table_id="pc-trajectory-0", sortable=true) }}
 <h4>Task</h4>
 {{ content_cell(t.get("task")) }}
 
-<h3>Plan</h3>
+<h3 id="pc-plan">Plan</h3>
 {% set plan = doc.get("plan") %}
 {% if plan %}
 <p class="muted">{{ (plan.get("attempts") or []) | length }} drafting attempt(s); the validated plan is
@@ -97,7 +114,7 @@ cancels any LoadCoach job in flight.</p>
 {{ empty_state("No plan: this trajectory bypassed planning or has not drafted one yet.") }}
 {% endif %}
 
-<h3>Envelopes</h3>
+<h3 id="pc-envelopes">Envelopes</h3>
 {% set rows = [] %}
 {% for one in doc.get("intents") or [] %}
 {% set _ = rows.append([one.get("step_id"), one.get("revision"), one.get("approved_tier") or "—", (one.get("fallback_tiers") or []) | join(", ") or "—", (one.get("approved_tools") or []) | join(", ") or "none", one.get("max_classification") or "—", measure(one.get("max_turns")), one.get("minted_by") or "—"]) %}
@@ -106,7 +123,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Step", "mono": true}, {"label": "Revision", "numeric": true}, {"label": "Tier"}, {"label": "Fallbacks"}, {"label": "Tools"}, {"label": "Max classification"}, {"label": "Max turns", "numeric": true}, {"label": "Minted by", "mono": true}], rows, caption="Every ExecutionIntent revision, superseded ones included", density="dense", table_id="pc-trajectory-3", sortable=true) }}
 {% else %}{{ empty_state("No envelope has been minted.") }}{% endif %}
 
-<h3>Timeline</h3>
+<h3 id="pc-timeline">Timeline</h3>
 {% for thread in doc.get("threads") or [] %}
 <section class="card pc-thread">
   <h4>{% if thread.get("kind") == "compaction" %}Compaction summary{% else %}Step {{ thread.get("step_id") }}{% endif %}
@@ -131,7 +148,7 @@ cancels any LoadCoach job in flight.</p>
 {{ empty_state("This trajectory opened no thread.") }}
 {% endfor %}
 
-<h3>Tool calls</h3>
+<h3 id="pc-tool-calls">Tool calls</h3>
 {% set rows = [] %}
 {% for one in doc.get("tool_calls") or [] %}
 {% set _ = rows.append([one.get("tool_name"), outcome_badge(one.get("status")), one.get("reason") or "—", one.get("risk_class") or "—", one.get("egress") or "—", one.get("isolation_tier") or "—", measure(one.get("duration_ms"), "ms"), content_cell(one.get("arguments")), content_cell(one.get("result"))]) %}
@@ -140,7 +157,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Tool", "mono": true}, {"label": "Outcome"}, {"label": "Reason"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation"}, {"label": "Duration", "numeric": true}, {"label": "Arguments"}, {"label": "Result"}], rows, caption="Every recorded call, refusals and failures included", density="dense", table_id="pc-trajectory-6", sortable=true) }}
 {% else %}{{ empty_state("This trajectory called no tools.") }}{% endif %}
 
-<h3>Compactions</h3>
+<h3 id="pc-compactions">Compactions</h3>
 {% set rows = [] %}
 {% for one in doc.get("compactions") or [] %}
 {% set _ = rows.append([one.get("step_id"), one.get("tier"), one.get("budget_tokens"), one.get("tokens_before"), one.get("tokens_after_estimate"), (one.get("turns_before") ~ " → " ~ one.get("turns_after")), badge("unmet", tone="warning") if one.get("budget_unmet") else badge("met", tone="success")]) %}
@@ -149,7 +166,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Step", "mono": true}, {"label": "Tier"}, {"label": "Target", "numeric": true}, {"label": "Before", "numeric": true}, {"label": "After", "numeric": true}, {"label": "Turns"}, {"label": "Budget"}], rows, caption="Where the wire differed from the rows", density="dense", table_id="pc-trajectory-7", sortable=true) }}
 {% else %}{{ empty_state("Nothing was compacted.") }}{% endif %}
 
-<h3>Debits</h3>
+<h3 id="pc-debits">Debits</h3>
 {% set rows = [] %}
 {% for one in doc.get("ledger_entries") or [] %}
 {% set usage = one.get("usage") or {} %}
@@ -159,7 +176,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Turn"}, {"label": "When", "mono": true}, {"label": "Input", "numeric": true}, {"label": "Output", "numeric": true}, {"label": "Priced"}, {"label": "Tags"}], rows, caption="Recorded debits", density="dense", table_id="pc-trajectory-8", sortable=true) }}
 {% else %}{{ empty_state("Nothing was debited.") }}{% endif %}
 
-<h3>Egress decisions</h3>
+<h3 id="pc-egress">Egress decisions</h3>
 {% set rows = [] %}
 {% for one in doc.get("egress_decisions") or [] %}
 {% set request_ = one.get("request") or {} %}
@@ -169,7 +186,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Verdict"}, {"label": "Target"}, {"label": "Classification"}, {"label": "Policy"}, {"label": "Reason"}, {"label": "When", "mono": true}], rows, caption="Every decision about whether data could leave", density="dense", table_id="pc-trajectory-9", sortable=true) }}
 {% else %}{{ empty_state("No egress decision was recorded.") }}{% endif %}
 
-<h3>Deviations</h3>
+<h3 id="pc-deviations">Deviations</h3>
 {% set rows = [] %}
 {% for one in doc.get("deviations") or [] %}
 {% set _ = rows.append([badge(one.get("category"), tone="danger" if one.get("disposition") == "halt" else "warning"), one.get("severity"), one.get("disposition"), short(one.get("turn_id")), one.get("created_at")]) %}
@@ -178,7 +195,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Category"}, {"label": "Severity"}, {"label": "Disposition"}, {"label": "Turn"}, {"label": "When", "mono": true}], rows, caption="Where execution differed from its envelope", density="dense", table_id="pc-trajectory-10", sortable=true) }}
 {% else %}{{ empty_state("Execution never differed from its envelope.") }}{% endif %}
 
-<h3>Approvals</h3>
+<h3 id="pc-approvals">Approvals</h3>
 {% set rows = [] %}
 {% for one in doc.get("approvals") or [] %}
 {% set _ = rows.append([one.get("kind"), outcome_badge(one.get("status")), one.get("reason") or "—", (one.get("step_ids") or []) | join(", ") or "—", one.get("approver_token_id") or "—", one.get("resolved_at") or "—"]) %}
@@ -187,7 +204,7 @@ cancels any LoadCoach job in flight.</p>
 {{ table([{"label": "Kind"}, {"label": "Status"}, {"label": "Reason"}, {"label": "Steps"}, {"label": "Approver", "mono": true}, {"label": "Resolved", "mono": true}], rows, caption="Requests this trajectory raised", density="dense", table_id="pc-trajectory-11", sortable=true) }}
 {% else %}{{ empty_state("Nothing about this trajectory needed a person.") }}{% endif %}
 
-<h3>Events</h3>
+<h3 id="pc-events">Events</h3>
 {% if not t.get("completed_at") %}
 {% set stream_url = events_url %}
 {% include "_log_pane.html" %}
@@ -201,33 +218,34 @@ cancels any LoadCoach job in flight.</p>
 {% elif sourced.data is not none %}
 {% set data = sourced.data %}
 {% set t = data["trajectory"] %}
-<h3>The request</h3>
-{{ kv_list([
-  {"label": "Trajectory", "value": t.get("trajectory_id")},
-  {"label": "State", "value": t.get("state") or "—"},
-  {"label": "Cause", "value": t.get("cause") or "—"},
-  {"label": "Error code", "value": t.get("error_code") or "—"},
-  {"label": "Project", "value": t.get("project") or "—"},
-  {"label": "Tier pin", "value": t.get("tier") or "—"},
-  {"label": "Token budget", "value": t.get("budget_tokens") if t.get("budget_tokens") is not none else "—"},
-  {"label": "Created", "value": t.get("created_at") or "—"},
-  {"label": "Completed", "value": t.get("completed_at") or "—"},
-]) }}
+<h3 id="pc-request">The request</h3>
+{% set request_rows = [
+  ["Trajectory", t.get("trajectory_id")],
+  ["State", t.get("state") or "—"],
+  ["Cause", t.get("cause") or "—"],
+  ["Error code", t.get("error_code") or "—"],
+  ["Project", t.get("project") or "—"],
+  ["Tier pin", t.get("tier") or "—"],
+  ["Token budget", t.get("budget_tokens") if t.get("budget_tokens") is not none else "—"],
+  ["Created", t.get("created_at") or "—"],
+  ["Completed", t.get("completed_at") or "—"],
+] %}
+{{ table([{"label": "Field"}, {"label": "Value"}], request_rows, caption="The request", density="dense", table_id="pc-trajectory-0", sortable=true) }}
 <h4>Task</h4>
 {{ content_cell(t.get("task")) }}
 <p class="notice">PromptCadence is not answering, so this is its database's rows rather than its
 explanation document: the plan, envelopes and compactions need the running application to compose.</p>
-<h3>Turns</h3>
+<h3 id="pc-turns">Turns</h3>
 {{ rows_table(data["turns"], [("#", "sequence"), ("Role", "role"), ("Tier", "tier"), ("Model", "model_canonical_id"), ("Finish", "finish_reason"), ("Input", "input_tokens"), ("Output", "output_tokens"), ("Content", "content_text", 4000)], "Turns") }}
-<h3>Tool calls</h3>
+<h3 id="pc-tool-calls">Tool calls</h3>
 {{ rows_table(data["tool_calls"], [("Tool", "tool_name"), ("Outcome", "status"), ("Reason", "reason"), ("Risk", "risk_class"), ("Egress", "egress"), ("Isolation", "isolation_tier"), ("Duration ms", "duration_ms"), ("Result", "result_summary", 1000)], "Tool calls") }}
-<h3>Debits</h3>
+<h3 id="pc-debits">Debits</h3>
 {{ rows_table(data["ledger"], [("Turn", "turn_id"), ("When", "occurred_at"), ("Unpriced", "unpriced"), ("Pricing", "pricing_hash")], "Debits") }}
-<h3>Egress decisions</h3>
+<h3 id="pc-egress">Egress decisions</h3>
 {{ rows_table(data["egress"], [("Verdict", "verdict"), ("Target", "target"), ("Classification", "classification"), ("Policy", "policy"), ("Reason", "reason"), ("When", "decided_at")], "Egress decisions") }}
-<h3>Approvals</h3>
+<h3 id="pc-approvals">Approvals</h3>
 {{ rows_table(data["approvals"], [("Kind", "kind"), ("Status", "status"), ("Reason", "reason"), ("Approver", "approver_token_id"), ("Resolved", "resolved_at")], "Approvals") }}
-<h3>Events</h3>
+<h3 id="pc-events">Events</h3>
 {{ rows_table(data["events"], [("#", "sequence"), ("Event", "event_type"), ("At", "timestamp")], "Events") }}
 {% endif %}
 {{ page_source(sourced) }}

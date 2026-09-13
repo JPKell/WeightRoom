@@ -54,6 +54,7 @@ __all__ = [
     "segment",
     "system_api",
     "tiers_api",
+    "tool_api",
     "tools_api",
     "trajectories_api",
     "trajectories_db",
@@ -419,6 +420,19 @@ def tiers_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
 def tools_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
     """``GET /tools``: the registry, withheld tools with their cause, and the isolation probe."""
     body = call(client, settings, APP, "GET", "tools")
+    return dict(body) if isinstance(body, Mapping) else {}
+
+
+def tool_api(client: httpx.Client, settings: Settings, name: str) -> dict[str, Any]:
+    """``GET /tools/{name}``: one tool by exact name — found, even when withheld.
+
+    Raises:
+        AppRefused: ``TOOL_NOT_FOUND`` (PromptCadence answers ``422``) — no configured tool has
+            that name; the page's not-found state, distinct from a withheld one, which is found
+            and says why.
+        AppUnreachable: It did not answer.
+    """
+    body = call(client, settings, APP, "GET", f"tools/{segment(name)}")
     return dict(body) if isinstance(body, Mapping) else {}
 
 
