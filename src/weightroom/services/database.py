@@ -114,7 +114,7 @@ def postgres_bootstrap_script(config_paths: Mapping[str, Path]) -> str:
         "# 1. A server. Skip this line if one is already running (the W7 local-PG leg used the",
         "#    same image).",
         f'docker run -d --name {_POSTGRES_CONTAINER} -e POSTGRES_PASSWORD="$PG_PASSWORD" \\',
-        f"  -p 5432:5432 -v {_POSTGRES_VOLUME}:/var/lib/postgresql/data {_POSTGRES_IMAGE}",
+        f"  -p 127.0.0.1:5432:5432 -v {_POSTGRES_VOLUME}:/var/lib/postgresql/data {_POSTGRES_IMAGE}",
         "",
         "# 2. One role and one database per application, owner-scoped to it.",
         'PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -U postgres <<SQL',
