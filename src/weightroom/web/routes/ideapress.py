@@ -24,6 +24,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, Streamin
 
 from weightroom.services import ideapress_actions as actions
 from weightroom.services import ideapress_pages as ip
+from weightroom.services import loadcoach_pages as lc
 from weightroom.services.app_api import outcome_of
 from weightroom.services.app_api import stream as app_stream
 from weightroom.services.audit import record
@@ -32,6 +33,8 @@ from weightroom.web.routes.apps import app_view, read_app_page, render_app_page
 from weightroom.web.session import CurrentOperator, now_of
 
 if TYPE_CHECKING:
+    from weightroom.services.app_pages import Sourced
+    from weightroom.services.apps import AppView
     from weightroom.services.auth import Principal
 
 __all__ = ["ui_router"]
@@ -85,6 +88,31 @@ def _optional[T](read: Callable[[], T]) -> T | None:
         return None
 
 
+NAV_ROWS = 8
+"""Row WX10: the top nav names the eight most recent projects, by name."""
+
+
+def _nav_projects(
+    request: Request, view: AppView, client: Any, settings: Any
+) -> Sourced[dict[str, Any]]:
+    """The unfiltered first page of ``GET /projects``, for the top nav on every projects page.
+
+    Its own read, never the page's own (filtered, differently paged) one — a status filter on
+    Projects, or which project is open, must never make a recent project disappear from the nav.
+    """
+    return read_app_page(
+        request,
+        view,
+        api=lambda: ip.projects_api(
+            client, settings, status=None, content_type=None, archived=False, cursor=None,
+            page_rows=NAV_ROWS,
+        ),
+        database=lambda handle: ip.projects_db(
+            handle, status=None, content_type=None, archived=False, page=1, page_rows=NAV_ROWS
+        ),
+    )  # fmt: skip
+
+
 # --- Projects -------------------------------------------------------------------------------------
 
 
@@ -99,8 +127,6 @@ def _projects(  # noqa: PLR0913 — the list's filters, and what the last action
     page: int = 1,
     deleted: str | None = None,
     archive_path: str | None = None,
-    create_error: SuiteError | None = None,
-    form: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
@@ -124,7 +150,6 @@ def _projects(  # noqa: PLR0913 — the list's filters, and what the last action
         next_href = _href(f"{BASE}/projects", **filters, cursor=data["next_cursor"])
     elif data.get("next_page"):
         next_href = _href(f"{BASE}/projects", **filters, page=data["next_page"])
-    workflows = _optional(lambda: ip.workflows_api(client, settings)) if sourced.live else None
     return render_app_page(
         request,
         principal,
@@ -133,15 +158,13 @@ def _projects(  # noqa: PLR0913 — the list's filters, and what the last action
         selected="Projects",
         view=view,
         sourced=sourced,
+        nav=_nav_projects(request, view, client, settings),
         project_status=project_status or "",
         content_type=content_type or "",
         archived=archived,
         next_href=next_href,
-        workflows=workflows,
         deleted=deleted,
         archive_path=archive_path,
-        create_error=create_error,
-        form=dict(form or {}),
     )
 
 
@@ -157,12 +180,36 @@ def projects_page(  # noqa: PLR0913 — one parameter per query field
     deleted: str | None = None,
     archive: str | None = None,
 ) -> HTMLResponse:
-    """Every project, newest activity first, by status and content type; and the create form."""
+    """Every project, newest activity first, by status and content type."""
     return _projects(
         request, principal, project_status=project_status or None,
         content_type=content_type or None, archived=archived, cursor=cursor or None, page=page,
         deleted=deleted, archive_path=archive,
     )  # fmt: skip
+
+
+def _project_new(
+    request: Request,
+    principal: Principal,
+    *,
+    create_error: SuiteError | None = None,
+    form: Mapping[str, Any] | None = None,
+) -> HTMLResponse:
+    view = app_view(request, APP)
+    client, settings = _clients(request)
+    nav = _nav_projects(request, view, client, settings)
+    workflows = _optional(lambda: ip.workflows_api(client, settings)) if nav.live else None
+    return render_app_page(
+        request, principal, APP, "ip_project_new.html", selected="Projects", view=view,
+        sourced=nav, nav=nav, workflows=workflows, create_error=create_error,
+        form=dict(form or {}),
+    )  # fmt: skip
+
+
+@ui_router.get(f"{BASE}/projects/new", summary="New project", response_class=HTMLResponse)
+def project_new_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The create form, on its own page — reached from the top nav's *New* (row WX10)."""
+    return _project_new(request, principal)
 
 
 @ui_router.post(f"{BASE}/projects", summary="Create a project from the page")
@@ -197,7 +244,7 @@ def create_from_page(  # noqa: PLR0913 — one parameter per form field
             request, principal, "ideapress.project_create", target=None, outcome=outcome_of(exc),
             params=params, message=exc.message,
         )  # fmt: skip
-        return _projects(request, principal, create_error=exc, form=form)
+        return _project_new(request, principal, create_error=exc, form=form)
     project_id = str(created.get("id") or "")
     _audit(
         request, principal, "ideapress.project_create", target=project_id or None, outcome="ok",
@@ -235,6 +282,7 @@ def _project(  # noqa: PLR0913 — the page, and what the last action left on it
         selected="Projects",
         view=view,
         sourced=sourced,
+        nav=_nav_projects(request, view, client, settings),
         project_id=project_id,
         action_error=action_error,
         form=dict(form or {}),
@@ -402,10 +450,16 @@ def _backends(
     sourced = read_app_page(
         request, view, api=lambda: ip.backends_api(client, settings), database=None
     )
+    defaults = _optional(lambda: ip.settings_api(client, settings)) if sourced.live else None
+    # Row WX10: LoadCoach's own models, read beside IdeaPress's — gated on this page's own
+    # liveness (not LoadCoach's), like every other secondary read on this route, so a stopped
+    # IdeaPress never sends this page a second application's traffic it did not ask to make.
+    loadcoach_models = _optional(lambda: lc.models_api(client, settings)) if sourced.live else None
     return render_app_page(
         request, principal, APP, "ip_backends.html", selected="Backends", view=view,
         sourced=sourced, tested=dict(tested) if tested is not None else None,
-        action_error=action_error,
+        action_error=action_error, loadcoach_models=loadcoach_models,
+        stage_bindings=ip.loadcoach_bindings(defaults),
     )  # fmt: skip
 
 

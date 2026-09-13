@@ -1,17 +1,15 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_ip.html" import short, state_badge, project_link %}
+{% from "mirrorwall/components.html" import table, empty_state, pagination %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% from "_ip.html" import short, state_badge, project_link, projects_nav %}
 {% block title %}Projects — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Projects {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/ideapress/workflows">Workflows</a> · <a href="/apps/ideapress/backends">Backends</a></div>
-</div>
+{% call app_page_header(view, "Projects", "Projects", "Newest activity first. A project is an idea, its brief, the plan compiled from it and the units drafted against that plan. Open one to plan it, run its stages and read what came back.") %}
+<a href="/apps/ideapress/workflows">Workflows</a> · <a href="/apps/ideapress/backends">Backends</a>
+{% endcall %}
+{{ projects_nav(nav, none) }}
 {% include "_app_state.html" %}
 {% if deleted %}<p class="notice" role="status">Deleted <strong>{{ deleted }}</strong>{% if archive_path %}; its archive was written first, to <code>{{ archive_path }}</code>{% endif %}.</p>{% endif %}
-<p class="muted">Newest activity first. A project is an idea, its brief, the plan compiled from it and the
-units drafted against that plan. Open one to plan it, run its stages and read what came back.</p>
 
 <form class="filter-bar" action="/apps/ideapress/projects" method="get" role="search">
   <div class="field"><label for="ip-status">Status</label>
@@ -22,37 +20,6 @@ units drafted against that plan. Open one to plan it, run its stages and read wh
   <label class="kit-check"><input type="checkbox" name="archived" value="true"{{ ' checked' if archived else '' }}> archived too</label>
   <button type="submit">Filter</button>
 </form>
-
-{% if sourced.live %}
-<details class="card kit-form"{% if create_error %} open{% endif %}>
-  <summary><strong>New project</strong> <span class="muted">— IdeaPress derives the slug from the title, and compiles requirements from the brief when you plan it</span></summary>
-  {{ refusal(create_error) }}
-  <form method="post" action="/apps/ideapress/projects">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <div class="field"><label for="ip-title">Title</label>
-      <input id="ip-title" name="title" value="{{ form.get('title', '') }}" required maxlength="200"></div>
-    <div class="field"><label for="ip-content-type">Content type</label>
-      <input id="ip-content-type" name="content_type" value="{{ form.get('content_type') or 'article' }}">
-      <span class="field-hint">IdeaPress refuses a type its registry does not hold.</span></div>
-    <div class="field"><label for="ip-workflow">Workflow</label>
-      {% if workflows is not none %}
-      <select id="ip-workflow" name="workflow_id">
-        {% for one in workflows["workflows"] %}<option value="{{ one.get('id') }}"{{ ' selected' if (form.get('workflow_id') or 'standard') == one.get('id') else '' }}>{{ one.get("id") }} {{ one.get("version") or "" }}</option>{% endfor %}
-      </select>
-      {% else %}
-      <input id="ip-workflow" name="workflow_id" value="{{ form.get('workflow_id') or 'standard' }}">
-      <span class="field-hint">The workflow list could not be read; name one.</span>
-      {% endif %}</div>
-    <div class="field kit-wide"><label for="ip-brief">Brief</label>
-      <textarea id="ip-brief" name="brief" rows="6">{{ form.get("brief", "") }}</textarea>
-      <span class="field-hint">One page. The requirement compiler reads this and nothing else, and a URL in it is what research may fetch.</span></div>
-    <div class="field kit-wide"><label for="ip-material">Author material</label>
-      <textarea id="ip-material" name="author_material" rows="3" placeholder='{"audience": "…"}'>{{ form.get("author_material", "") }}</textarea>
-      <span class="field-hint">A JSON object, stored as IdeaPress stores it; blank for none.</span></div>
-    <div class="kit-wide"><button type="submit" data-variant="primary">Create project</button></div>
-  </form>
-</details>
-{% endif %}
 
 {{ refusal(sourced.error) }}
 {% if sourced.data is not none %}

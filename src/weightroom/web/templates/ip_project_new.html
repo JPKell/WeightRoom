@@ -1,0 +1,41 @@
+{% extends "_shell.html" %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% from "_ip.html" import projects_nav %}
+{% block title %}New project — IdeaPress — WeightRoom{% endblock %}
+{% block page_content %}
+{% call app_page_header(view, "New project", "Projects", "IdeaPress derives the slug from the title, and compiles requirements from the brief when you plan it.") %}
+<a href="/apps/ideapress/projects">All projects</a>
+{% endcall %}
+{{ projects_nav(nav, "new") }}
+{% include "_app_state.html" %}
+{{ refusal(create_error) }}
+{% if sourced.live %}
+<form method="post" action="/apps/ideapress/projects" class="card kit-form">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <div class="field"><label for="ip-title">Title</label>
+    <input id="ip-title" name="title" value="{{ form.get('title', '') }}" required maxlength="200"></div>
+  <div class="field"><label for="ip-content-type">Content type</label>
+    <input id="ip-content-type" name="content_type" value="{{ form.get('content_type') or 'article' }}">
+    <span class="field-hint">IdeaPress refuses a type its registry does not hold.</span></div>
+  <div class="field"><label for="ip-workflow">Workflow</label>
+    {% if workflows is not none %}
+    <select id="ip-workflow" name="workflow_id">
+      {% for one in workflows["workflows"] %}<option value="{{ one.get('id') }}"{{ ' selected' if (form.get('workflow_id') or 'standard') == one.get('id') else '' }}>{{ one.get("id") }} {{ one.get("version") or "" }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <input id="ip-workflow" name="workflow_id" value="{{ form.get('workflow_id') or 'standard' }}">
+    <span class="field-hint">The workflow list could not be read; name one.</span>
+    {% endif %}</div>
+  <div class="field kit-wide"><label for="ip-brief">Brief</label>
+    <textarea id="ip-brief" name="brief" rows="6">{{ form.get("brief", "") }}</textarea>
+    <span class="field-hint">One page. The requirement compiler reads this and nothing else, and a URL in it is what research may fetch.</span></div>
+  <div class="field kit-wide"><label for="ip-material">Author material</label>
+    <textarea id="ip-material" name="author_material" rows="3" placeholder='{"audience": "…"}'>{{ form.get("author_material", "") }}</textarea>
+    <span class="field-hint">A JSON object, stored as IdeaPress stores it; blank for none.</span></div>
+  <div class="kit-wide"><button type="submit" data-variant="primary">Create project</button></div>
+</form>
+{% else %}
+<p class="muted">Creating a project needs IdeaPress's own API; start it first.</p>
+{% endif %}
+{{ page_source(sourced) }}
+{% endblock %}

@@ -6,6 +6,25 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX10)
+- **IdeaPress's Projects tab gets a top nav; Backends gets a LoadCoach-backed models table.**
+  `ip_projects.html` and `ip_project.html` now carry a nav strip — the eight most recent projects
+  by name, *All*, *New* — read from an unfiltered, eight-row `GET /projects`
+  (`routes/ideapress._nav_projects`) kept independent of the list page's own filters, page and
+  cursor, so a status filter or an open project can never make a recent project disappear from
+  it. The create form moves off the list onto its own page, `GET /apps/ideapress/projects/new`
+  (new template `ip_project_new.html`; `POST /projects` still creates, and still renders back onto
+  this page on a refusal). Backends: the three inference-mode cards shrink to one table row each,
+  and a new **Models available in LoadCoach** table (`loadcoach_pages.models_api`, read alongside
+  IdeaPress's own and gated on this page's own liveness, never LoadCoach's) shows every model
+  LoadCoach has discovered — available and enabled ones plainly, with the `[models.stages]`
+  binding(s) that name them (`ideapress_pages.loadcoach_bindings`, matched to LoadCoach's
+  `canonical_id` by IdeaPress's own reference string, ADR-0024) and a link to Settings to change
+  one; any other model is dimmed with an *Enable in LoadCoach* link to its LoadCoach detail page.
+  This page still writes nothing. `ip_projects.html`, `ip_project.html`, `ip_backends.html` and
+  `ip_project_new.html` are the first pages to call `_app_page.html`'s `app_page_header` (row
+  WP1's kit macro, built with no caller until now).
+
 ### Added (row WX6)
 - **The telemetry history page draws an ECharts line chart** beside its existing accessible SVG
   (`GET /telemetry/history`), the console's first use of MirrorWall's newly vendored ECharts
