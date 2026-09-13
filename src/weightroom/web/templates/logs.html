@@ -1,8 +1,11 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% block title %}Logs — WeightRoom{% endblock %}
 {% block page_content %}
+{% set links = [] %}
+{% for app in applications %}{% set _ = links.append({"label": app | app_label, "href": "/apps/" ~ app}) %}{% endfor %}
+{{ page_nav(links=links) }}
 <h2>Logs</h2>
-<p>Per application: {% for app in applications %}<a href="/apps/{{ app }}">{{ app }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% with stream_url = "/api/v1/logs/stream", max_lines = 1000 %}
   {% include "_log_pane.html" %}
 {% endwith %}

@@ -27,17 +27,31 @@
   .log-pane-follow { display: inline-flex; align-items: center; gap: var(--mw-space-1, 4px); margin: 0; }
   .log-pane-follow input { width: auto; height: auto; margin: 0; }
   .log-pane-bar button { width: auto; }
-  /* Shared by every page that shows a log: the history list (`app_logs.html`, three stacked lines
-     because a level, an app/version/pid line and a message/logger/request_id line do not fit the
-     `table()` macro's one-row-one-record contract) and this live pane, wherever it is included. */
+  /* Shared by every page that shows a log: the history list (`app_logs.html`) and this live pane,
+     wherever it is included. Row WY2: a 3 × 3 grid — left (level, date, time), middle (app,
+     version, pid), right (message, logger, request id) — the message column takes the rest. */
   .log-rows { list-style: none; margin: 0; padding: 0; }
-  .log-rows .log-row { padding: 4px 0; border-bottom: 1px solid var(--mw-border); }
+  .log-rows .log-row {
+    display: grid; grid-template-columns: max-content max-content 1fr;
+    column-gap: var(--mw-space-3, 12px);
+    padding: 4px 0; border-bottom: 1px solid var(--mw-border);
+  }
   .log-rows .log-row:last-child { border-bottom: none; }
-  .log-rows .log-row p { margin: 0; white-space: pre-wrap; word-break: break-word; }
-  .log-rows .log-row-1 { display: flex; align-items: center; gap: .5rem; }
-  .log-rows .log-row-2 {
+  .log-rows .log-row p { margin: 0; }
+  .log-col-1, .log-col-2 { white-space: nowrap; }
+  .log-col-2 {
     opacity: .65; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     font-size: .8125rem;
+  }
+  .log-col-3 { min-width: 0; }
+  .log-col-3 p { white-space: pre-wrap; word-break: break-word; }
+  .log-col-3 p:not(:first-child) { opacity: .65; font-size: .8125rem; }
+  .log-rows .log-row.notice-line { display: block; }
+  .log-rows .log-row.notice-line p { white-space: pre-wrap; word-break: break-word; }
+  @media (max-width: 480px) {
+    .log-rows .log-row { grid-template-columns: max-content 1fr; }
+    .log-col-1, .log-col-2 { grid-column: 1; }
+    .log-col-3 { grid-column: 2; grid-row: 1 / span 2; }
   }
   .log-pane .log-rows {
     max-height: 24rem; overflow-y: auto; padding: var(--space-2, .5rem);
@@ -66,26 +80,34 @@
   const maximum = Number(pane.dataset.logMax || 500);
   clear.addEventListener("click", () => { pane.replaceChildren(); });
 
-  // "%Y-%m-%d %H:%M:%S", local, no offset — the same shape the server-rendered history uses
-  // (`app_logs.html`, via `line.at.astimezone().strftime(...)`); `Date`'s getters are already
-  // local, so no timezone conversion is needed here.
-  const stampOf = (iso) => {
+  // "YYYY-MM-DD" / "HH:MM:SS", local, no offset — the same shapes the server-rendered history
+  // uses (`app_logs.html`, via `line.at.astimezone().strftime(...)`); `Date`'s getters are
+  // already local, so no timezone conversion is needed here.
+  const dateTimeOf = (iso) => {
     const at = new Date(iso);
-    if (Number.isNaN(at.getTime())) { return iso; }
+    if (Number.isNaN(at.getTime())) { return [iso, ""]; }
     const pad = (n) => String(n).padStart(2, "0");
-    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} `
-      + `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+    return [
+      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`,
+      `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`,
+    ];
   };
 
-  const row = (lines) => {
+  const col = (cls, texts) => {
+    const div = document.createElement("div");
+    div.className = cls;
+    for (const text of texts) {
+      const p = document.createElement("p");
+      p.textContent = text;
+      div.appendChild(p);
+    }
+    return div;
+  };
+
+  const row = (cols) => {
     const item = document.createElement("li");
     item.className = "log-row";
-    for (const [cls, text] of lines) {
-      const p = document.createElement("p");
-      p.className = cls;
-      p.textContent = text;
-      item.appendChild(p);
-    }
+    for (const [cls, texts] of cols) { item.appendChild(col(cls, texts)); }
     return item;
   };
 
@@ -95,22 +117,33 @@
     if (follow.checked) { pane.scrollTop = pane.scrollHeight; }
   };
 
-  // Three stacked lines, the same shape the history page renders (row WX2's kickoff): level and
-  // timestamp; app, version and pid; the message with its logger and request id.
+  // The 3 × 3 grid (row WY2, roadmap §5): left column level/date/time, middle column
+  // app/version/pid, right column message/logger/request id.
   const appendLog = (payload) => {
+    const [date, time] = dateTimeOf(payload.at);
     const item = row([
-      ["log-row-1", `${(payload.level || "info").toUpperCase()} ${stampOf(payload.at)}`],
-      ["log-row-2", `${payload.app || payload.unit || "—"} ${payload.version || "—"}`
-        + (payload.pid ? ` [${payload.pid}]` : "")],
-      ["log-row-3", `${payload.message} · ${payload.logger || "—"} · ${payload.request_id || "—"}`],
+      ["log-col log-col-1", [(payload.level || "info").toUpperCase(), date, time]],
+      ["log-col log-col-2", [
+        payload.app || payload.unit || "—",
+        payload.version || "—",
+        payload.pid ? String(payload.pid) : "—",
+      ]],
+      ["log-col log-col-3", [
+        payload.message,
+        payload.logger || "—",
+        payload.request_id || "—",
+      ]],
     ]);
     if (payload.level) { item.dataset.level = payload.level; }
     append(item);
   };
 
   const appendNotice = (text, level) => {
-    const item = row([["log-row-3", text]]);
-    item.classList.add("notice-line");
+    const item = document.createElement("li");
+    item.className = "log-row notice-line";
+    const p = document.createElement("p");
+    p.textContent = text;
+    item.appendChild(p);
     if (level) { item.dataset.level = level; }
     append(item);
   };

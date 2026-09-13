@@ -6,6 +6,17 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed (row WY2)
+- **Every log view is a 3 × 3 grid**: level/date/time, app/version/pid, message/logger/request id
+  — the same markup and class names (`log-col log-col-1/2/3`) in the server-rendered history
+  (`app_logs.html`) and the live pane's script (`_log_pane.html`), one shared stylesheet. At 412 px
+  the left and middle columns merge into one narrow column of six lines; the message column keeps
+  its width. `app_logs.html`'s and `logs.html`'s link strips are now `page_nav`.
+- **Every settings table right-aligns Value, Source and Applies**; Source and Applies shrink to
+  content so Key and Value share the rest, and Applies stacks its pills and buttons one per line,
+  right-aligned, inside a new `.applies-stack` wrapper `<div>` (a `display: flex` directly on the
+  `<td>` corrupted Chromium's text painting for the first stacked pill — moving the flex box to an
+  inner div fixed it).
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

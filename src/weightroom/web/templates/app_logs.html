@@ -1,11 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, pagination %}
-{% from "_app_page.html" import refusal, level_badge %}
+{% from "_app_page.html" import refusal, level_badge, page_nav %}
 {% block title %}Logs — {{ view.name | app_label }} — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": "JSON", "href": "/api/v1/apps/" ~ view.name ~ "/logs"}]) }}
 <div class="page-head">
   <h2>Logs {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/api/v1/apps/{{ view.name }}/logs">JSON</a> · <a href="/logs">Every unit</a></div>
 </div>
 {% include "_app_state.html" %}
 
@@ -31,9 +31,21 @@
 <ol class="log-rows">
   {% for line in journal.lines %}
   <li class="log-row" data-level="{{ line.level }}">
-    <p class="log-row-1">{{ level_badge(line.level) }} <span class="mono">{{ line.at.astimezone().strftime("%Y-%m-%d %H:%M:%S") }}</span></p>
-    <p class="log-row-2 mono">{{ line.app }} {{ line.version or "—" }}{{ (" [" ~ line.pid ~ "]") if line.pid else "" }}</p>
-    <p class="log-row-3">{{ line.text or line.message }} <span class="muted">· {{ line.logger or "—" }} · {{ line.request_id or "—" }}</span></p>
+    <div class="log-col log-col-1">
+      <p>{{ level_badge(line.level) }}</p>
+      <p>{{ line.at.astimezone().strftime("%Y-%m-%d") }}</p>
+      <p>{{ line.at.astimezone().strftime("%H:%M:%S") }}</p>
+    </div>
+    <div class="log-col log-col-2">
+      <p>{{ line.app }}</p>
+      <p>{{ line.version or "—" }}</p>
+      <p>{{ line.pid or "—" }}</p>
+    </div>
+    <div class="log-col log-col-3">
+      <p>{{ line.text or line.message }}</p>
+      <p>{{ line.logger or "—" }}</p>
+      <p>{{ line.request_id or "—" }}</p>
+    </div>
   </li>
   {% endfor %}
 </ol>
