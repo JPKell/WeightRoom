@@ -822,6 +822,10 @@ def _lc_form(
             router.get(url__regex=rf"{LOADCOACH_URL}/api/v1/.*").mock(
                 return_value=httpx.Response(200, json={})
             )
+            # The Models page reads FreeWeight for its Context fit column (row WX9).
+            router.get(url__regex=r"http://127\.0\.0\.1:8765/api/v1/.*").mock(
+                return_value=httpx.Response(200, json={})
+            )
             return console.post_form(path, data)
 
     return exercise

@@ -12,7 +12,7 @@ Every action is a form post writing exactly one audit row whether LoadCoach acce
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 from urllib.parse import urlencode
 
@@ -20,6 +20,7 @@ from baseaicore import SuiteError, new_id
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 
+from weightroom.services import freeweight_pages as fw
 from weightroom.services import loadcoach_actions as actions
 from weightroom.services import loadcoach_pages as lc
 from weightroom.services.app_api import outcome_of
@@ -88,17 +89,71 @@ def _clients(request: Request) -> tuple[Any, Any]:
 # --- Models ---------------------------------------------------------------------------------------
 
 
-def _models(
+def _optional[T](read: Callable[[], T], default: T) -> tuple[T, SuiteError | None]:
+    """``read()``, or ``default`` and the refusal — for a column that enriches a page.
+
+    Ability, speed and context fit each come from a *second* read, and none of them is the page:
+    the Models page is the registry, and a reader that refuses costs that page its column and a
+    note, never its rows (ADR-0016 — an unavailable figure says so, it does not become a zero).
+    """
+    try:
+        return read(), None
+    except SuiteError as exc:
+        return default, exc
+
+
+def _by_ability(
+    models: Sequence[Mapping[str, Any]],
+    ability: str,
+    scores: Mapping[str, Mapping[str, float]],
+) -> list[Mapping[str, Any]]:
+    """``models`` in the registry's own order, or ordered by one capability's bound score.
+
+    Highest first; a model with no bound evidence for that capability sorts last and shows a dash,
+    because no measurement is not a low score (ADR-0016). Registry order — LoadCoach's, newest
+    seen first — is returned untouched when no ability is chosen, so the default page is exactly
+    what the API said.
+    """
+    if not ability:
+        return list(models)
+    return sorted(
+        models,
+        key=lambda one: (
+            -float(scores.get(str(one.get("canonical_id") or ""), {}).get(ability, float("-inf")))
+        ),
+    )
+
+
+def _models(  # noqa: PLR0913 — what an action leaves on the page, plus this page's own controls
     request: Request,
     principal: Principal,
     *,
     action_error: SuiteError | None = None,
     scanned: Mapping[str, Any] | None = None,
+    ability: str = "",
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
         request, view, api=lambda: lc.models_api(client, settings), database=lc.models_db
+    )
+    empty: dict[str, Any] = {}
+    no_abilities: dict[str, Any] = {"capabilities": [], "scores": {}}
+    abilities, _abilities_error = (
+        _optional(lambda: lc.abilities_api(client, settings), no_abilities)
+        if sourced.live
+        else (no_abilities, None)
+    )
+    speed, _speed_error = (
+        _optional(lambda: lc.speed_api(client, settings), empty) if sourced.live else (empty, None)
+    )
+    # A cross-application read: FreeWeight measures the context that fits, LoadCoach never does
+    # (row WX7's `GET /results/context-fit`). FreeWeight down, or older than that row, costs the
+    # column its numbers and nothing else.
+    context_fit, context_fit_error = (
+        _optional(lambda: fw.context_fit_api(client, settings), empty)
+        if sourced.data
+        else (empty, None)
     )
     return render_app_page(
         request,
@@ -108,15 +163,29 @@ def _models(
         selected="Models",
         view=view,
         sourced=sourced,
+        ordered=_by_ability(sourced.data or [], ability, abilities["scores"]),
         action_error=action_error,
         scanned=scanned,
+        ability=ability,
+        abilities=abilities["capabilities"],
+        scores=abilities["scores"],
+        speed=speed,
+        context_fit=context_fit,
+        context_fit_error=context_fit_error,
     )
 
 
 @ui_router.get(f"{BASE}/models", summary="Models", response_class=HTMLResponse)
-def models_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """Every model discovery has seen, with evidence, reliability, residency and its switches."""
-    return _models(request, principal)
+def models_page(
+    request: Request, principal: CurrentOperator, ability: str | None = None
+) -> HTMLResponse:
+    """Every model discovery has seen, with evidence, reliability, residency and its switches.
+
+    ``ability`` is one capability id from the bound evidence this LoadCoach holds: the table gains
+    that capability's score per model and is ordered by it, highest first, with every model that
+    has no bound evidence for it last (no evidence is not a low score — ADR-0016).
+    """
+    return _models(request, principal, ability=(ability or "").strip())
 
 
 @ui_router.post(f"{BASE}/models/discover", summary="Scan for models from the page")
@@ -227,20 +296,6 @@ def _routing(
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
-    page_rows = settings.ui.page_rows
-    decisions = read_app_page(
-        request,
-        view,
-        api=lambda: lc.decisions_api(client, settings),
-        database=lambda handle: lc.decisions_db(handle, page_rows=page_rows),
-    )
-    # `GET /routing-decisions` hardcodes its own cap (50) with no `limit` the console can raise
-    # (row WX5); the stopped path's cap is `page_rows`. Each source is "possibly more" only
-    # against its own ceiling — a fixed 50 on the API path would be the wrong number to compare
-    # a `page_rows=200` database read against.
-    decisions_cap = 50 if decisions.live else page_rows
-    decisions_rows = decisions.data or []
-    decisions_capped = bool(decisions_rows) and len(decisions_rows) >= decisions_cap
     profiles = read_app_page(
         request,
         view,
@@ -257,8 +312,6 @@ def _routing(
         "lc_routing.html",
         selected="Routing",
         view=view,
-        decisions=decisions,
-        decisions_capped=decisions_capped,
         profiles=profiles,
         models=models.data or [],
         explained=explained,
@@ -270,8 +323,47 @@ def _routing(
 
 @ui_router.get(f"{BASE}/routing", summary="Routing", response_class=HTMLResponse)
 def routing_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """The explain form, the decision history, and the task profiles routing ranks against."""
+    """The explain form — always open — and the task profiles routing ranks against.
+
+    The decision history moved to its own page at ``/routing/decisions`` (row WX9): the form is
+    what an operator comes here to use, and a form behind a summary under a long table is a form
+    nobody opens.
+    """
     return _routing(request, principal)
+
+
+@ui_router.get(f"{BASE}/routing/decisions", summary="Decisions", response_class=HTMLResponse)
+def routing_decisions_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """Every routing decision LoadCoach persisted, newest first.
+
+    Persisted, not sampled — but not pageable either: ``GET /routing-decisions`` hardcodes its own
+    cap of 50 with no ``limit`` the console can raise (row WX5), so a live read says *first N of
+    more* rather than offering a pager that could not work. The stopped path's cap is
+    ``[ui] page_rows``.
+    """
+    view = app_view(request, APP)
+    client, settings = _clients(request)
+    page_rows = settings.ui.page_rows
+    decisions = read_app_page(
+        request,
+        view,
+        api=lambda: lc.decisions_api(client, settings),
+        database=lambda handle: lc.decisions_db(handle, page_rows=page_rows),
+    )
+    # Each source is "possibly more" only against its own ceiling — a fixed 50 on the API path
+    # would be the wrong number to compare a `page_rows=200` database read against.
+    decisions_cap = 50 if decisions.live else page_rows
+    rows = decisions.data or []
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "lc_decisions.html",
+        selected="Routing",
+        view=view,
+        decisions=decisions,
+        decisions_capped=bool(rows) and len(rows) >= decisions_cap,
+    )
 
 
 @ui_router.post(f"{BASE}/routing", summary="Explain a route from the page")
@@ -408,19 +500,77 @@ def task_profile_page(request: Request, principal: CurrentOperator, task: str) -
 # --- Reliability ----------------------------------------------------------------------------------
 
 
+_PREFIXED_KEYS: Final = ("canonical_id", "subject_canonical_id", "task_profile_id")
+"""The identifiers a Reliability prefix matches: the model's, and the task profile's.
+
+Both, not one: ``tools.agent.`` is a family of task profiles and ``ollama/gemma`` a family of
+models, and an operator typing either means the same thing by it.
+"""
+
+
+def _keep_prefix(document: Any, prefix: str) -> int:  # noqa: ANN401 — the page's own document
+    """Keep only the rows whose model or task profile starts with ``prefix``; return how many went.
+
+    Console-side ``startswith`` over the rows the page already fetched (row WX9, the operator's
+    default) — LoadCoach's own ``task`` and ``model`` filters are exact, and adding a prefix
+    parameter to its API for a browser control is the wrong place for it. The document is edited
+    in place, so the pager, the source line and the window table all see the same rows.
+
+    Args:
+        document: The reliability document, or ``None`` when nothing was read.
+        prefix: What the operator typed; empty keeps everything.
+
+    Returns:
+        The number of rows the prefix removed. Zero when nothing was removed, which is also what
+        an empty prefix returns — the page uses it only to tell "nothing matched" from "nothing
+        recorded".
+    """
+    if not prefix or not isinstance(document, dict):
+        return 0
+    removed = 0
+    for key in ("reliability", "stats"):
+        rows = document.get(key)
+        if not isinstance(rows, list):
+            continue
+        kept = [row for row in rows if _matches_prefix(row, prefix)]
+        removed += len(rows) - len(kept)
+        document[key] = kept
+    return removed
+
+
+def _matches_prefix(row: Any, prefix: str) -> bool:  # noqa: ANN401 — one row of either shape
+    """Whether this pair's model or task profile starts with ``prefix``."""
+    if not isinstance(row, Mapping):
+        return False
+    model = row.get("model")
+    named = model if isinstance(model, Mapping) else {}
+    candidates = [row.get(key) for key in _PREFIXED_KEYS]
+    candidates += [named.get(key) for key in _PREFIXED_KEYS]
+    return any(isinstance(one, str) and one.startswith(prefix) for one in candidates)
+
+
 @ui_router.get(f"{BASE}/reliability", summary="Reliability", response_class=HTMLResponse)
-def reliability_page(
+def reliability_page(  # noqa: PLR0913 — one parameter per control on the filter bar
     request: Request,
     principal: CurrentOperator,
     task: str | None = None,
     model: str | None = None,
+    prefix: str | None = None,
     page: int = 1,
 ) -> HTMLResponse:
-    """Production evidence per model and task profile: windows, factor, regression, breaker."""
+    """Production evidence per model and task profile: windows, factor, regression, breaker.
+
+    ``task`` and ``model`` are exact and are LoadCoach's own filters. ``prefix`` is the console's:
+    it matches ``startswith`` over the pairs the page already fetched, which is what makes
+    ``tools.agent.`` — a family of profiles rather than one — a usable filter without a new
+    endpoint (row WX9, the operator's default). It is applied **after** paging, so a page that
+    the prefix empties says so rather than looking like the end of the list.
+    """
     view = app_view(request, APP)
     client, settings = _clients(request)
     page_rows = settings.ui.page_rows
     wanted_task, wanted_model = task or None, model or None
+    wanted_prefix = (prefix or "").strip()
     sourced = read_app_page(
         request,
         view,
@@ -431,11 +581,24 @@ def reliability_page(
             handle, task=wanted_task, model=wanted_model, page=page, page_rows=page_rows
         ),
     )
+    prefix_hid = _keep_prefix(sourced.data, wanted_prefix)
     next_page = (sourced.data or {}).get("next_page")
     next_href = (
-        _href(f"{BASE}/reliability", task=wanted_task, model=wanted_model, page=next_page)
+        _href(
+            f"{BASE}/reliability",
+            task=wanted_task,
+            model=wanted_model,
+            prefix=wanted_prefix,
+            page=next_page,
+        )
         if next_page
         else None
+    )
+    profiles = read_app_page(
+        request, view, api=lambda: lc.task_profiles_api(client, settings), database=None
+    )
+    models = read_app_page(
+        request, view, api=lambda: lc.models_api(client, settings), database=None
     )
     return render_app_page(
         request,
@@ -447,6 +610,10 @@ def reliability_page(
         sourced=sourced,
         task=wanted_task or "",
         model=wanted_model or "",
+        prefix=wanted_prefix,
+        prefix_hid=prefix_hid,
+        profile_ids=[str(one.get("profile_id") or "") for one in profiles.data or []],
+        model_ids=sorted({str(one.get("canonical_id") or "") for one in models.data or []} - {""}),
         next_href=next_href,
     )
 
@@ -464,23 +631,104 @@ def _href(path: str, **query: Any) -> str:
     return f"{path}?{urlencode(kept)}" if kept else path
 
 
-def _queue(  # noqa: PLR0913 — the filters, and what a failed action leaves on the page
+def _queue(
     request: Request,
     principal: Principal,
     *,
-    filters: Mapping[str, str | None] | None = None,
-    cursor: str | None = None,
-    page: int = 1,
     confirm: str | None = None,
     action_error: SuiteError | None = None,
+) -> HTMLResponse:
+    """The queue as it stands *now*: its report, its controls, and the SSE region.
+
+    Row WX9 split what was one page into three — current, a new job, history — and this is the
+    only one of them that streams: two pages subscribed to the same region would be two
+    connections rendering the same frames.
+    """
+    view = app_view(request, APP)
+    client, settings = _clients(request)
+    report = read_app_page(request, view, api=lambda: lc.queue_api(client, settings), database=None)
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "lc_queue.html",
+        selected="Queue",
+        view=view,
+        report=report,
+        confirm=confirm,
+        sentences=actions.QUEUE_VERBS,
+        action_error=action_error,
+    )
+
+
+def _queue_new(
+    request: Request,
+    principal: Principal,
+    *,
     submit_error: SuiteError | None = None,
     form: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
+    """The Submit form on its own page, with the idempotency key minted at render (WP2 §2.5)."""
+    view = app_view(request, APP)
+    client, settings = _clients(request)
+    live = view.running and view.reachable
+    profiles = (
+        read_app_page(
+            request, view, api=lambda: lc.task_profiles_api(client, settings), database=None
+        ).data
+        if live
+        else None
+    )
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "lc_queue_new.html",
+        selected="Queue",
+        view=view,
+        live=live,
+        classes=lc.JOB_CLASSES,
+        submit_error=submit_error,
+        form=dict(form or {}),
+        profiles=profiles or [],
+        classifications=actions.CLASSIFICATIONS,
+        idempotency_key=new_id(),
+    )
+
+
+@ui_router.get(f"{BASE}/queue", summary="Queue", response_class=HTMLResponse)
+def queue_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The queue's report, live, and its controls."""
+    return _queue(request, principal)
+
+
+@ui_router.get(f"{BASE}/queue/new", summary="Submit a job", response_class=HTMLResponse)
+def queue_new_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The Submit form: one job, queued and routed like any other."""
+    return _queue_new(request, principal)
+
+
+@ui_router.get(f"{BASE}/queue/history", summary="Job history", response_class=HTMLResponse)
+def queue_history_page(  # noqa: PLR0913 — one parameter per filter LoadCoach's Jobs page takes
+    request: Request,
+    principal: CurrentOperator,
+    state: str | None = None,
+    job_class: Annotated[str | None, Query(alias="class")] = None,
+    task: str | None = None,
+    source: str | None = None,
+    cursor: str | None = None,
+    page: int = 1,
+) -> HTMLResponse:
+    """Every job, filtered and paged by ``[ui] page_rows``, newest first."""
     view = app_view(request, APP)
     client, settings = _clients(request)
     page_rows = settings.ui.page_rows
-    wanted = {key: (filters or {}).get(key) or None for key in ("state", "class", "task", "source")}
-    report = read_app_page(request, view, api=lambda: lc.queue_api(client, settings), database=None)
+    wanted = {
+        "state": state or None,
+        "class": job_class or None,
+        "task": task or None,
+        "source": source or None,
+    }
     jobs = read_app_page(
         request,
         view,
@@ -496,58 +744,21 @@ def _queue(  # noqa: PLR0913 — the filters, and what a failed action leaves on
     data = jobs.data or {}
     next_href = None
     if data.get("next_cursor"):
-        next_href = _href(f"{BASE}/queue", **wanted, cursor=data["next_cursor"]) + "#jobs"
+        next_href = _href(f"{BASE}/queue/history", **wanted, cursor=data["next_cursor"]) + "#jobs"
     elif data.get("next_page"):
-        next_href = _href(f"{BASE}/queue", **wanted, page=data["next_page"]) + "#jobs"
-    profiles = (
-        read_app_page(
-            request, view, api=lambda: lc.task_profiles_api(client, settings), database=None
-        ).data
-        if report.live
-        else None
-    )
+        next_href = _href(f"{BASE}/queue/history", **wanted, page=data["next_page"]) + "#jobs"
     return render_app_page(
         request,
         principal,
         APP,
-        "lc_queue.html",
+        "lc_queue_history.html",
         selected="Queue",
         view=view,
-        report=report,
         jobs=jobs,
         filters={key: value or "" for key, value in wanted.items()},
         states=lc.JOB_STATES,
         classes=lc.JOB_CLASSES,
         next_href=next_href,
-        confirm=confirm,
-        sentences=actions.QUEUE_VERBS,
-        action_error=action_error,
-        submit_error=submit_error,
-        form=dict(form or {}),
-        profiles=profiles or [],
-        classifications=actions.CLASSIFICATIONS,
-        idempotency_key=new_id(),
-    )
-
-
-@ui_router.get(f"{BASE}/queue", summary="Queue", response_class=HTMLResponse)
-def queue_page(  # noqa: PLR0913 — one parameter per filter LoadCoach's Jobs page takes
-    request: Request,
-    principal: CurrentOperator,
-    state: str | None = None,
-    job_class: Annotated[str | None, Query(alias="class")] = None,
-    task: str | None = None,
-    source: str | None = None,
-    cursor: str | None = None,
-    page: int = 1,
-) -> HTMLResponse:
-    """The queue's report, live; its controls; and every job, filtered, with the Submit form."""
-    return _queue(
-        request,
-        principal,
-        filters={"state": state, "class": job_class, "task": task, "source": source},
-        cursor=cursor or None,
-        page=page,
     )
 
 
@@ -691,13 +902,13 @@ def submit_job_from_page(  # noqa: PLR0913 — one parameter per form field, as 
             params=params,
             message=exc.message,
         )
-        return _queue(request, principal, submit_error=exc, form=form)
+        return _queue_new(request, principal, submit_error=exc, form=form)
     job_id = str(document.get("job_id") or "")
     _audit(
         request, principal, "loadcoach.job_submit", target=job_id or None, outcome="ok",
         params={**params, "state": document.get("state")},
     )  # fmt: skip
-    location = f"{BASE}/queue/jobs/{lc.segment(job_id)}" if job_id else f"{BASE}/queue"
+    location = f"{BASE}/queue/jobs/{lc.segment(job_id)}" if job_id else f"{BASE}/queue/history"
     return RedirectResponse(location, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -828,16 +1039,17 @@ def _evidence(
     action_error: SuiteError | None = None,
     imported: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
+    """The admin half: the store's overview, its sources, and Import (row WX9)."""
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
-        request, view, api=lambda: lc.evidence_api(client, settings), database=lc.evidence_db
+        request, view, api=lambda: lc.evidence_store_api(client, settings), database=lc.evidence_db
     )
     return render_app_page(
         request,
         principal,
         APP,
-        "lc_evidence.html",
+        "lc_evidence_admin.html",
         selected="Evidence",
         view=view,
         sourced=sourced,
@@ -848,8 +1060,47 @@ def _evidence(
 
 
 @ui_router.get(f"{BASE}/evidence", summary="Evidence", response_class=HTMLResponse)
-def evidence_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """Imported evidence by match state, the store's summary, the sources, and Import."""
+def evidence_page(
+    request: Request,
+    principal: CurrentOperator,
+    capability: str | None = None,
+    model: str | None = None,
+    min_confidence: str | None = None,
+) -> HTMLResponse:
+    """The records, with LoadCoach's own ``capability`` / ``model`` / ``min_confidence`` filters.
+
+    The filters are sent to LoadCoach rather than applied here: each match state is read against
+    its own cap, and a console-side filter over a capped page would quietly hide records the
+    filter was meant to find. The stopped path reads the rows and says the filters need the API.
+    """
+    view = app_view(request, APP)
+    client, settings = _clients(request)
+    filters = {
+        "capability": (capability or "").strip(),
+        "model": (model or "").strip(),
+        "min_confidence": (min_confidence or "").strip(),
+    }
+    sourced = read_app_page(
+        request,
+        view,
+        api=lambda: lc.evidence_api(client, settings, **filters),
+        database=lc.evidence_db,
+    )
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "lc_evidence.html",
+        selected="Evidence",
+        view=view,
+        sourced=sourced,
+        filters=filters,
+    )
+
+
+@ui_router.get(f"{BASE}/evidence/admin", summary="Evidence admin", response_class=HTMLResponse)
+def evidence_admin_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The store's summary, every source, and Import."""
     return _evidence(request, principal)
 
 
@@ -919,6 +1170,7 @@ def _providers(  # noqa: PLR0913 — what an action leaves on the page
     form: Mapping[str, Any] | None = None,
     saved: str | None = None,
     removed: str | None = None,
+    prefill: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
@@ -940,6 +1192,7 @@ def _providers(  # noqa: PLR0913 — what an action leaves on the page
         form=dict(form or {}),
         saved=saved,
         removed=removed,
+        prefill=dict(prefill or {}),
     )
 
 
@@ -949,9 +1202,24 @@ def providers_page(
     principal: CurrentOperator,
     saved: str | None = None,
     removed: str | None = None,
+    kind: str | None = None,
 ) -> HTMLResponse:
-    """Every ``[providers.<name>]`` registration as a form, and one to add another (ADR-0117)."""
-    return _providers(request, principal, saved=saved or None, removed=removed or None)
+    """Every ``[providers.<name>]`` registration as a form, and one to add another (ADR-0117).
+
+    ``kind`` prefills the *Add a registration* form — the **Add llama.cpp** link's whole
+    mechanism (row WX9). It is a prefill and nothing more: the form is submitted by a person, the
+    password gate on a new registration is unchanged, and a kind LoadCoach does not support is
+    refused by LoadCoach in its own words rather than filtered here.
+    """
+    wanted = (kind or "").strip()
+    prefill = {"kind": wanted} if wanted else None
+    if wanted == "llamacpp":
+        # The one kind that launches its own server: `model_directory` is required and there is no
+        # default worth guessing, so the form opens with the field empty and marked required.
+        prefill = {"kind": wanted, "base_url": "", "server_path": "llama-server"}
+    return _providers(
+        request, principal, saved=saved or None, removed=removed or None, prefill=prefill
+    )
 
 
 @ui_router.post(f"{BASE}/providers", summary="Save or remove a registration from the page")
@@ -968,6 +1236,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
     model_directory: Annotated[str, Form()] = "",
     state_dir: Annotated[str, Form()] = "",
     server_path: Annotated[str, Form()] = "",
+    enabled: Annotated[str, Form()] = "",
     confirm: Annotated[str, Form()] = "",
     password: Annotated[str, Form()] = "",
 ) -> Response:
@@ -985,7 +1254,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
     form = {
         "name": wanted, "kind": kind, "base_url": base_url, "timeout_seconds": timeout_seconds,
         "remote": remote, "model_directory": model_directory, "state_dir": state_dir,
-        "server_path": server_path,
+        "server_path": server_path, "enabled": enabled,
     }  # fmt: skip
     if action == "delete":
         if confirm != wanted or not wanted:
@@ -1030,6 +1299,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
         values = actions.registration_values(
             kind=kind, base_url=base_url, timeout_seconds=timeout_seconds, remote=remote == "true",
             model_directory=model_directory, state_dir=state_dir, server_path=server_path,
+            enabled=enabled == "true",
         )  # fmt: skip
         changed, security = actions.touched(current, values)
         if security:

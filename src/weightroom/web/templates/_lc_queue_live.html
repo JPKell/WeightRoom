@@ -1,7 +1,7 @@
 {#- The queue's live region (row WP2): rendered on the page and, identically, into every frame the
     console's queue stream sends — one report, one template, never LoadCoach's own markup. Takes
     `report`, LoadCoach's queue §11 document. -#}
-{% from "mirrorwall/components.html" import badge, empty_state, kv_list, table %}
+{% from "mirrorwall/components.html" import badge, empty_state, table %}
 {% from "_lc.html" import job_link, breaker_badge %}
 {% set flags = report.get("flags") or {} %}
 {% set latency = report.get("dispatch_latency_ms") or {} %}
@@ -9,17 +9,26 @@
 {% set by_class = report.get("depth_by_class") or {} %}
 {% set state_parts = [] %}{% for key, value in by_state | dictsort %}{% set _ = state_parts.append(key ~ " " ~ value) %}{% endfor %}
 {% set class_parts = [] %}{% for key, value in by_class | dictsort %}{% set _ = class_parts.append(key ~ " " ~ value) %}{% endfor %}
-{{ kv_list([
-  {"label": "Dispatch", "value": badge("paused", tone="warning") if flags.get("paused") else (badge("draining", tone="warning") if flags.get("draining") else badge("running", tone="success"))},
-  {"label": "Active jobs", "value": (report.get("active") if report.get("active") is not none else "—") ~ " of at most " ~ (report.get("max_depth") if report.get("max_depth") is not none else "—")},
-  {"label": "By state", "value": state_parts | join(" · ") or "empty"},
-  {"label": "By class", "value": class_parts | join(" · ") or "empty"},
-  {"label": "Oldest queued", "value": ((report.get("oldest_queued_age_seconds") | round(1)) ~ " s") if report.get("oldest_queued_age_seconds") is number else "—"},
-  {"label": "Starving", "value": report.get("starving") if report.get("starving") is not none else "—"},
-  {"label": "Completed, last 5 min", "value": (report.get("throughput") or {}).get("completed_last_5m", "—")},
-  {"label": "Dispatch latency", "value": ((latency.get("median") | round(1)) ~ " ms median, " ~ (latency.get("max") | round(1)) ~ " ms max over " ~ latency.get("samples") ~ " claims") if latency.get("samples") else "no claim yet"},
-  {"label": "Last recovery", "value": ((report.get("last_recovery") or {}).get("touched", "—") ~ " job(s) reconciled") if report.get("last_recovery") else "—"},
-]) }}
+{#- Row WX9: the status block is a two-row table — one header row of labels, one row of values —
+    rather than a nine-item definition list that reads as a column of unrelated sentences. -#}
+{{ table(
+  [{"label": "Dispatch"}, {"label": "Active jobs"}, {"label": "By state"}, {"label": "By class"},
+   {"label": "Oldest queued", "numeric": true}, {"label": "Starving", "numeric": true},
+   {"label": "Completed, 5 min", "numeric": true}, {"label": "Dispatch latency"},
+   {"label": "Last recovery"}],
+  [[
+    badge("paused", tone="warning") if flags.get("paused") else (badge("draining", tone="warning") if flags.get("draining") else badge("running", tone="success")),
+    (report.get("active") if report.get("active") is not none else "—") ~ " of at most " ~ (report.get("max_depth") if report.get("max_depth") is not none else "—"),
+    state_parts | join(" · ") or "empty",
+    class_parts | join(" · ") or "empty",
+    ((report.get("oldest_queued_age_seconds") | round(1)) ~ " s") if report.get("oldest_queued_age_seconds") is number else "—",
+    report.get("starving") if report.get("starving") is not none else "—",
+    (report.get("throughput") or {}).get("completed_last_5m", "—"),
+    ((latency.get("median") | round(1)) ~ " ms median, " ~ (latency.get("max") | round(1)) ~ " ms max over " ~ latency.get("samples") ~ " claims") if latency.get("samples") else "no claim yet",
+    ((report.get("last_recovery") or {}).get("touched", "—") ~ " job(s) reconciled") if report.get("last_recovery") else "—",
+  ]],
+  caption="The queue as it stands", density="dense", row_count=1, table_id="lc-queue-status"
+) }}
 
 <h4>Executing now</h4>
 {% set executions = report.get("executions") or [] %}

@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% block title %}Providers — LoadCoach — WeightRoom{% endblock %}
 
 {% macro registration_fields(prefix, one) -%}
@@ -22,6 +22,7 @@
 <div class="field"><label for="{{ prefix }}-server_path">server_path</label>
   <input id="{{ prefix }}-server_path" name="server_path" value="{{ one.get('server_path', '') }}"></div>
 <label class="kit-check"><input type="checkbox" name="remote" value="true"{{ ' checked' if one.get('remote') in (true, 'true') else '' }}> remote{% if "remote" in security_fields %} <span class="muted">· security</span>{% endif %}</label>
+<label class="kit-check"><input type="checkbox" name="enabled" value="true"{{ ' checked' if one.get('enabled', true) in (true, 'true') else '' }}> enabled</label>
 <div class="field"><label for="{{ prefix }}-password">Your password</label>
   <input id="{{ prefix }}-password" name="password" type="password" autocomplete="current-password">
   <span class="field-hint">Needed when a security key changes or a registration is added.</span></div>
@@ -29,18 +30,18 @@
 
 {% block page_content %}
 {% set data = sourced.data %}
-<div class="page-head">
-  <h2>Providers {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/adapters">Adapters</a> · <a href="/apps/loadcoach/settings">Every other key</a></div>
-</div>
+{% call app_page_header(view, "Providers", "Providers", "Each block below is one [providers.<name>] table in LoadCoach's own configuration file; saving edits that file in place and the running server re-registers immediately.") %}
+  <a href="/apps/loadcoach/providers?kind=llamacpp#provider-new" data-variant="primary">Add llama.cpp</a> · <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/adapters">Adapters</a> · <a href="/apps/loadcoach/settings">Every other key</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if saved %}<p class="notice" role="status">Saved <code>{{ saved }}</code>: LoadCoach wrote its file and re-registered its providers.</p>{% endif %}
 {% if removed %}<p class="notice" role="status">Removed <code>{{ removed }}</code>: LoadCoach wrote its file and re-registered its providers.</p>{% endif %}
-<p class="muted">Each registration is one <code>[providers.&lt;name&gt;]</code> table in LoadCoach's own configuration
-file. LoadCoach validates a change, keeps the previous file as <code>config.toml.bak</code>, writes only the
+<p class="muted">LoadCoach validates a change, keeps the previous file as <code>config.toml.bak</code>, writes only the
 provider tables and re-registers without a restart (ADR-0117). A registration carries no secret, so none is
-ever shown here. Changing <code>{{ security_fields | sort | join("</code>, <code>") | safe }}</code>, adding a
+ever shown here. Unticking <strong>enabled</strong> keeps the block in the file and takes it out of the
+registry: nothing is discovered through it, routing cannot reach it, and the models it last served read
+<code>provider_disabled</code> — LoadCoach refuses to leave itself with no enabled registration. Changing <code>{{ security_fields | sort | join("</code>, <code>") | safe }}</code>, adding a
 registration or removing one asks for your password (spec §7.4).</p>
 
 {% if preview %}
@@ -92,7 +93,15 @@ registration or removing one asks for your password (spec §7.4).</p>
 
 <section class="card kit-form" id="provider-new">
   <h3>Add a registration</h3>
-  {% set fresh = form if form and form.get("name") not in ((data.get("registrations") or []) | map(attribute="name") | list) else {} %}
+  {% set fresh = form if form and form.get("name") not in ((data.get("registrations") or []) | map(attribute="name") | list) else (prefill or {}) %}
+  {% if fresh.get("kind") == "llamacpp" %}
+  <p class="notice" role="status">A <code>llamacpp</code> registration launches and supervises its own
+  <code>llama-server</code> rather than talking to one already running, so it takes
+  <code>model_directory</code> — the directory of GGUF weights it serves — and no
+  <code>base_url</code>. <code>model_directory</code> is required; <code>state_dir</code> and
+  <code>server_path</code> default to <code>&lt;data_dir&gt;/llamacpp/&lt;name&gt;</code> and
+  <code>llama-server</code> on PATH. Adding a registration still asks for your password.</p>
+  {% endif %}
   <form method="post" action="/apps/loadcoach/providers">
     <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
     <input type="hidden" name="base_digest" value="{{ data.get('config_digest') or '' }}">

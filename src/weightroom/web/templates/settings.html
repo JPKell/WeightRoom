@@ -11,7 +11,10 @@
   .field-hint-details { display: inline; }
   .field-hint-details summary {
     display: inline-block;
-    max-width: 60ch;
+    /* Row WX9: `60ch` alone is wider than a phone, so a long description pushed the page into a
+       horizontal scroll at 412 px. Clamped against the viewport, not the cell: a percentage
+       max-width inside an auto-layout table is circular and blows the table out instead. */
+    max-width: min(60ch, calc(100vw - 96px));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

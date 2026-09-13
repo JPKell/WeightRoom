@@ -44,6 +44,39 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   Spending today — read off the same `GET /system/status` body the generic figures already fetch
   (its embedded `ledger.day`, the same document `GET /ledger` answers), so it costs no second
   call and is empty for the other three applications.
+### Added (row WX9)
+- **LoadCoach's Models page ranks by ability, and says how fast and how far each model goes.**
+  The name column is the provider's own model name with the canonical id under it and the
+  registration in its own column; an **Ability** select built from the bound evidence this
+  LoadCoach holds re-ranks the table by that capability's score, with a model that has no bound
+  evidence for it last rather than lowest; measured tokens/s and p95 come from the busiest task
+  profile of the last seven days, with the profile named in the cell; and a **Context fit** column
+  reads FreeWeight's `GET /api/v1/results/context-fit` (row WX7), shown with the runtime profile
+  and machine it was measured under. Each is a second read, and one that refuses costs the page
+  its column and a note, never its rows.
+- **Three of LoadCoach's menu entries now open a page nav.** Routing is *Explain* (the form,
+  always open, no longer behind a summary under a long table) and *History*
+  (`/apps/loadcoach/routing/decisions`); Queue is *Current* / *New job* / *History*
+  (`/queue`, `/queue/new`, `/queue/history`), with the SSE region on the first of them only and
+  the queue's status block as a two-row table; Evidence is *Records* — with LoadCoach's own
+  `capability`, `model` and `min_confidence` filters passed through rather than applied here — and
+  *Store and import* (`/evidence/admin`).
+- **Reliability offers the lists it already fetched.** Task profile and model are selects, and a
+  **Starts with** box matches `startswith` over this page's pairs, so `tools.agent.` reaches a
+  family of profiles without a new endpoint. Nothing about the prefix reaches LoadCoach.
+- **LoadCoach's Providers page can park a registration and add a llama.cpp one.** An **Enabled**
+  checkbox per registration writes LoadCoach's new `[providers.<name>] enabled`; **Add llama.cpp**
+  prefills the add form and says what that kind needs. The password gate on a new registration and
+  on a security key is unchanged.
+- **The job page says what feedback is worth**: accepted one acceptance, edited half, rejected
+  none; the factor bounded to 0.5–1.0, and neutral below `minimums.factor_attempts` attempts.
+
+### Fixed (row WX9)
+- **An operator's `[providers.<name>]` keys reach the settings form.** They were filed under
+  *undescribed* with no values (WX3's finding): the form resolves a file key through the
+  document's `json_schema`, and LoadCoach emitted `additionalProperties: true` for `[providers]`,
+  which carries no type to descend into. Fixed in LoadCoach's schema output, so the console needed
+  no application-specific rule; the vendored fixture is re-recorded.
 
 ### Added (row WX6)
 - **The telemetry history page draws an ECharts line chart** beside its existing accessible SVG

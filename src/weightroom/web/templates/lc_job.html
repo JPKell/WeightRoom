@@ -1,16 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_lc.html" import measure, explanation %}
 {% block title %}Job — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
 {% set job = data.get("job") if data else none %}
 {% set routing = (job.get("routing") or {}) if job else {} %}
-<div class="page-head">
-  <h2>Job {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/loadcoach/queue#jobs">Every job</a>
+{% call app_page_header(view, "Job", "Queue", "One job end to end: what was asked, what routing chose and why, what ran, and what came back.") %}
+    <a href="/apps/loadcoach/queue/history#jobs">Every job</a>
     {% if routing.get("decision_id") %} · <a href="/apps/loadcoach/routing/decisions/{{ routing.get('decision_id') | urlencode }}">Its routing decision</a>{% endif %}
     {% if sourced.live and job and job.get("state") not in terminal %}
     <form method="post" action="/apps/loadcoach/queue/jobs/{{ job_id | urlencode }}/cancel" class="kit-inline">
@@ -18,8 +16,7 @@
       <button type="submit">Cancel job</button>
     </form>
     {% endif %}
-  </div>
-</div>
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 <p class="mono muted">{{ job_id }}</p>
@@ -147,6 +144,13 @@ hashes, token counts, timings and routing decision remain.</p>
 {% else %}
 <p class="muted">No caller has given feedback on this job.</p>
 {% endif %}
+<p class="field-hint">Accepted is worth one acceptance, accepted-but-edited half of one, rejected
+none. Acceptance pulls this model and task profile's routing factor, which is bounded to
+<code>0.5&thinsp;–&thinsp;1.0</code>: production evidence can at most halve a candidate's score,
+never zero it and never raise it above its measured capability. Below
+<code>minimums.factor_attempts</code> counted attempts the factor stays neutral, so feedback on a
+pair nothing has run yet changes no routing decision — it is recorded, and it starts counting
+(<a href="/apps/loadcoach/reliability">Reliability</a> names the minimum in force).</p>
 {% if sourced.live %}
 <details class="card kit-form">
   <summary><strong>Give feedback</strong> <span class="muted">— it folds into reliability, attributed to this console's token</span></summary>

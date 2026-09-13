@@ -1,5 +1,7 @@
 [adapters]
   --- adapters.directory: string
+[console]
+  --- console.url: string
 [evidence]
   --- evidence.accept_schema_majors: array
   -S- evidence.allowed_source_hosts: array

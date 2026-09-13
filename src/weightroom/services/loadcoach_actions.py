@@ -484,11 +484,14 @@ def registration_values(  # noqa: PLR0913 — one keyword per writable key (ADR-
     model_directory: str,
     state_dir: str,
     server_path: str,
+    enabled: bool,
 ) -> dict[str, Any]:
     """The ``PUT /providers/{name}`` values the form describes; LoadCoach validates them.
 
     Every text key is sent, blank included: an empty optional key removes it from the table, as it
     does on LoadCoach's own page. ``timeout_seconds`` is left out when blank, so the table keeps it.
+    ``enabled`` is sent as the checkbox stands (row WX9) — unticked is ``false``, which is what
+    an unticked box means; LoadCoach refuses the write that would leave no registration enabled.
 
     Raises:
         LoadCoachFormInvalid: ``kind`` is blank, or the timeout is not a positive number.
@@ -503,6 +506,7 @@ def registration_values(  # noqa: PLR0913 — one keyword per writable key (ADR-
         "state_dir": state_dir.strip(),
         "server_path": server_path.strip(),
         "remote": remote,
+        "enabled": enabled,
     }
     timeout = _decimal("Timeout seconds", timeout_seconds, lowest=0.1, highest=86400.0)
     if timeout is not None:

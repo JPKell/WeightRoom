@@ -50,6 +50,7 @@ __all__ = [
     "benchmarks_api",
     "charts",
     "compare_api",
+    "context_fit_api",
     "dashboard_api",
     "database_stats_api",
     "evidence_api",
@@ -1004,6 +1005,37 @@ def results_api(
     )  # fmt: skip
     page = _document(_document(body).get("page"))
     return {"items": _listed(body, "items"), "next_cursor": page.get("next_cursor")}
+
+
+def context_fit_api(client: httpx.Client, settings: Settings) -> dict[str, dict[str, Any]]:
+    """``GET /results/context-fit``: the largest context each model was *measured* to fit.
+
+    FreeWeight's ``memory_kv`` benchmark is the only place in the suite that measures this, and
+    row WX7 added the endpoint that carries it out of FreeWeight. One row per (model, runtime
+    profile, machine): a single number per model would be a lie, because the answer moves with
+    the runtime profile it was measured under and with the card it was measured on.
+
+    Read by LoadCoach's Models page, which is a **cross-application** read the console makes on
+    the operator's behalf — LoadCoach never learns this and never should (no application reads
+    another's database, and this is not routing's business).
+
+    Returns:
+        ``canonical_id`` → the newest row for it, carrying ``max_successful_context_tokens``,
+        ``capped_by_configuration``, ``observed_mb_per_1k_context``, ``runtime_profile_hash``
+        and ``machine_fingerprint``. A model FreeWeight has never measured is simply absent, and
+        the caller renders ``—`` for it rather than a number nobody measured (ADR-0016).
+
+    Raises:
+        AppRefused: FreeWeight refused — including the ``404`` of a FreeWeight older than WX7.
+        AppUnreachable: It did not answer.
+    """
+    body = call(client, settings, APP, "GET", "results/context-fit", timeout_seconds=30.0)
+    found: dict[str, dict[str, Any]] = {}
+    for row in _listed(body, "items"):
+        canonical = str(row.get("canonical_id") or "")
+        if canonical:
+            found.setdefault(canonical, dict(row))
+    return found
 
 
 def compare_api(

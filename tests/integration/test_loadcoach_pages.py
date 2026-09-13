@@ -16,6 +16,7 @@ import httpx
 import respx
 
 from tests.support import (
+    FREEWEIGHT_URL,
     JSON_HEADERS,
     LOADCOACH_URL,
     Console,
@@ -23,12 +24,15 @@ from tests.support import (
     fake_application,
     fill_rows,
     fixture_database,
+    mock_freeweight,
     mock_loadcoach,
 )
 from weightroom.services.apps import AppState
 from weightroom.services.processes import FakeSystemdController
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "loadcoach"
+FW_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "freeweight"
+FW_FIXTURES_DEFAULT = json.loads((FW_FIXTURES / "context-fit.json").read_text(encoding="utf-8"))
 HTML = {"Accept": "text/html"}
 BASE = "/apps/loadcoach"
 API = f"{LOADCOACH_URL}/api/v1"
@@ -72,6 +76,7 @@ def mock_api(
     *,
     version: str = "1.5.0",
     bodies: dict[str, Any] | None = None,
+    context_fit: Any = None,  # noqa: ANN401 — a recorded JSON document
 ) -> dict[str, Any]:
     """LoadCoach's recorded reads, by path under ``/api/v1``; ``bodies`` replaces or adds some."""
     mock_loadcoach(router, version=version)
@@ -84,12 +89,20 @@ def mock_api(
         "task-profiles": fixture("task-profiles"),
         "task-profiles/general.chat": fixture("task-profile"),
         "reliability": fixture("reliability"),
+        "evidence": fixture("evidence"),
     }
     recorded.update(bodies or {})
-    return {
+    routes = {
         path: router.get(f"{API}/{path}").mock(return_value=httpx.Response(200, json=body))
         for path, body in recorded.items()
     }
+    # The Models page reads FreeWeight for its Context fit column (row WX9/WX7): a cross-
+    # application read the console makes, not one LoadCoach makes.
+    mock_freeweight(router)
+    routes["results/context-fit"] = router.get(f"{FREEWEIGHT_URL}/api/v1/results/context-fit").mock(
+        return_value=httpx.Response(200, json=context_fit or FW_FIXTURES_DEFAULT)
+    )
+    return routes
 
 
 def page(console: Console, path: str) -> str:
@@ -138,6 +151,75 @@ def test_the_models_page_reads_the_registry_and_offers_its_switches(tmp_path: Pa
     assert "From the API" in text
 
 
+def test_the_models_page_names_the_model_the_registration_and_the_context_that_fits(
+    tmp_path: Path,
+) -> None:
+    """Row WX9: the name column is the provider's own name, the registration is its own column,
+    and Context fit is FreeWeight's measurement with the runtime profile it was measured under.
+    """
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        text = page(console, f"{BASE}/models")
+    assert "deepseek-coder-v2:latest</a>" in text  # provider_model_name, not the canonical id
+    assert ">Registration<" in text and ">Context fit<" in text
+    assert "32k" in text  # 32 768 measured tokens
+    assert "runtime profile 8f2c1d4e · machine jordan-main · 118 MB per 1k context" in text
+    assert "capped" in text  # the 16k row is capped by configuration, and says so
+
+
+def test_context_fit_is_a_dash_and_a_reason_when_freeweight_does_not_answer(
+    tmp_path: Path,
+) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        router.get(f"{FREEWEIGHT_URL}/api/v1/results/context-fit").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        text = page(console, f"{BASE}/models")
+    assert "Context fit is empty —" in text
+    assert CANONICAL in text  # the registry is the page; the column is not
+
+
+def test_an_ability_ranks_the_registry_by_its_bound_evidence(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    bound = fixture("evidence")
+    bound["items"] = [
+        _bound_record(CANONICAL, "structured_output", 0.42),
+        _bound_record("ollama/gpt-oss:20b@sha256:17052f91a42e", "structured_output", 0.91),
+    ]
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"evidence": bound})
+        offered = page(console, f"{BASE}/models")
+        ranked = page(console, f"{BASE}/models?ability=structured_output")
+    assert '<option value="structured_output"' in offered
+    assert "ranked by structured_output" in ranked
+    assert ranked.index("0.910") < ranked.index("0.420")
+
+
+def _bound_record(canonical: str, capability: str, score: float) -> dict[str, Any]:
+    """One ``capability.evidence`` envelope as ``GET /evidence?match_state=bound`` returns it."""
+    provider_kind, _, rest = canonical.partition("/")
+    name = rest.split("@", 1)[0]
+    return {
+        "schema": "capability.evidence",
+        "schema_version": "1.0",
+        "payload": {
+            "model": {
+                "canonical_id": canonical,
+                "provider_kind": provider_kind,
+                "provider_model_name": name,
+            },
+            "capability_id": capability,
+            "score": score,
+            "confidence": 0.7,
+            "sample_count": 40,
+            "measured_at": "2026-09-09T00:00:00Z",
+        },
+    }
+
+
 def test_one_model_shows_its_identity_reliability_and_breaker(tmp_path: Path) -> None:
     console, _database = loadcoach_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
@@ -157,9 +239,12 @@ def test_routing_lists_decisions_and_profiles_and_a_decision_names_every_rejecti
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
         routing = page(console, f"{BASE}/routing")
+        history = page(console, f"{BASE}/routing/decisions")
         one = page(console, f"{BASE}/routing/decisions/{decision['decision_id']}")
         profile = page(console, f"{BASE}/routing/task-profiles/general.chat")
-    assert f'href="{BASE}/routing/decisions/{decision["decision_id"]}"' in routing
+    # Row WX9: the history is its own page, linked from the one carrying the form.
+    assert f'href="{BASE}/routing/decisions"' in routing
+    assert f'href="{BASE}/routing/decisions/{decision["decision_id"]}"' in history
     assert f'href="{BASE}/routing/task-profiles/general.chat"' in routing
     assert f'action="{BASE}/routing"' in routing
     assert "insufficient_vram" in one
@@ -186,8 +271,39 @@ def test_routing_decisions_says_first_n_of_more_when_the_api_hands_back_its_own_
     assert len(decisions["decisions"]) == 50, "the fixture already is LoadCoach's own cap"
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"routing-decisions": decisions})
-        routing = page(console, f"{BASE}/routing")
-    assert "First 50 of more" in routing
+        history = page(console, f"{BASE}/routing/decisions")
+    assert "First 50 of more" in history
+
+
+def test_reliability_offers_the_lists_it_already_fetched_as_selects(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        text = page(console, f"{BASE}/reliability")
+    assert '<select id="lc-rel-task" name="task">' in text
+    assert '<option value="general.chat"' in text
+    assert '<select id="lc-rel-model" name="model">' in text
+    assert f'<option value="{CANONICAL}"' in text
+    assert 'name="prefix"' in text
+
+
+def test_a_prefix_matches_a_family_of_task_profiles_here_not_at_loadcoach(
+    tmp_path: Path,
+) -> None:
+    """Row WX9: `startswith` over the pairs the page already fetched — LoadCoach's own `task`
+    filter is exact, and a prefix parameter on its API for a browser control is the wrong place.
+    """
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        routes = mock_api(router)
+        matched = page(console, f"{BASE}/reliability?prefix=tools.agent.")
+        missed = page(console, f"{BASE}/reliability?prefix=nothing.starts.with.this")
+    table = matched.split("<table", 1)[1].split("</table>", 1)[0]
+    assert "tools.agent.local_fast" in table
+    assert "general.chat" not in table
+    assert "No pair on this page starts with nothing.starts.with.this" in missed
+    # Nothing about the prefix reaches LoadCoach.
+    assert "prefix" not in routes["reliability"].calls.last.request.url.params
 
 
 def test_reliability_pages_by_ui_page_rows_and_the_next_link_walks_every_pair(
@@ -304,7 +420,7 @@ def test_stopped_pages_read_the_database_with_a_start_beside_them(tmp_path: Path
     assert "/warm" not in models  # API-only actions are off
     assert "reasoning_recorded" in page(console, f"{BASE}/models/{STOPPED_MODEL}")
     routing = page(console, f"{BASE}/routing")
-    assert STOPPED_DECISION in routing
+    assert STOPPED_DECISION in page(console, f"{BASE}/routing/decisions")
     assert "a profile recorded before the stop" in routing
     assert f'action="{BASE}/routing"' not in routing
     assert "insufficient_vram" in page(console, f"{BASE}/routing/decisions/{STOPPED_DECISION}")

@@ -1,0 +1,70 @@
+{% extends "_shell.html" %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% block title %}New job — LoadCoach — WeightRoom{% endblock %}
+{% block page_content %}
+{% call app_page_header(view, "New job", "Queue", "One job, queued and dispatched by class and priority, and routed like any other — nothing here bypasses routing.") %}
+  <a href="/apps/loadcoach/queue">Current</a> · <a href="/apps/loadcoach/queue/history">History</a> · <a href="/apps/loadcoach/routing">Explain a route first</a> · {{ docs_link("loadcoach") }}
+{% endcall %}
+{% include "_app_state.html" %}
+{{ refusal(submit_error) }}
+{% if live %}
+<section class="card kit-form">
+  <h3>Submit a job <span class="muted">— <code>POST /jobs</code></span></h3>
+  <form method="post" action="/apps/loadcoach/queue/jobs">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <input type="hidden" name="idempotency_key" value="{{ form.get('idempotency_key') or idempotency_key }}">
+    <div class="field"><label for="lc-job-task">Task profile</label>
+      {% if profiles %}
+      <select id="lc-job-task" name="task" required>
+        {% for one in profiles %}<option value="{{ one.get('profile_id') }}"{{ ' selected' if (form.get('task') or 'general.chat') == one.get('profile_id') else '' }}>{{ one.get("profile_id") }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <input id="lc-job-task" name="task" value="{{ form.get('task', '') }}" required placeholder="general.chat">
+      {% endif %}</div>
+    <div class="field"><label for="lc-job-class">Class</label>
+      <select id="lc-job-class" name="class">
+        {% for one in classes %}<option value="{{ one }}"{{ ' selected' if (form.get('class') or 'normal') == one else '' }}>{{ one }}</option>{% endfor %}
+      </select></div>
+    <div class="field"><label for="lc-job-priority">Priority</label>
+      <input id="lc-job-priority" name="priority" inputmode="numeric" value="{{ form.get('priority', '') }}" placeholder="the class's default">
+      <span class="field-hint">Within the class's band (queue §1).</span></div>
+    <div class="field"><label for="lc-job-wait">Max wait seconds</label>
+      <input id="lc-job-wait" name="max_wait_seconds" inputmode="numeric" value="{{ form.get('max_wait_seconds', '') }}"></div>
+    <div class="field kit-wide"><label for="lc-job-prompt">Prompt</label>
+      <textarea id="lc-job-prompt" name="prompt" rows="4" required>{{ form.get("prompt", "") }}</textarea></div>
+    <div class="field kit-wide"><label for="lc-job-system">System</label>
+      <textarea id="lc-job-system" name="system" rows="2">{{ form.get("system", "") }}</textarea></div>
+    <div class="field"><label for="lc-job-classification">Data classification</label>
+      <select id="lc-job-classification" name="data_classification">
+        <option value="">not declared</option>
+        {% for one in classifications %}<option value="{{ one }}"{{ ' selected' if form.get('data_classification') == one else '' }}>{{ one }}</option>{% endfor %}
+      </select></div>
+    <div class="field"><label for="lc-job-model">Pin a model</label>
+      <input id="lc-job-model" name="model" value="{{ form.get('model', '') }}" placeholder="a canonical id, or blank"></div>
+    <div class="field"><label for="lc-job-adapter">Pin an adapter</label>
+      <input id="lc-job-adapter" name="adapter" value="{{ form.get('adapter', '') }}" placeholder="a manifest name, or blank"></div>
+    <div class="field"><label for="lc-job-temperature">Temperature</label>
+      <input id="lc-job-temperature" name="temperature" inputmode="decimal" value="{{ form.get('temperature', '') }}" placeholder="the profile's"></div>
+    <div class="field"><label for="lc-job-tokens">Max output tokens</label>
+      <input id="lc-job-tokens" name="max_output_tokens" inputmode="numeric" value="{{ form.get('max_output_tokens', '') }}" placeholder="the profile's"></div>
+    <div class="field"><label for="lc-job-think">Thinking</label>
+      <select id="lc-job-think" name="think">
+        <option value="">no control sent</option>
+        <option value="true"{{ ' selected' if form.get('think') == 'true' else '' }}>ask for it</option>
+        <option value="false"{{ ' selected' if form.get('think') == 'false' else '' }}>suppress it</option>
+      </select>
+      <span class="field-hint">Either value requires <code>thinking_control</code> of every candidate (ADR-0099).</span></div>
+    <fieldset class="field kit-wide"><legend>Delivery</legend>
+      <label class="kit-check"><input type="checkbox" name="stream" value="true"{{ ' checked' if form.get('stream', 'true') == 'true' else '' }}> stream the reply, thinking included</label>
+      <label class="kit-check"><input type="checkbox" name="idempotent" value="true"{{ ' checked' if form.get('idempotent', 'true') == 'true' else '' }}> idempotent (may be retried after a restart)</label>
+    </fieldset>
+    <div class="kit-wide"><button type="submit" data-variant="primary">Submit</button></div>
+  </form>
+  <p class="field-hint">The idempotency key is minted when this page renders, so a double submit of
+  the same form is one job, not two.</p>
+</section>
+{% else %}
+<p class="notice">A job is submitted through LoadCoach's own API, so this form needs LoadCoach
+answering. Its <a href="/apps/loadcoach/queue/history">history</a> reads from its database either way.</p>
+{% endif %}
+{% endblock %}

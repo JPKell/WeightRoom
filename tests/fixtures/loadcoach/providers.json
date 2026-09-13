@@ -9,6 +9,7 @@
    "model_directory": "",
    "state_dir": "",
    "server_path": "llama-server",
+   "enabled": true,
    "shadowed_by": ""
   }
  ],
@@ -17,6 +18,7 @@
  "allow_remote": false,
  "writable_fields": [
   "kind",
+  "enabled",
   "base_url",
   "timeout_seconds",
   "remote",

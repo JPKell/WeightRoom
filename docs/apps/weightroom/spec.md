@@ -221,7 +221,7 @@ disabled and a *start* button.
 | Application | Menu | Source per page |
 |---|---|---|
 | **FreeWeight** | Overview · Models · Runs · Results · **Dashboard** · Evidence · Goals · Adapters · **System** · Settings · Provider · Tokens · Logs · Database | API for runs, results, evidence, goals, provider; database for the models/runs listing when stopped; CLI for `token`, `db delete --model`, `run start`; *Dashboard* (summary cards, the model × suite comparison heatmap with FreeWeight's own *separated* marking) and *System* (version, health, ten components) from the API only — judged needed at row WP6, built at row WPF5 |
-| **LoadCoach** | Overview · Models · Routing · Queue · Evidence · Adapters · Reliability · **System** · Settings · Providers · Tokens · Logs · Database | API for everything it serves (`/route` explain, jobs, queue pause/resume/drain, providers, `models/{ref}/enabled`, settings); database for decisions history when stopped; CLI for `token`; *System* (version, machine fingerprint, health components; dispatch, residency and breakers link to Queue and Reliability rather than repeating them) from the API only — judged needed at row WP6, built at row WPF5 |
+| **LoadCoach** | Overview · Models · Routing · Queue · Evidence · Adapters · Reliability · **System** · Settings · Providers · Tokens · Logs · Database | API for everything it serves (`/route` explain, jobs, queue pause/resume/drain, providers, `models/{ref}/enabled`, settings); database for decisions history when stopped; CLI for `token`; *System* (version, machine fingerprint, health components; dispatch, residency and breakers link to Queue and Reliability rather than repeating them) from the API only — judged needed at row WP6, built at row WPF5. Three of its menu entries open a **page nav** rather than one page (row WX9): Routing is *Explain* / *History* (`/routing`, `/routing/decisions`), Queue is *Current* / *New job* / *History* (`/queue`, `/queue/new`, `/queue/history` — only the first streams), Evidence is *Records* / *Store and import* (`/evidence`, `/evidence/admin`). The nav is on the page, in its header actions; the left menu keeps one entry per tab and the sub-page's `selected` keeps it highlighted |
 | **IdeaPress** | Overview · Projects · Units · Workflows · Backends · Settings · Logs · Database | API for projects, units, stage runs, backends; database for the listing when stopped |
 | **PromptCadence** | Overview · Trajectories · Approvals · Tiers · Tools · Ledger · Egress · System · Settings · Tokens · Logs · Database | API for everything; approvals grant/deny with the `approve`-scoped token ([ADR-0049](../../adr/0049-approval-is-a-mode-with-its-own-scope.md)); database for the listing when stopped; *System* (health, active work, the last recovery pass) from the API only — added by the operator on 2026-09-10, built at row WPC1 |
 
@@ -420,6 +420,12 @@ records in its own `audit_log`. It never mounts a package table of its own.
    [ADR-0123](../../adr/0123-weightroom-is-a-host-operator-tool-above-the-layer-rules.md)
    rule 2, and `.importlinter` asserts the two things it may not do (import an application; import
    `toolyard`, `cutctx`, `commissioner`).
+   A page under one application's tab may show another application's measurement where only that
+   application produces it — LoadCoach's Models page carries FreeWeight's *Context fit* from
+   `GET /api/v1/results/context-fit` (row WX9). It stays a console read over HTTP: neither
+   application learns of the other, nothing is written back, and the column carries the runtime
+   profile and machine the number was measured under, because one number per model would be a lie.
+   An unreachable second application costs that page its column and a note, never its rows.
 2. **Every action is an audit row.** Process control, settings writes, guarded database writes,
    curated operations, catalog changes, prompt overrides, job runs, alert acknowledgements,
    login and logout, TLS rotation. The row names the operator, the time, the target, the

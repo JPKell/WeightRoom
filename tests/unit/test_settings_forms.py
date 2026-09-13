@@ -133,6 +133,42 @@ def test_a_field_added_to_a_fixture_document_appears_with_no_code_change(tmp_pat
     assert invented.description == "A key no version of this console has heard of."
 
 
+def test_a_named_provider_registrations_keys_are_typed_fields_not_undescribed(
+    tmp_path: Path,
+) -> None:
+    """Row WX9. The file writes `[providers.<name>]`; the schema types it through
+    `additionalProperties`, which pydantic's `extra="allow"` alone emits as `true` — less than the
+    truth, since LoadCoach refuses an extra under `[providers]` that is not a registration table.
+    WX3 found the form filing every such key under `undescribed` with no value; the fix is in
+    LoadCoach's own schema output, and this asserts the vendored document carries it.
+    """
+    form = _form(
+        "loadcoach",
+        tmp_path,
+        toml=(
+            "[providers]\nallow_remote = false\n"
+            '[providers.local]\nkind = "ollama"\nbase_url = "http://127.0.0.1:11434"\n'
+            "enabled = false\n"
+        ),
+    )
+
+    assert not form.undescribed
+    enabled = form.field_for("providers.local.enabled")
+    assert enabled is not None
+    assert (enabled.kind, enabled.value, enabled.default) == ("boolean", False, True)
+    base_url = form.field_for("providers.local.base_url")
+    assert base_url is not None
+    assert (base_url.kind, base_url.value) == ("string", "http://127.0.0.1:11434")
+    # It is filed under the section it lives in, beside the policy key that shares the table.
+    providers = next(one for one in form.sections if one.name == "providers")
+    assert {one.key for one in providers.fields} >= {
+        "providers.allow_remote",
+        "providers.local.kind",
+        "providers.local.base_url",
+        "providers.local.enabled",
+    }
+
+
 def test_a_key_the_document_does_not_describe_is_listed_raw_not_dropped(tmp_path: Path) -> None:
     form = _form(
         "ideapress", tmp_path, toml="[something]\nnobody_knows = 1\n[server]\nport = 8767\n"

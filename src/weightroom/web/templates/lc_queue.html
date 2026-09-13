@@ -1,25 +1,20 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_lc.html" import job_link, measure %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% block title %}Queue — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set flags = (report.data or {}).get("flags") or {} %}
-<div class="page-head">
-  <h2>Queue {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/loadcoach/reliability">Reliability</a>
-    {% if report.live %}
-    {% for verb, label, off in [("pause", "Pause dispatch", flags.get("paused")), ("drain", "Drain", flags.get("draining")), ("resume", "Resume", not flags.get("paused") and not flags.get("draining"))] %}
-    <form method="post" action="/apps/loadcoach/queue/control" class="kit-inline">
-      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-      <input type="hidden" name="verb" value="{{ verb }}">
-      <button type="submit"{% if verb == "resume" %} data-variant="primary"{% endif %}{% if off %} disabled{% endif %}>{{ label }}</button>
-    </form>
-    {% endfor %}
-    {% endif %}
-  </div>
-</div>
+{% call app_page_header(view, "Queue", "Queue", "Queued work, dispatched by class and priority. This page is what the queue is doing now, and it updates while LoadCoach streams it.") %}
+  <a href="/apps/loadcoach/queue/new">New job</a> · <a href="/apps/loadcoach/queue/history">History</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
+  {% if report.live %}
+  {% for verb, label, off in [("pause", "Pause dispatch", flags.get("paused")), ("drain", "Drain", flags.get("draining")), ("resume", "Resume", not flags.get("paused") and not flags.get("draining"))] %}
+  <form method="post" action="/apps/loadcoach/queue/control" class="kit-inline">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <input type="hidden" name="verb" value="{{ verb }}">
+    <button type="submit"{% if verb == "resume" %} data-variant="primary"{% endif %}{% if off %} disabled{% endif %}>{{ label }}</button>
+  </form>
+  {% endfor %}
+  {% endif %}
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if confirm %}
@@ -34,9 +29,8 @@
   </form>
 </div>
 {% endif %}
-<p class="muted">Queued work, dispatched by class and priority. Pause stops dispatch without dropping
-anything, drain finishes what is executing and starts nothing new, resume clears both; each asks
-first and says what stops. The report below updates while LoadCoach streams it.</p>
+<p class="muted">Pause stops dispatch without dropping anything, drain finishes what is executing and
+starts nothing new, resume clears both; each asks first and says what stops.</p>
 
 {{ refusal(report.error) }}
 {% if report.data is not none %}
@@ -45,108 +39,4 @@ first and says what stops. The report below updates while LoadCoach streams it.<
 </div>
 {% endif %}
 {{ page_source(report) }}
-
-<h3 id="jobs">Jobs</h3>
-{% if report.live %}
-<details class="card kit-form"{% if submit_error %} open{% endif %}>
-  <summary><strong>Submit a job</strong> <span class="muted">— <code>POST /jobs</code>: queued, dispatched by class and priority, routed like any other</span></summary>
-  {{ refusal(submit_error) }}
-  <form method="post" action="/apps/loadcoach/queue/jobs">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <input type="hidden" name="idempotency_key" value="{{ form.get('idempotency_key') or idempotency_key }}">
-    <div class="field"><label for="lc-job-task">Task profile</label>
-      {% if profiles %}
-      <select id="lc-job-task" name="task" required>
-        {% for one in profiles %}<option value="{{ one.get('profile_id') }}"{{ ' selected' if (form.get('task') or 'general.chat') == one.get('profile_id') else '' }}>{{ one.get("profile_id") }}</option>{% endfor %}
-      </select>
-      {% else %}
-      <input id="lc-job-task" name="task" value="{{ form.get('task', '') }}" required placeholder="general.chat">
-      {% endif %}</div>
-    <div class="field"><label for="lc-job-class">Class</label>
-      <select id="lc-job-class" name="class">
-        {% for one in classes %}<option value="{{ one }}"{{ ' selected' if (form.get('class') or 'normal') == one else '' }}>{{ one }}</option>{% endfor %}
-      </select></div>
-    <div class="field"><label for="lc-job-priority">Priority</label>
-      <input id="lc-job-priority" name="priority" inputmode="numeric" value="{{ form.get('priority', '') }}" placeholder="the class's default">
-      <span class="field-hint">Within the class's band (queue §1).</span></div>
-    <div class="field"><label for="lc-job-wait">Max wait seconds</label>
-      <input id="lc-job-wait" name="max_wait_seconds" inputmode="numeric" value="{{ form.get('max_wait_seconds', '') }}"></div>
-    <div class="field kit-wide"><label for="lc-job-prompt">Prompt</label>
-      <textarea id="lc-job-prompt" name="prompt" rows="4" required>{{ form.get("prompt", "") }}</textarea></div>
-    <div class="field kit-wide"><label for="lc-job-system">System</label>
-      <textarea id="lc-job-system" name="system" rows="2">{{ form.get("system", "") }}</textarea></div>
-    <div class="field"><label for="lc-job-classification">Data classification</label>
-      <select id="lc-job-classification" name="data_classification">
-        <option value="">not declared</option>
-        {% for one in classifications %}<option value="{{ one }}"{{ ' selected' if form.get('data_classification') == one else '' }}>{{ one }}</option>{% endfor %}
-      </select></div>
-    <div class="field"><label for="lc-job-model">Pin a model</label>
-      <input id="lc-job-model" name="model" value="{{ form.get('model', '') }}" placeholder="a canonical id, or blank"></div>
-    <div class="field"><label for="lc-job-adapter">Pin an adapter</label>
-      <input id="lc-job-adapter" name="adapter" value="{{ form.get('adapter', '') }}" placeholder="a manifest name, or blank"></div>
-    <div class="field"><label for="lc-job-temperature">Temperature</label>
-      <input id="lc-job-temperature" name="temperature" inputmode="decimal" value="{{ form.get('temperature', '') }}" placeholder="the profile's"></div>
-    <div class="field"><label for="lc-job-tokens">Max output tokens</label>
-      <input id="lc-job-tokens" name="max_output_tokens" inputmode="numeric" value="{{ form.get('max_output_tokens', '') }}" placeholder="the profile's"></div>
-    <div class="field"><label for="lc-job-think">Thinking</label>
-      <select id="lc-job-think" name="think">
-        <option value="">no control sent</option>
-        <option value="true"{{ ' selected' if form.get('think') == 'true' else '' }}>ask for it</option>
-        <option value="false"{{ ' selected' if form.get('think') == 'false' else '' }}>suppress it</option>
-      </select>
-      <span class="field-hint">Either value requires <code>thinking_control</code> of every candidate (ADR-0099).</span></div>
-    <fieldset class="field kit-wide"><legend>Delivery</legend>
-      <label class="kit-check"><input type="checkbox" name="stream" value="true"{{ ' checked' if form.get('stream', 'true') == 'true' else '' }}> stream the reply, thinking included</label>
-      <label class="kit-check"><input type="checkbox" name="idempotent" value="true"{{ ' checked' if form.get('idempotent', 'true') == 'true' else '' }}> idempotent (may be retried after a restart)</label>
-    </fieldset>
-    <div class="kit-wide"><button type="submit" data-variant="primary">Submit</button></div>
-  </form>
-</details>
-{% endif %}
-
-<form class="filter-bar" action="/apps/loadcoach/queue#jobs" method="get" role="search">
-  <div class="field"><label for="lc-jobs-state">State</label>
-    <select id="lc-jobs-state" name="state">
-      <option value="">any</option>
-      {% for one in states %}<option value="{{ one }}"{{ ' selected' if filters.state == one else '' }}>{{ one }}</option>{% endfor %}
-    </select></div>
-  <div class="field"><label for="lc-jobs-class">Class</label>
-    <select id="lc-jobs-class" name="class">
-      <option value="">any</option>
-      {% for one in classes %}<option value="{{ one }}"{{ ' selected' if filters["class"] == one else '' }}>{{ one }}</option>{% endfor %}
-    </select></div>
-  <div class="field"><label for="lc-jobs-task">Task</label>
-    <input id="lc-jobs-task" name="task" value="{{ filters.task }}" placeholder="general.chat"></div>
-  <div class="field"><label for="lc-jobs-source">Source</label>
-    <input id="lc-jobs-source" name="source" value="{{ filters.source }}" placeholder="promptcadence"></div>
-  <button type="submit">Filter</button>
-  {% if filters.state or filters["class"] or filters.task or filters.source %}<a href="/apps/loadcoach/queue#jobs">Clear</a>{% endif %}
-</form>
-{{ refusal(jobs.error) }}
-{% if jobs.data is not none %}
-{% set found = jobs.data["items"] %}
-{% if found %}
-{% set rows = [] %}
-{% for one in found %}
-{% set task = one.get("task") or {} %}
-{% set model = one.get("model") or {} %}
-{% set _ = rows.append([
-  job_link(one.get("job_id")),
-  badge(one.get("state") or "—", tone="success" if one.get("state") == "completed" else ("danger" if one.get("state") == "failed" else "neutral"), title=one.get("state_reason")),
-  one.get("class") or "—",
-  (task.get("id") or "—") ~ " " ~ (task.get("version") or ""),
-  model.get("subject_canonical_id") or model.get("canonical_id") or "—",
-  one.get("source") or "—",
-  measure((one.get("priority") or {}).get("effective")),
-  (one.get("attempt") if one.get("attempt") is not none else "—") ~ "/" ~ (one.get("max_attempts") if one.get("max_attempts") is not none else "—"),
-  (one.get("timestamps") or {}).get("created_at") or "—"
-]) %}
-{% endfor %}
-{{ table([{"label": "Job"}, {"label": "State"}, {"label": "Class"}, {"label": "Task"}, {"label": "Model", "mono": true}, {"label": "Source"}, {"label": "Priority", "numeric": true}, {"label": "Attempts", "numeric": true}, {"label": "Created", "mono": true}], rows, caption="Newest first; every transition is persisted with a reason", density="dense", complete=false, row_count=rows | length) }}
-{{ pagination(next_href=next_href) }}
-{% else %}
-{{ empty_state("No job matches these filters.", "Every job", "/apps/loadcoach/queue#jobs") }}
-{% endif %}
-{% endif %}
-{{ page_source(jobs) }}
 {% endblock %}
