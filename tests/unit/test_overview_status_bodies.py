@@ -58,6 +58,16 @@ def test_promptcadence_counts_active_trajectories_by_state_and_pending_approvals
     }
 
 
+def test_oldest_queued_is_a_duration_row_wy3() -> None:
+    """LoadCoach's Oldest queued is tagged ``duration`` (row WY3), read by both this page and the
+    console's ``/`` cards; a null age still dashes (ADR-0016), never ``0``."""
+    body = _body("loadcoach")
+    body["oldest_queued_age_seconds"] = 125.0
+    assert _figures("loadcoach", body)["Oldest queued"] == "2m 05s"
+    body["oldest_queued_age_seconds"] = None
+    assert _figures("loadcoach", body)["Oldest queued"] == "—"
+
+
 def test_a_missing_field_or_a_shape_it_cannot_count_stays_a_dash_never_a_zero() -> None:
     body = _body("promptcadence")
     del body["active_trajectories"]

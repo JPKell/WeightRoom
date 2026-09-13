@@ -288,6 +288,38 @@ def test_a_status_call_that_fails_while_running_still_renders_dashes_not_a_crash
     assert all(figure.value == "—" for figure in overview.figures)
 
 
+@respx.mock
+def test_oldest_queued_renders_as_a_duration_row_wy3(tmp_path: Path) -> None:
+    """Row WY3's one intentional change to this page's own rendering: LoadCoach's Oldest queued
+    used to show ``oldest_queued_age_seconds`` verbatim (``"125.0"``); ``_STATUS_FIGURES`` now
+    tags it ``duration`` so both this page and the console's own ``/`` cards read it in the same
+    units the design brief asks the cards for. Every other figure and the table are untouched —
+    the tests above, run unmodified against the refactored :func:`overview_for`, are that proof."""
+    respx.get(f"{BASE_URL}/api/v1/system/status").mock(
+        return_value=httpx.Response(
+            200, json={"active": 1, "oldest_queued_age_seconds": 125.0, "starving": False}
+        )
+    )
+    database_url = _synthetic_db(tmp_path, revision="0015")
+    executable = _fake_cli(tmp_path, database_url=database_url)
+    settings = _settings(tmp_path, executable=executable)
+    console_db = _console_database(tmp_path)
+    view = _view(installed=True, running=True, reachable=True, executable=str(executable))
+
+    overview = overview_for(
+        APP,
+        view,
+        settings=settings,
+        database=console_db,
+        client=httpx.Client(),
+        urls=DatabaseUrlCache(),
+        now=0.0,
+    )
+
+    figures = {f.label: f.value for f in overview.figures}
+    assert figures["Oldest queued"] == "2m 05s"
+
+
 def test_the_database_url_is_launched_once_per_ttl_not_once_per_render(tmp_path: Path) -> None:
     """Row WPF6: ``config show --json`` is a process launch, so the Overview shares the cache.
 

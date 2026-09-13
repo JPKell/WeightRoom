@@ -6,6 +6,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WY3)
+- **The console's `/` shows LoadCoach, PromptCadence and FreeWeight's live figures** — one compact
+  card row per application, above the Applications table, each linking to its own tab. The figures
+  are `services/overview.py`'s own `_STATUS_FIGURES`, reused (never re-read) through a new public
+  `status_figures()` — the fetch-and-map half of `overview_for`'s running branch, pulled out so
+  both call it — and read from all three applications concurrently (`overview_cards()`, a small
+  thread pool), never opening a database. A stopped, unreachable, or non-answering application's
+  card is `—` for every figure, never `0` (ADR-0016), with the reason in the card's `title`.
+  LoadCoach's *Oldest queued* is now a duration (`duration_human`), on both `/` and its own
+  Overview page — `_STATUS_FIGURES`' one tag change, the single intentional difference in an
+  otherwise byte-identical refactor. `shell.html`'s link strip is now `page_nav()`, which renders
+  nothing here since Applications/Logs/Ollama/Trust are already in the left menu (row WY1).
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

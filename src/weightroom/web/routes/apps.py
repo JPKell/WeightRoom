@@ -139,6 +139,7 @@ def render_shell_page(
     nav_footer: str | None = None,
     active_app: str | None = None,
     side_nav_stubs: Sequence[Mapping[str, str]] = (),
+    views: Sequence[AppView] | None = None,
     **context: Any,
 ) -> HTMLResponse:
     """Render a page inside the shell: the tabs, the strip and the left menu (design brief §4).
@@ -146,13 +147,19 @@ def render_shell_page(
     Every HTML page but login, the error page and the standalone trust page goes through this —
     those three render before or outside a session and extend ``mirrorwall/base.html`` directly,
     never the shell.
+
+    Args:
+        views: The four applications, already computed — pass this when the caller needed them
+            for its own page content too (row WY3's ``/`` cards), so ``inventory()`` — a
+            ``systemctl show`` launch — runs once per render rather than twice. Computed here,
+            the ordinary way, when the caller has no reason to have them already.
     """
     from weightroom.web.rendering import CONSOLE_SIDE_NAV
 
     return render_form_page(
         request,
         template_name,
-        views=views_for_request(request),
+        views=views if views is not None else views_for_request(request),
         active_app=active_app,
         nav_sections=nav_sections if nav_sections is not None else CONSOLE_SIDE_NAV,
         nav_footer=nav_footer,

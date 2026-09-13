@@ -1,5 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import card, status_dot, table %}
+{% from "_app_page.html" import page_nav %}
 {% block title %}Overview — WeightRoom{% endblock %}
 {% block extra_head %}
 <style>
@@ -24,14 +25,11 @@
 {% macro app_link(name) %}<a href="/apps/{{ name }}">{{ name | app_label }}</a>{% endmacro %}
 
 {% block page_content %}
+{{ page_nav() }}
+{# Applications, Logs, Ollama and Trust are all in the left menu (row WY1) — a page bar repeating
+   them would fail test_page_nav.py, so this page has none. #}
 <div class="page-head">
   <h2>Overview</h2>
-  <span class="page-actions">
-    <a href="/apps">Applications</a>
-    <a href="/logs">Logs</a>
-    <a href="/ollama">Ollama</a>
-    <a href="/trust">Trust this CA</a>
-  </span>
 </div>
 
 <ul class="card-grid">
@@ -40,6 +38,22 @@
           note="leaf days left; wr-gym tls show", kind="figure") }}
   {{ card("Operator", principal.username, note=principal.source, kind="figure") }}
 </ul>
+
+{# Row WY3: LoadCoach, PromptCadence and FreeWeight's live figures, one compact card row each,
+   reusing `services/overview.py`'s own figure set (`_STATUS_FIGURES`) — never a database read.
+   `card_item.reason` is set only when every figure below it is a dash (ADR-0016: unsupported is
+   not zero), and becomes the row's `title` so the reason is one hover away. #}
+{% for card_item in cards %}
+<h4>
+  {{ app_link(card_item.app) }}
+  {{ status_dot(card_item.pill | pill_status, label=card_item.pill) }}
+</h4>
+<ul class="card-grid"{% if card_item.reason %} title="{{ card_item.reason }}"{% endif %}>
+  {% for figure in card_item.figures %}
+  {{ card(figure.label, figure.value, note=figure.note, kind="figure") }}
+  {% endfor %}
+</ul>
+{% endfor %}
 
 <h3>Applications</h3>
 {# A dense table (design brief §4) rather than the bulleted links this page carried at W3, and the

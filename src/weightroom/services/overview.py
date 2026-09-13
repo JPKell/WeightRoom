@@ -24,11 +24,18 @@ belongs, and this Overview table is content to be a read of the same rows, once.
 Figures differ: they are read from ``GET /api/v1/system/status`` (one call, already built by
 every application) when the application answers, and from ``COUNT(*)`` over the same named
 tables the primary table reads when it does not.
+
+Row WY3 reuses the same figures, without a database, for three compact cards on the console's
+``/``: :func:`status_figures` is the fetch-and-map half of :func:`overview_for`'s running branch,
+pulled out so both call it, and :func:`overview_cards` runs it for LoadCoach, PromptCadence and
+FreeWeight concurrently (one status read each, never sequential — three 3-second timeouts in a
+row would itself blow the shell's render budget).
 """
 
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
@@ -45,13 +52,23 @@ from weightroom.services.db_reader import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import httpx
 
     from weightroom.config import Settings
     from weightroom.services.apps import AppView
     from weightroom.services.db_reader import DatabaseUrlCache
 
-__all__ = ["Figure", "Overview", "OverviewTable", "overview_for"]
+__all__ = [
+    "AppCard",
+    "Figure",
+    "Overview",
+    "OverviewTable",
+    "overview_cards",
+    "overview_for",
+    "status_figures",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +103,7 @@ _STATUS_FIGURES: Final[dict[str, tuple[tuple[str, tuple[str, ...], str], ...]]] 
     ),
     "loadcoach": (
         ("Active", ("active",), "value"),
-        ("Oldest queued", ("oldest_queued_age_seconds",), "value"),
+        ("Oldest queued", ("oldest_queued_age_seconds",), "duration"),
         ("Starving", ("starving",), "value"),
     ),
     "ideapress": (
@@ -168,7 +185,7 @@ def _dig(body: dict[str, Any], path: tuple[str, ...]) -> Any:
 
 def _shown(value: Any, how: str) -> str:  # noqa: ANN401 — whatever the status body holds
     """One figure's text, by :data:`_STATUS_FIGURES`' rule; ``—`` for anything else."""
-    from mirrorwall import bytes_human
+    from mirrorwall import bytes_human, duration_human
 
     if how.startswith("count"):
         if not isinstance(value, list):
@@ -185,6 +202,8 @@ def _shown(value: Any, how: str) -> str:  # noqa: ANN401 — whatever the status
         return "—"
     if how == "bytes" and isinstance(value, int) and not isinstance(value, bool):
         return str(bytes_human(value))
+    if how == "duration" and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(duration_human(value))
     return str(value)
 
 
@@ -239,6 +258,93 @@ def _fetch_status(
         logger.info("overview.status_unreachable", extra={"app": app})
         return None
     return body if isinstance(body, dict) else None
+
+
+def _status_figures_and_body(
+    app: str, view: AppView, *, settings: Settings, client: httpx.Client
+) -> tuple[tuple[Figure, ...], dict[str, Any] | None]:
+    """:data:`_STATUS_FIGURES` read live off ``app``'s own status, and the body they came from.
+
+    The body is returned too because PromptCadence's own Overview section
+    (:func:`_promptcadence_figures`) reads more of the same document than the plain figures do;
+    a caller that only wants the figures is :func:`status_figures`. Dashes, never a crash, when
+    the call fails — this assumes ``view.running and view.reachable`` already, which is what
+    makes the call worth attempting at all.
+    """
+    body = _fetch_status(settings, app, view, client=client)
+    figures = _dash_figures(app) if body is None else _figures_from_status(app, body)
+    return figures, body
+
+
+def status_figures(
+    app: str, view: AppView, *, settings: Settings, client: httpx.Client
+) -> tuple[Figure, ...]:
+    """:data:`_STATUS_FIGURES` read live off ``app``'s own ``/system/status`` — no database.
+
+    Dashes, never a zero (ADR-0016), when ``app`` is stopped, unreachable, or its status call
+    fails. This is the same fetch :func:`overview_for` makes for a running application; it is
+    public so the console's ``/`` cards (:func:`overview_cards`) can reuse it directly.
+    """
+    if not (view.running and view.reachable):
+        return _dash_figures(app)
+    figures, _body = _status_figures_and_body(app, view, settings=settings, client=client)
+    return figures
+
+
+_CARD_APPS: Final[tuple[str, ...]] = ("loadcoach", "promptcadence", "freeweight")
+"""The three applications the console's ``/`` shows a card for (design brief; IdeaPress not
+asked)."""
+
+
+@dataclass(frozen=True, slots=True)
+class AppCard:
+    """One application's compact figure row on the console's ``/`` (row WY3)."""
+
+    app: str
+    pill: str
+    """``view.pill``, so the template needs no second lookup into ``views`` by name."""
+    figures: tuple[Figure, ...]
+    reason: str | None = None
+    """Why every figure is a dash, for the card's ``title``; ``None`` while the figures are live."""
+
+
+def _card_reason(view: AppView, figures: tuple[Figure, ...]) -> str | None:
+    if not view.running:
+        return f"{view.pill}."
+    if not view.reachable:
+        return f"{view.error or 'not reachable'}."
+    if all(figure.value == "—" for figure in figures):
+        return "status call failed."
+    return None
+
+
+def overview_cards(
+    views: Sequence[AppView], *, settings: Settings, client: httpx.Client
+) -> tuple[AppCard, ...]:
+    """LoadCoach, PromptCadence and FreeWeight's cards for ``/``: one status read each, concurrent.
+
+    Never opens a database or launches ``config show`` — the figures this reads are exactly the
+    ones :data:`_STATUS_FIGURES` already names, from the API only. A sequential read of three
+    calls, each up to :data:`_STATUS_TIMEOUT_SECONDS`, would itself blow the shell's render
+    budget, so the three run in a small thread pool rather than one after another.
+    """
+    by_name = {view.name: view for view in views}
+    with ThreadPoolExecutor(max_workers=len(_CARD_APPS)) as pool:
+        futures = [
+            (app, pool.submit(status_figures, app, by_name[app], settings=settings, client=client))
+            for app in _CARD_APPS
+            if app in by_name
+        ]
+        cards = []
+        for app, future in futures:
+            view = by_name[app]
+            figures = future.result()
+            cards.append(
+                AppCard(
+                    app=app, pill=view.pill, figures=figures, reason=_card_reason(view, figures)
+                )
+            )
+        return tuple(cards)
 
 
 def _figures_from_database(engine: Any, app: str) -> tuple[Figure, ...]:  # noqa: ANN401
@@ -317,10 +423,9 @@ def overview_for(
     # substituting the database's numbers for what the application itself could not answer.
     promptcadence_figures: tuple[Figure, ...] = ()
     if view.running and view.reachable:
-        body = _fetch_status(settings, app, view, client=client)
+        figures, body = _status_figures_and_body(app, view, settings=settings, client=client)
         figures_from_api = body is not None
         figures_resolved = True
-        figures = _dash_figures(app) if body is None else _figures_from_status(app, body)
         if app == "promptcadence" and body is not None:
             promptcadence_figures = _promptcadence_figures(body)
     else:
