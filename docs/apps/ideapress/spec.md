@@ -97,6 +97,7 @@ GET  /projects/{id}/units/{unit_id}                               GET .../histor
 POST /projects/{id}/units/{unit_id}/revise
 GET  /projects/{id}/export                                        POST /projects/{id}/export
 GET  /export/formats               GET  /workflows                GET  /workflows/{id}
+POST /workflows                    PUT  /workflows/{id}
 GET  /backends                     POST /backends/test
 GET  /settings                     PUT  /settings
 ```
@@ -110,7 +111,7 @@ ideapress project create|list|show|delete|import|export
 ideapress plan build|show
 ideapress stage run|list|status|cancel
 ideapress unit list|show|history|revise
-ideapress workflow list|show
+ideapress workflow list|show|save
 ideapress backend list|test|switch
 ideapress prompts list|show|build
 ```
@@ -130,9 +131,15 @@ results); events.
 ## 10. Data ownership
 
 Owns `ideapress.sqlite3`: projects, briefs, plans, units, requirements, stage_runs, attempts,
-validations, audits, revisions, drafts, exports, backend_config, settings, and — since 1.4 —
-`tool_call_records`. Owns its project artifact directory, including the `sources/` subdirectory an
+validations, audits, revisions, drafts, exports, backend_config, settings, since 1.4
+`tool_call_records`, and since 1.5 `workflows`. Owns its project artifact directory, including the `sources/` subdirectory an
 operator drops research material into. Reads nothing belonging to another application.
+
+`workflows` holds the workflow definitions a project binds to, one row per version, append-only
+([ADR-0143](../../adr/0143-a-workflow-is-a-stored-versioned-record-a-project-pins.md), migration
+`0014`). `projects.workflow_id`/`workflow_version` have named it since `0001`; until 1.5 there was
+nothing to name. Nothing outside IdeaPress writes it — WeightRoomGym's editor is HTTP over
+`POST`/`PUT /workflows` like any other client.
 
 `tool_call_records` is ToolYard's record shape in IdeaPress's own table
 ([ADR-0116](../../adr/0116-research-runs-under-toolyard-and-fetches-only-a-named-host.md), migration

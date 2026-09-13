@@ -114,6 +114,34 @@ refusal on the attempt, the project untouched and the stage resumable once the c
 registry changes. It is never served by the bare base — an operator who pinned a house voice and
 received the base's prose has been told something false about what wrote their document.
 
+**A project runs the stages *its own workflow* lists, which since 1.5 is a stored record rather
+than this table** ([ADR-0143](../../adr/0143-a-workflow-is-a-stored-versioned-record-a-project-pins.md)).
+A workflow is a versioned JSON document in IdeaPress's own `workflows` table; a project pins
+`workflow_id` and `workflow_version` and keeps that version whatever is saved afterwards. What a
+workflow may vary is **membership and configuration**, never order and never the gates:
+
+* It holds only the **twelve editable kinds** — this table's sixteen minus `validate`, `coverage`,
+  `commit` and `export`. Those four are §1 rule 1 itself: they always run, they are not in a record,
+  and a document naming one is refused when it is written.
+* Its stages are stored in this table's ordinal order; a document listing them in any other order is
+  refused. `draft` before `outline` has no meaning, and the executor's shape *is* the order.
+* Each stage may name a `prompt_id` from the pack (one whose required variables are identical to the
+  stage's own record's), a `max_revision_rounds` on `revise`, and a `model_hint`. Absent means what
+  1.4 did: the shipped record, the `workflow.max_revision_rounds` setting, the `[models.stages]`
+  binding. A run's own `overrides` still win over all three.
+* `draft` is required; `requirements` and `outline` go together (the plan stage runs both); `revise`
+  needs `critique`; `audit_deep` needs `audit_fast`; `research_synthesis` needs `research`. Each is
+  refused at write, naming the field.
+
+The executor reads the bound definition at seven points — the plan run, any stage run, and the five
+review-loop steps (`repair`, `audit_fast`, `audit_deep`, `fact_check`, `critique`/`revise`). A stage
+the workflow does not list is refused **before a stage run row is written**, naming the workflow and
+what it does run. `standard 1.0` — seeded by migration `0014` and what every project made before 1.5
+is bound to — lists all twelve, so every one of those points takes the path this document has always
+described. **A workflow without `audit_fast` can satisfy no check-less blocking requirement**: ADR-0039
+makes an explicit attestation the only way, so such a requirement stays unsatisfied and its unit
+pauses at the coverage gate.
+
 This table is the **only** list of stage identifiers. `[models.stages]` keys,
 `[models.stage_adapters]` keys, the LoadCoach task map in §6 and the `stage` values in the API all
 draw from it, and a startup check asserts the three agree:

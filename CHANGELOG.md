@@ -6,6 +6,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX12)
+- **IdeaPress's workflows are editable from the console.** `ip_workflows.html` lists every stored
+  workflow at its newest version, with the stage vocabulary IdeaPress serves beside it — the kinds a
+  workflow may contain, each one's gate, its `[models.stages]` binding and its shipped prompt record,
+  and the four gate kinds (`validate`, `coverage`, `commit`, `export`) named as what a workflow may
+  never contain (ADR-0143). The workflow limits table stays, now saying which of the three levels
+  decides a revision bound.
+- **A new editor, `ip_workflow.html`** at `GET /apps/ideapress/workflows/{id}` and
+  `/apps/ideapress/workflows/new`: one row per stage kind, in the order they run, with a checkbox for
+  membership, a prompt `<select>` filled from IdeaPress's own `prompt_choices` for that stage, a
+  revision bound on `revise` and a model on every stage that reaches one. The record IdeaPress stores
+  sits below it in a collapsed JSON `<details>`, and every stored version is linked. Saving is
+  `POST /apps/ideapress/workflows` (create, at `1.0`) or `POST /apps/ideapress/workflows/{id}`
+  (`PUT`, the next minor) — **always a new version, never an edit in place**, so a project already
+  running keeps the definition it started under. One audit row per save, `ideapress.workflow_save`,
+  carrying the version; a refusal renders in IdeaPress's own words with what was ticked kept.
+- **A project's page links its bound workflow** at the version it pinned.
+- The console checks only what HTML cannot — a revision bound that is not a whole number — and leaves
+  every workflow rule to IdeaPress, whose refusal names the field.
+
 ### Added (row WX10)
 - **IdeaPress's Projects tab gets a top nav; Backends gets a LoadCoach-backed models table.**
   `ip_projects.html` and `ip_project.html` now carry a nav strip — the eight most recent projects

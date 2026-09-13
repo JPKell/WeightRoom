@@ -1,0 +1,109 @@
+{% extends "_shell.html" %}
+{% from "mirrorwall/components.html" import badge, empty_state, json_viewer %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% block title %}{{ workflow_id or "New workflow" }} — Workflows — IdeaPress — WeightRoom{% endblock %}
+{% block page_content %}
+<style>
+  /* Row WX12. The editor's stage table scrolls inside its own container, so at phone width its
+     columns keep a readable minimum instead of wrapping a stage name mid-word. */
+  [data-table="ip-workflow-editor"] th[scope="row"] { min-width: 20ch; }
+  [data-table="ip-workflow-editor"] th[scope="row"] code { white-space: nowrap; }
+  [data-table="ip-workflow-editor"] select { min-width: 24ch; }
+</style>
+{% set wf = (sourced.data or {}).get("workflow") or {} %}
+{% set vocabulary = (sourced.data or {}).get("vocabulary") or {} %}
+{% set versions = (sourced.data or {}).get("versions") or [] %}
+{% set action = "/apps/ideapress/workflows" ~ ("/" ~ (workflow_id | urlencode) if workflow_id else "") %}
+{% call app_page_header(view, workflow_id or "New workflow", "Workflows", "Saving writes a new version. Earlier versions stay, and every project keeps the version it was created on.") %}
+<a href="/apps/ideapress/workflows">All workflows</a> · <a href="/apps/ideapress/projects/new">New project on it</a>
+{% endcall %}
+{% include "_app_state.html" %}
+{% if saved %}<p class="notice" role="status">Saved as version {{ saved }}. Projects already running keep the version they were created on; a new project on this workflow gets the newest.</p>{% endif %}
+{{ refusal(save_error) }}
+{{ refusal(sourced.error) }}
+{% if sourced.data is not none %}
+
+{% if workflow_id %}
+<p class="muted">Showing version <strong>{{ wf.get("version") or "—" }}</strong>{% if versions %} of
+{% for one in versions %}<a href="/apps/ideapress/workflows/{{ workflow_id | urlencode }}?version={{ one | urlencode }}">{{ one }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.
+Editing always saves as a new version, whichever one is shown.</p>
+{% endif %}
+
+{% if sourced.live %}
+{% set chosen = form.get("kinds") %}
+<form method="post" action="{{ action }}" class="card kit-form">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <div class="field"><label for="ip-wf-id">Workflow id</label>
+    {% if workflow_id %}
+    <input id="ip-wf-id" value="{{ workflow_id }}" readonly>
+    <span class="field-hint">A save writes a new version of this workflow; it never renames one.</span>
+    {% else %}
+    <input id="ip-wf-id" name="id" value="{{ form.get('id', '') }}" required maxlength="50" pattern="[a-z0-9][a-z0-9-]*">
+    <span class="field-hint">Lowercase letters, digits and single hyphens. It is stored at version 1.0.</span>
+    {% endif %}</div>
+  <div class="field kit-wide"><label for="ip-wf-title">Title</label>
+    <input id="ip-wf-title" name="title" value="{{ form.get('title') or wf.get('title') or '' }}" required maxlength="200">
+    <span class="field-hint">One line, for a person reading the list.</span></div>
+
+  <fieldset class="kit-wide">
+    <legend>Stages</legend>
+    <p class="muted">Tick the stages this workflow runs. They always run in the order below — a
+    workflow chooses which stages run, never the order. The gates
+    {% for gate in vocabulary.get("gate_kinds") or [] %}<code>{{ gate }}</code>{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}
+    always run and cannot be listed.</p>
+    <div class="table-scroll">
+    <table data-table="ip-workflow-editor" data-density="dense" data-sortable="false" data-complete="true">
+      <thead><tr><th scope="col">Runs</th><th scope="col">Stage</th><th scope="col">Prompt</th><th scope="col">Revision rounds</th><th scope="col">Model</th></tr></thead>
+      <tbody>
+      {% for one in vocabulary.get("kinds") or [] %}
+      {% set kind = one.get("kind") %}
+      {% set stage = stages.get(kind) or {} %}
+      {% set on = (kind in chosen) if chosen is not none else (kind in stages) %}
+      <tr>
+        <td><input type="checkbox" id="ip-wf-on-{{ kind }}" name="kind" value="{{ kind }}"{{ ' checked' if on else '' }} aria-label="Run {{ kind }}"></td>
+        <th scope="row"><label for="ip-wf-on-{{ kind }}"><code>{{ kind }}</code></label>
+          <span class="muted">{{ one.get("gate") or "" }}</span></th>
+        <td>
+          {% set choices = (vocabulary.get("prompt_choices") or {}).get(kind) or [] %}
+          {% if choices %}
+          {% set picked = form.get("prompt_id." ~ kind) if form else none %}
+          {% set picked = picked if picked is not none else (stage.get("prompt_id") or "") %}
+          <select name="prompt_id.{{ kind }}" aria-label="{{ kind }} prompt">
+            <option value=""{{ ' selected' if not picked else '' }}>{{ (vocabulary.get("default_prompts") or {}).get(kind) or "the shipped record" }} (default)</option>
+            {% for choice in choices %}<option value="{{ choice }}"{{ ' selected' if picked == choice else '' }}>{{ choice }}</option>{% endfor %}
+          </select>
+          {% else %}
+          <span class="muted" title="this stage renders no prompt">—</span>
+          {% endif %}
+        </td>
+        <td>{% if kind == "revise" %}
+          <input type="number" name="max_revision_rounds.{{ kind }}" min="0" max="100" value="{{ form.get('max_revision_rounds.' ~ kind) if form.get('max_revision_rounds.' ~ kind) is not none else (stage.get('max_revision_rounds') if stage.get('max_revision_rounds') is not none else '') }}" placeholder="setting" aria-label="{{ kind }} revision rounds">
+          {% else %}<span class="muted" title="only the revise stage carries the loop's bound">—</span>{% endif %}</td>
+        <td>{% if one.get("uses_model") %}
+          <input name="model_hint.{{ kind }}" value="{{ form.get('model_hint.' ~ kind) if form.get('model_hint.' ~ kind) is not none else (stage.get('model_hint') or '') }}" placeholder="binding" maxlength="200" aria-label="{{ kind }} model">
+          {% else %}<span class="muted" title="this stage reaches no model">—</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted">A blank prompt, bound or model means the default: the shipped record, the
+    <code>workflow.max_revision_rounds</code> setting, and the stage's
+    <a href="/apps/ideapress/settings"><code>[models.stages]</code> binding</a>. IdeaPress refuses
+    anything a run could not execute — a missing <code>draft</code>, a <code>revise</code> with no
+    <code>critique</code> — and says which field.</p>
+  </fieldset>
+  <div class="kit-wide"><button type="submit" data-variant="primary">{% if workflow_id %}Save as a new version{% else %}Create workflow{% endif %}</button></div>
+</form>
+{% else %}
+<p class="muted">Editing a workflow needs IdeaPress's own API; start it first.</p>
+{% endif %}
+
+{% if workflow_id %}
+{{ json_viewer(wf, label="The record, as IdeaPress stores it") }}
+{% endif %}
+{% else %}
+{{ empty_state("This workflow could not be read.") }}
+{% endif %}
+{{ page_source(sourced) }}
+{% endblock %}

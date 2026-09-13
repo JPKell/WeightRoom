@@ -33,9 +33,29 @@ erDiagram
 ```text
 id ULID PK · title · slug UNIQUE · content_type · content_type_version
 workflow_id · workflow_version · status                -- draft|planning|generating|paused|complete|archived
+                                                       -- the pair is FK-free but resolved: `workflows`
 brief_text · author_material_json · config_json        -- per-project overrides of workflow limits and bindings
 created_at · updated_at · completed_at NULL · archived_at NULL
 ```
+
+### `workflows`
+```text
+id ULID PK · workflow_id · version                       -- UNIQUE (workflow_id, version)
+title · document_json · created_at
+```
+
+One **version** of one workflow definition, migration `0014`
+([ADR-0143](../../adr/0143-a-workflow-is-a-stored-versioned-record-a-project-pins.md)).
+`projects.workflow_id` and `projects.workflow_version` have named this table since `0001`; until
+1.5 it did not exist and the two columns took any string. Append-only: a save writes the next minor
+version and no row is ever updated or deleted, because a project pins the pair and a definition that
+changed under a run would make a stage run's provenance a claim rather than a record.
+
+`document_json` holds the record: `{id, version, title, stages: [{kind, prompt_id,
+max_revision_rounds, model_hint}]}`, the stages in workflows §2's ordinal order. It carries the
+**twelve editable kinds only** — the four gates (`validate`, `coverage`, `commit`, `export`) are
+never in a workflow and a document naming one is refused at write. `standard 1.0`, which every
+project created before 1.5 is bound to, is seeded by the migration and lists all twelve.
 
 ### `sources`
 ```text

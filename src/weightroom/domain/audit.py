@@ -112,6 +112,10 @@ ACTIONS: Final[frozenset[str]] = frozenset(
         "ideapress.unit_revise",
         "ideapress.unit_resume",
         "ideapress.export_write",
+        # WX12. A workflow created or saved as a new version through IdeaPress's own API
+        # (ADR-0143). One action for both: a save is a save, and which one it was is the
+        # `version` in the row's params.
+        "ideapress.workflow_save",
         # WP3. From FreeWeight's tab (enabling a model reuses `catalog.enabled`; starting a run is
         # the `job.enqueue` of W9's `freeweight_suite_run`): a discovery pass, a run cancelled or
         # repeated, and the `[provider]` block saved — a `security` row when kind or base_url moved.
