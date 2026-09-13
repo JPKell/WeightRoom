@@ -2,7 +2,12 @@
 {% block title %}{{ prompt_id }} — {{ app | app_label }} — WeightRoom{% endblock %}
 {% block extra_head %}
 <style>
-  .prompt-editor textarea { width: 100%; min-height: 28em; }
+  .prompt-editor textarea { width: 100%; }
+  /* A version is four characters and its hint is two sentences: the field spans the form and the
+     box stays the size of what goes in it (the `.field`-as-flex-item lesson of row WX7). */
+  .prompt-editor input[name="version"] { max-width: 12em; }
+  .prompt-editor textarea[name="template"] { min-height: 14em; }
+  .prompt-editor textarea[name="record"] { min-height: 24em; }
   .prompt-diff, .prompt-shipped { max-height: 40em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 {% endblock %}
@@ -26,6 +31,7 @@
 <p class="notice" role="alert">The override at <code>{{ detail.override_path }}</code> does not load:
 {{ detail.override_problem }}</p>
 {% endif %}
+<p class="muted">{{ detail.shipped.get("purpose") or "" }}</p>
 
 {% if detail.diff %}
 <h3>Diff against the shipped record</h3>
@@ -33,15 +39,36 @@
 {% endif %}
 
 <h3>{{ "Edit the override" if detail.has_override_file else "Override it" }}</h3>
-<form method="post" action="/apps/{{ app }}/prompts/{{ prompt_id }}" class="prompt-editor">
+{# Row WX8: the three fields anyone actually edits are named inputs, and the whole record is still
+   what is posted — the named values are patched into that JSON server-side, and the loader the
+   application itself runs is what validates the result. Nothing here writes a record by hand, so
+   "a record the editor accepts is one the application will load" stays true. #}
+<form method="post" action="/apps/{{ app }}/prompts/{{ prompt_id }}" class="prompt-editor kit-form">
   <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <label class="field">The whole record, as JSON
-    <textarea name="record" class="mono" spellcheck="false">{{ editor_text }}</textarea>
-  </label>
-  <p class="muted">Validated with the loader {{ app | app_label }} itself runs before anything is
-  written. Give the override its own <code>version</code> and a <code>metadata.change_reason</code>, so
-  what rendered it says which prompt it was.</p>
-  <button type="submit">Validate and write the override</button>
+  <div class="field kit-wide"><label for="prompt-version">Version</label>
+    <input id="prompt-version" name="version" value="{{ fields.version }}">
+    <span class="field-hint">The prompt's own version, independent of the record schema. Bump it: every sample records
+    the version that rendered it, and two different texts under one version cannot be told apart afterwards.</span></div>
+  <div class="field kit-wide"><label for="prompt-change-reason">Why it changed — <code>metadata.change_reason</code></label>
+    <input id="prompt-change-reason" name="change_reason" value="{{ fields.change_reason }}">
+    <span class="field-hint">The loader refuses a record without one (prompt standards §2.1); this page does not add it
+    for you.</span></div>
+  <div class="field kit-wide"><label for="prompt-template">The template — the user turn</label>
+    <textarea id="prompt-template" name="template" class="mono" spellcheck="false" rows="14">{{ fields.template }}</textarea>
+    <span class="field-hint">Jinja2 under <code>StrictUndefined</code>. It may use only the variables the record declares
+    {% if fields.variables %}— <code>{{ fields.variables | join(", ") }}</code>{% else %}, and it declares none{% endif %};
+    declaring one and never using it is refused as loudly as using one never declared.</span></div>
+  <details class="kit-details kit-wide">
+    <summary><strong>The whole record</strong> <span class="muted">— what is posted. The three fields above are patched into it.</span></summary>
+    <div class="field kit-wide"><label for="prompt-record">The record, as JSON</label>
+      <textarea id="prompt-record" name="record" class="mono" spellcheck="false">{{ editor_text }}</textarea>
+      <span class="field-hint">Every other key — <code>system</code>, <code>variables</code>, <code>purpose</code>,
+      <code>schema_version</code> — is edited here. Where this disagrees with a field above, the field above wins.</span></div>
+  </details>
+  <p class="muted kit-wide">Validated on a copy with the loader {{ app | app_label }} itself runs, before anything is written: a
+  record that would not load is never written, because an override that does not load stops IdeaPress starting and fails
+  every FreeWeight run.</p>
+  <div class="kit-wide"><button type="submit" data-variant="primary">Validate and write the override</button></div>
 </form>
 {% if detail.has_override_file %}
 <form method="post" action="/apps/{{ app }}/prompts/{{ prompt_id }}/delete">
@@ -51,6 +78,9 @@
 {% endif %}
 
 <h3>The shipped record</h3>
-<pre class="mono prompt-shipped">{{ detail.shipped | json_pretty }}</pre>
+<details class="kit-details">
+  <summary><strong>Shipped {{ detail.shipped.version }}</strong> <span class="muted">— what {{ app | app_label }} renders with no override</span></summary>
+  <pre class="mono prompt-shipped">{{ detail.shipped | json_pretty }}</pre>
+</details>
 {% endif %}
 {% endblock %}

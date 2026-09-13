@@ -72,7 +72,6 @@ _APP_PAGES: dict[str, tuple[str, ...]] = {
         "Models",
         "Runs",
         "Results",
-        "Dashboard",
         "Evidence",
         "Goals",
         "Adapters",
@@ -161,11 +160,11 @@ _PAGE_HREF: dict[str | tuple[str, str], str] = {
     "Workflows": "/apps/{app}/workflows",
     "Backends": "/apps/{app}/backends",
     # FreeWeight's own pages (row WP3). Machines has no menu entry: its pages open from Runs and
-    # Results, which link every machine they name.
+    # Results, which link every machine they name; nor does Dashboard, which row WX8 merged into
+    # the Overview (`/apps/freeweight`, its old path a redirect).
     ("freeweight", "Models"): "/apps/freeweight/models",
     ("freeweight", "Runs"): "/apps/freeweight/runs",
     ("freeweight", "Results"): "/apps/freeweight/results",
-    ("freeweight", "Dashboard"): "/apps/freeweight/dashboard",
     ("freeweight", "Evidence"): "/apps/freeweight/evidence",
     ("freeweight", "Adapters"): "/apps/freeweight/adapters",
     # FreeWeight's goals, drafts, calibration and grading (row WP4); Judges open from Goals.

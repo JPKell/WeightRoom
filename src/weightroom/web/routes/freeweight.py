@@ -323,15 +323,13 @@ def _startable_adapters(catalog: object) -> list[dict[str, Any]]:
     ]
 
 
-def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on the page
+def _runs(
     request: Request,
     principal: Principal,
     *,
     filters: Mapping[str, str | None],
     cursor: str | None = None,
     page: int = 1,
-    start_error: SuiteError | None = None,
-    form: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
@@ -351,7 +349,6 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
         next_href = _href(f"{BASE}/runs", **wanted, page=data["next_page"])
     benchmarks: list[dict[str, Any]] = []
     models: list[dict[str, Any]] = []
-    adapters: list[dict[str, Any]] = []
     machines: list[dict[str, Any]] = []
     if runs.live:
         benchmarks = (
@@ -368,11 +365,6 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
                 database=None,
             ).data
             or []
-        )
-        adapters = _startable_adapters(
-            read_app_page(
-                request, view, api=lambda: fw.adapters_api(client, settings), database=None
-            ).data
         )
         # The filter bar's Machine select (row WX7). A fingerprint is not a name anyone types,
         # and the Runs page was asking for one in a text box.
@@ -394,9 +386,9 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
         statuses=fw.RUN_STATUSES,
         next_href=next_href,
         benchmarks=benchmarks,
-        models=[one for one in models if one.get("enabled")],
-        # The Start form offers what may be measured (ADR-0118); the filter bar offers every
-        # model, because a run of a since-disabled model is still a run somebody wants to find.
+        # The filter bar offers every model, because a run of a since-disabled model is still a
+        # run somebody wants to find; the Overview's Start form is the one that filters to what
+        # may be measured (ADR-0118).
         model_options=models,
         machines=machines,
         # A run names its machine by fingerprint, which is not a name anyone recognises; this is
@@ -406,9 +398,6 @@ def _runs(  # noqa: PLR0913 — the filters, and what a refused start leaves on 
             for one in machines
             if one.get("machine_fingerprint")
         },
-        adapters=adapters,
-        start_error=start_error,
-        form=dict(form or {}),
     )
 
 
@@ -467,7 +456,9 @@ def start_from_page(  # noqa: PLR0913 — one parameter per field of FreeWeight'
             schedule_id=None,
         )
     except SuiteError as exc:
-        return _runs(request, principal, filters={}, start_error=exc, form=form)
+        # The Start form lives on the Overview since row WX8, so a refusal comes back where it
+        # was pressed — the Runs page only links to it.
+        return overview(request, principal, start_error=exc, form=form)
     return RedirectResponse(
         f"{BASE}/runs/starting/{fw.segment(job.id)}", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -1108,17 +1099,66 @@ def nickname_from_page(
 # --- Adapters, provider ---------------------------------------------------------------------------
 
 
-@ui_router.get(f"{BASE}/adapters", summary="Adapters", response_class=HTMLResponse)
-def adapters_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """Every adapter the directory holds or FreeWeight measured under, with its base and runs."""
+def _adapters(
+    request: Request,
+    principal: Principal,
+    *,
+    action_error: SuiteError | None = None,
+    drafted: Mapping[str, Any] | None = None,
+) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
         request, view, api=lambda: fw.adapters_api(client, settings), database=fw.adapters_db
     )
     return render_app_page(
-        request, principal, APP, "fw_adapters.html", selected="Adapters", view=view, sourced=sourced
+        request,
+        principal,
+        APP,
+        "fw_adapters.html",
+        selected="Adapters",
+        view=view,
+        sourced=sourced,
+        action_error=action_error,
+        drafted=dict(drafted or {}),
     )
+
+
+@ui_router.get(f"{BASE}/adapters", summary="Adapters", response_class=HTMLResponse)
+def adapters_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """Every adapter the directory holds or FreeWeight measured under, with its base and runs."""
+    return _adapters(request, principal)
+
+
+@ui_router.post(f"{BASE}/adapters/{{adapter}}/draft", summary="Draft a manifest from the page")
+def draft_from_page(
+    request: Request,
+    principal: CurrentOperator,
+    adapter: str,
+    base_model_name: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """``POST /adapters/{name}/draft`` (ADR-0145): a proposal for an artifact with no manifest.
+
+    The draft registers nothing — its suffix keeps it out of FreeWeight's manifest reading — so
+    this is not a write to the adapter registry but a note beside a file, and the row it audits
+    records the base the operator claimed. Renaming it to ``<name>.manifest.json`` stays a
+    person's job at a terminal (ADR-0061 rule 4).
+    """
+    client, settings = _clients(request)
+    params = {"app": APP, "adapter": adapter, "base_model_name": base_model_name.strip()}
+    try:
+        written = actions.draft_manifest(client, settings, adapter, base_model_name=base_model_name)
+    except SuiteError as exc:
+        _audit(
+            request, principal, "freeweight.adapter_draft", target=adapter,
+            outcome=outcome_of(exc), params=params, message=exc.message,
+        )  # fmt: skip
+        return _adapters(request, principal, action_error=exc)
+    _audit(
+        request, principal, "freeweight.adapter_draft", target=adapter, outcome="ok",
+        params={**params, "path": written.get("path")},
+    )  # fmt: skip
+    return _adapters(request, principal, drafted=written)
 
 
 @ui_router.get(f"{BASE}/adapters/{{adapter}}", summary="One adapter", response_class=HTMLResponse)
@@ -1236,39 +1276,108 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
     )
 
 
-# --- Dashboard and System (row WPF5) ---------------------------------------------------------
+# --- Overview (row WX8, the Dashboard merged in) and System (row WPF5) ----------------------
 
 
-@ui_router.get(f"{BASE}/dashboard", summary="Dashboard", response_class=HTMLResponse)
-def dashboard_page(
+def overview(  # noqa: PLR0913 — the dashboard's four filters, and what a refused start leaves
     request: Request,
-    principal: CurrentOperator,
-    suite: str | None = None,
-    model: str | None = None,
-    machine: str | None = None,
-    since: str | None = None,
+    principal: Principal,
+    *,
+    filters: Mapping[str, str | None] | None = None,
+    start_error: SuiteError | None = None,
+    form: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
-    """The cross-model summary and comparison heatmap over ``GET /dashboard`` (api.md §5a).
+    """FreeWeight's Overview: the unit, the dashboard, the Start form, the heatmap and the log.
 
-    No console page shows this view otherwise: Results is a metric-level query and Compare works
-    per subject (WP6's finding). Read-only, over the running API only — the scatter panels and
-    per-metric tables stay on FreeWeight's own page.
+    Row WX8 merged the Dashboard page into this one. The two were the same question asked twice —
+    *what has this machine measured* — and the Dashboard's menu entry was the only way to the
+    answer, one click past a landing page that showed four figures and a table of models. The
+    dashboard's own filters come with it, so ``/apps/freeweight/dashboard?suite=…`` still means
+    what it meant (that path now redirects here, query and all).
+
+    Args:
+        request: The request.
+        principal: The signed-in operator.
+        filters: The dashboard's scope — suite, model, machine, since.
+        start_error: FreeWeight's or the queue's refusal of a start, to render in the form.
+        form: What the operator typed into the Start form, kept across a refusal.
+
+    Returns:
+        The rendered page.
     """
+    import time
+
+    from weightroom.services.overview import overview_for
+
     view = app_view(request, APP)
     client, settings = _clients(request)
-    wanted = {"suite": suite, "model": model, "machine": machine, "since": since}
+    state = request.app.state
+    summary = overview_for(
+        APP,
+        view,
+        settings=settings,
+        database=state.database,
+        client=client,
+        urls=state.database_urls,
+        now=time.monotonic(),
+    )
+    wanted = {key: (filters or {}).get(key) or None for key in fw.DASHBOARD_FILTERS}
     sourced = read_app_page(
         request, view, api=lambda: fw.dashboard_api(client, settings, wanted), database=None
     )
+    benchmarks: list[dict[str, Any]] = []
+    models: list[dict[str, Any]] = []
+    adapters: list[dict[str, Any]] = []
+    if view.reachable:
+        benchmarks = (
+            read_app_page(
+                request, view, api=lambda: fw.benchmarks_api(client, settings), database=None
+            ).data
+            or []
+        )
+        models = (
+            read_app_page(
+                request,
+                view,
+                api=lambda: fw.models_api(client, settings, sort="canonical_id"),
+                database=None,
+            ).data
+            or []
+        )
+        adapters = _startable_adapters(
+            read_app_page(
+                request, view, api=lambda: fw.adapters_api(client, settings), database=None
+            ).data
+        )
+    chart = fw.heatmap_option(sourced.data or {})
     return render_app_page(
         request,
         principal,
         APP,
-        "fw_dashboard.html",
-        selected="Dashboard",
+        "fw_overview.html",
+        selected="Overview",
         view=view,
+        overview=summary,
         sourced=sourced,
         filters={key: value or "" for key, value in wanted.items()},
+        chart=chart,
+        benchmarks=benchmarks,
+        models=[one for one in models if one.get("enabled")],
+        adapters=adapters,
+        start_error=start_error,
+        form=dict(form or {}),
+        # ECharts is 1.1 MB and this is the tab's landing page: it is asked for only when there
+        # is a heatmap to draw (ADR-0142's per-page opt-in, taken per *render*).
+        mirrorwall={"htmx": True, "echarts": chart is not None},
+    )
+
+
+@ui_router.get(f"{BASE}/dashboard", summary="Dashboard, merged into the Overview")
+def dashboard_page(request: Request, principal: CurrentOperator) -> Response:
+    """Row WX8: the Dashboard is the Overview. Its path keeps its meaning — filters and all."""
+    query = request.url.query
+    return RedirectResponse(
+        f"{BASE}?{query}" if query else BASE, status_code=status.HTTP_303_SEE_OTHER
     )
 
 

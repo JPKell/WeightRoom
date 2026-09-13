@@ -120,6 +120,9 @@ ACTIONS: Final[frozenset[str]] = frozenset(
         "freeweight.run_repeat",
         "freeweight.provider_save",
         "freeweight.machine_nickname",
+        # WX8. A manifest *draft* written beside an unmanifested artifact (ADR-0145): a
+        # proposal nothing registers, so the row records who proposed it and for what base.
+        "freeweight.adapter_draft",
         # WP4 Gate A. From FreeWeight's Goals page: a goal created from a pack, forked from a
         # starter, edited (a separating edit's preview is a `pending` row), deleted (its preview a
         # `pending` row) or imported; a wizard draft begun, stepped, saved as a pack or abandoned.

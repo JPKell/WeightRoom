@@ -1,14 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_fw.html" import run_link, short, status_badge, value, machine_link %}
 {% block title %}Adapter — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data or {} %}
-<div class="page-head">
-  <h2>Adapter {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/adapters">Every adapter</a> · <a href="/apps/freeweight/runs?adapter={{ adapter_name | urlencode }}">Its runs</a></div>
-</div>
+{% call app_page_header(view, adapter_name, "Adapters", "One adapter: its base, the runs and results measured under it, and what it scored beside the bare base.") %}
+  <a href="/apps/freeweight/adapters">Every adapter</a> ·
+  <a href="/apps/freeweight/runs?adapter={{ adapter_name | urlencode }}">Its runs</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}
 {% for adapter in data.get("adapters") or [] %}

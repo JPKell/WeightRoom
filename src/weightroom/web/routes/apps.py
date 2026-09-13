@@ -555,8 +555,20 @@ def read_app_page[T](
 
 @ui_router.get("/apps/{app}", summary="One application's page", response_class=HTMLResponse)
 def app_page(request: Request, principal: CurrentOperator, app: str) -> HTMLResponse:
-    """One application's Overview: the pill, four figures, the primary table, the log tail."""
+    """One application's Overview: the pill, four figures, the primary table, the log tail.
+
+    FreeWeight's is its own page (row WX8): the Dashboard was merged into it, so it carries the
+    dashboard's cards, its filters, the heatmap and the Start form as well. Dispatched here rather
+    than routed separately, because ``/apps/{app}`` is declared before FreeWeight's router and a
+    later ``/apps/freeweight`` would never match.
+    """
     name = require_app(app)
+    if name == "freeweight":
+        from weightroom.web.routes.freeweight import overview as freeweight_overview
+
+        wanted = dict(request.query_params)
+        return freeweight_overview(request, principal, filters=wanted)
+
     from weightroom.services.overview import overview_for
 
     view = _view(request, name)

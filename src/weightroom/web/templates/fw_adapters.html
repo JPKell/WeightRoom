@@ -1,19 +1,33 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_fw.html" import yes_no, value, availability, link %}
 {% block title %}Adapters — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+<style>
+  /* Row WX8: one artifact per line with its Draft form beside it, wrapping to two lines on a
+     phone rather than pushing the button off the screen. */
+  .fw-unmanifested { list-style: none; padding: 0; }
+  .fw-unmanifested li { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 16px; margin-bottom: 8px; }
+  .fw-unmanifested form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 8px; margin: 0; }
+  .fw-unmanifested button { width: auto; }
+</style>
 {% set data = sourced.data %}
-<div class="page-head">
-  <h2>Adapters {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/evidence">Evidence</a> · <a href="/apps/freeweight/provider">Provider</a> · <a href="/apps/loadcoach/adapters">LoadCoach's adapters</a></div>
-</div>
+{% call app_page_header(view, "Adapters", "Adapters", "The LoRA adapters FreeWeight can measure a base under: the operator's directory as FreeWeight reads it, beside every adapter it has measured under.") %}
+  <a href="/apps/freeweight/evidence">Evidence</a> · <a href="/apps/freeweight/provider">Provider</a> ·
+  <a href="/apps/loadcoach/adapters">LoadCoach's adapters</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">The LoRA adapters FreeWeight can measure a base under: the operator's adapter directory as FreeWeight reads it
-(ADR-0061), beside FreeWeight's own record of every adapter it has measured under, which outlives the directory. A subject is a
+<p class="muted">The directory is read as ADR-0061 says: one artifact and one reviewed manifest each. A subject is a
 base with one adapter applied, and its evidence is measured on it, never inherited from the base (ADR-0059). Only
 <code>provider.kind = "llamacpp"</code> serves an adapter subject.</p>
+{{ refusal(action_error) }}
+{% if drafted %}
+<p class="notice" role="status">Draft written to <code>{{ drafted.get("path") }}</code> for
+<span class="mono">{{ drafted.get("adapter") }}</span>. It registers nothing yet — read it, set
+<code>data_classification</code> and the declared capabilities, verify the base, then rename it:
+<code>mv {{ drafted.get("path") }} {{ (drafted.get("path") or "") | replace(".manifest.draft.json", ".manifest.json") }}</code></p>
+{% endif %}
 {{ refusal(sourced.error) }}
 {% if data is not none %}
 {% if data.get("enabled") is sameas false %}
@@ -56,14 +70,52 @@ page to measure them.</p>
 {% for one in data.get("invalid") %}{% set _ = rows.append([one.get("path") or "—", one.get("problem") or "—"]) %}{% endfor %}
 {{ table([{"label": "Manifest", "mono": true}, {"label": "Problem"}], rows, density="dense", row_count=rows | length, table_id="fw-adapters-2", sortable=true) }}
 {% endif %}
+{# The directory — its drafts and its artifacts — is read only by the running FreeWeight, and
+   means nothing at all when adapters are off (the notice above says which key turns them on). #}
+{% if sourced.live and data.get("enabled") is not sameas false %}
+<h3 id="drafts">Drafts</h3>
+<p class="muted">A draft is a proposal: FreeWeight and <code>loadcoach adapters scan</code> may both write one, and
+neither registers anything (ADR-0145). The suffix is what enforces that — nothing reads a
+<code>.manifest.draft.json</code> as a manifest. <strong>Keeping one is renaming it</strong>, at a terminal, after a
+person has read it: <code>mv &lt;name&gt;.manifest.draft.json &lt;name&gt;.manifest.json</code>. Check the base first —
+a draft records it at <code>name_only</code> confidence with no digest — and set
+<code>data_classification</code>, which a draft writes as <code>confidential</code> precisely so that a value nobody
+chose cannot leak anything (ADR-0065).</p>
 {% if data.get("drafts") %}
-<h3>Drafts</h3>
-<p class="muted">Never registered until a person reviews one and renames it.</p>
 <ul>{% for one in data.get("drafts") %}<li class="mono">{{ one }}</li>{% endfor %}</ul>
+{% else %}
+<p class="muted">No draft is waiting for review.</p>
 {% endif %}
+
+<h3 id="unmanifested">Without a manifest</h3>
+<p class="muted">A <strong>manifest</strong> is the reviewed <code>&lt;name&gt;.manifest.json</code> beside an
+artifact — the file that says what this adapter is: its <code>artifact_sha256</code>, which is its identity, the base
+it was trained against and how well that is proven, the capabilities it claims, and its
+<code>data_classification</code>. There is no registry service; the directory and these files <em>are</em> the
+registry (ADR-0061), and an artifact without one is present and unusable — FreeWeight will not offer it to a
+provider or measure under it.</p>
 {% if data.get("unmanifested") %}
-<h3>Artifacts with no manifest</h3>
-<ul>{% for one in data.get("unmanifested") %}<li class="mono">{{ one }}</li>{% endfor %}</ul>
+<p class="muted"><strong>Draft manifest</strong> writes a proposal for one: FreeWeight hashes the artifact and fills
+in what it can prove, and asks you for the one thing no reader of a GGUF can establish — the name of the base it was
+trained against. Nothing is overwritten, and nothing is registered.</p>
+<ul class="fw-unmanifested">
+  {% for one in data.get("unmanifested") %}
+  {#- `unmanifested` carries full paths; the draft route names the artifact by its stem. -#}
+  {% set stem = (one.rsplit("/", 1) | last).removesuffix(".gguf") %}
+  <li>
+    <span class="mono" title="{{ one }}">{{ one.rsplit("/", 1) | last }}</span>
+    <form method="post" action="/apps/freeweight/adapters/{{ stem | urlencode }}/draft" class="kit-actions">
+      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+      <div class="field"><label for="fw-draft-base-{{ loop.index }}">Base model name</label>
+        <input id="fw-draft-base-{{ loop.index }}" name="base_model_name" required placeholder="qwen3:8b" autocapitalize="off"></div>
+      <button type="submit">Draft manifest</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">Every artifact in the directory has a manifest.</p>
+{% endif %}
 {% endif %}
 {% endif %}
 {{ page_source(sourced) }}
