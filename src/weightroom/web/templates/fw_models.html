@@ -1,12 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, params_b, context_k, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, params_b, context_k, app_page_header, page_nav %}
 {% from "_fw.html" import filter_styles, model_link, yes_no, model_switch with context %}
 {% block title %}Models — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": "Docs", "href": "/docs?section=apps#docs-apps-freeweight"}]) }}
 {{ filter_styles() }}
 {% call app_page_header(view, "Models", "Models", "Every model identity FreeWeight's discovery has recorded, with its latest descriptor.") %}
-  <a href="/apps/freeweight/runs">Runs</a> · <a href="/apps/freeweight/provider">Provider</a> · {{ docs_link("freeweight") }}
   <form method="post" action="/apps/freeweight/models/discover" class="kit-inline">
     <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
     <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="FreeWeight is not answering"{% endif %}>Refresh from provider</button>
@@ -70,7 +70,6 @@ from — and is applied by its API. This list is read from the database file ins
 {% set _ = rows.append([
   model_link(model.get("id"), model.get("canonical_id"), model.get("display_name")),
   model.get("provider_kind") or "—",
-  model.get("canonical_id") or "—",
   model.get("family") or "—",
   model.get("quantization") or "—",
   params_b(model.get("parameter_count")),
@@ -81,7 +80,7 @@ from — and is applied by its API. This list is read from the database file ins
   (badge("enabled", tone="success") if model.get("enabled") else badge("disabled", tone="danger")) ~ (model_switch(model, current_path) if sourced.live and model.get("id") else "")
 ]) %}
 {% endfor %}
-{{ table([{"label": "Model"}, {"label": "Provider"}, {"label": "Canonical ID", "mono": true}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Confidence"}, {"label": "Results"}, {"label": "Last seen", "mono": true}, {"label": "Use"}], rows, caption="Every model identity recorded, with its latest descriptor", density="dense", row_count=rows | length, table_id="fw-models", sortable=true) }}
+{{ table([{"label": "Model"}, {"label": "Provider"}, {"label": "Family"}, {"label": "Quantization"}, {"label": "Parameters", "numeric": true}, {"label": "Context", "numeric": true}, {"label": "Confidence"}, {"label": "Results"}, {"label": "Last seen", "mono": true}, {"label": "Use"}], rows, caption="Every model identity recorded, with its latest descriptor", density="dense", row_count=rows | length, table_id="fw-models", sortable=true) }}
 {% else %}
 {{ empty_state("No model has been discovered yet. Refresh from the provider once it answers.", "Provider", "/apps/freeweight/provider") }}
 {% endif %}

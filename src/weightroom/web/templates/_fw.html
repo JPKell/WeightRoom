@@ -58,6 +58,15 @@
 {%- else -%}{{ badge("unavailable", tone="danger", title=adapter.get("unavailable_reason")) }} {{ adapter.get("unavailable_reason") or "" }}{%- endif -%}
 {%- endmacro %}
 
+{% macro model_name(canonical_id, adapter=none) -%}
+{#- Row WY8: Results and Evidence name the model that was measured, not the identity string
+    `Models`' own link already carries — its provider name (`canonical_name`, ADR-0024's own
+    grammar), with the full canonical ID and any adapter kept as the title. -#}
+{%- if canonical_id -%}
+<span class="mono" title="{{ canonical_id }}{% if adapter %} + {{ adapter }}{% endif %}">{{ canonical_id | canonical_name }}{% if adapter %} + {{ adapter }}{% endif %}</span>
+{%- else -%}<span class="muted">—</span>{%- endif -%}
+{%- endmacro %}
+
 {% macro yes_no(flag) -%}
 {%- if flag is none -%}<span class="muted">—</span>{%- elif flag -%}yes{%- else -%}no{%- endif -%}
 {%- endmacro %}

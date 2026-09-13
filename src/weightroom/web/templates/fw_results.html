@@ -1,12 +1,15 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_fw.html" import run_link, short, status_badge, value, machine_link, link %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
+{% from "_fw.html" import run_link, short, status_badge, value, machine_link, link, model_name %}
 {% block title %}Results — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(links=[
+  {"label": "Compare", "href": "/apps/freeweight/results/compare"},
+  {"label": "Machines", "href": "/apps/freeweight/machines"},
+]) }}
 <div class="page-head">
   <h2>Results {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/results/compare">Compare</a> · <a href="/apps/freeweight/evidence">Evidence</a> · <a href="/apps/freeweight/machines">Machines</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">Every stored metric, newest run first. Completed runs only unless you ask otherwise: a metric from a run
@@ -43,7 +46,7 @@ that stopped halfway measured a different set of cases than the row beside it.</
   value(row.get("excluded_count"), fmt="%d"),
   value(row.get("stddev")),
   value(row.get("coefficient_of_variation"), fmt="%.3g"),
-  row.get("model") or "—",
+  model_name(row.get("model")),
   (row.get("suite") or "—") ~ " " ~ (row.get("suite_version") or ""),
   row.get("run_test_key") or "run",
   machine_link(row.get("machine_fingerprint")),
@@ -53,7 +56,7 @@ that stopped halfway measured a different set of cases than the row beside it.</
   link("/apps/freeweight/runs/" ~ ((row.get("run_id") or "") | urlencode) ~ ("/tests/" ~ (row.get("run_test_id") | urlencode) if row.get("run_test_id") else ""), (row.get("run_id") or "—")[:8])
 ]) %}
 {% endfor %}
-{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Stddev", "numeric": true}, {"label": "CV", "numeric": true}, {"label": "Model", "mono": true}, {"label": "Suite"}, {"label": "Test"}, {"label": "Machine"}, {"label": "Runtime profile"}, {"label": "Run status"}, {"label": "Created", "mono": true}, {"label": "Raw source"}], rows, caption="Stored metrics; an unsupported measurement shows —, never 0", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-results", sortable=true) }}
+{{ table([{"label": "Metric", "mono": true}, {"label": "Value", "numeric": true}, {"label": "Unit"}, {"label": "n", "numeric": true}, {"label": "Excluded", "numeric": true}, {"label": "Stddev", "numeric": true}, {"label": "CV", "numeric": true}, {"label": "Model"}, {"label": "Suite"}, {"label": "Test"}, {"label": "Machine", "hidden": true}, {"label": "Runtime profile", "hidden": true}, {"label": "Run status"}, {"label": "Created", "mono": true}, {"label": "Raw source"}], rows, caption="Stored metrics; an unsupported measurement shows —, never 0", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-results", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 {% else %}
 {{ empty_state("Nothing measured under these filters.", "Start a run", "/apps/freeweight/runs") }}

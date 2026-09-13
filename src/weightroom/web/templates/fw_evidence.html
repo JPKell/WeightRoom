@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_fw.html" import run_link, short, value, machine_link %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
+{% from "_fw.html" import run_link, short, value, machine_link, model_name %}
 {% macro staleness(explained) -%}
 {#- FreeWeight's staleness verdict for one record, as of the request that read it (api.md §6). -#}
 {%- set now = (explained or {}).get("staleness") or {} -%}
@@ -11,9 +11,9 @@
 {%- endmacro %}
 {% block title %}Evidence — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": "LoadCoach's import", "href": "/apps/loadcoach/evidence"}]) }}
 <div class="page-head">
   <h2>Evidence {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/results">Results</a> · <a href="/apps/loadcoach/evidence">LoadCoach's import</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">What LoadCoach routes on: one <code>capability.evidence</code> record per subject, runtime profile, machine and
@@ -39,7 +39,7 @@ A <code>user.*</code> record carries its goal hash, jury and calibration beside 
 {% set calibration = record.get("calibration") or {} %}
 {% set _ = rows.append([
   record.get("capability_id") ~ (" · goal" if record.get("goal_hash") else ""),
-  (record.get("subject") or "—") ~ (" + " ~ record.get("adapter") if record.get("adapter") else ""),
+  model_name(record.get("subject"), record.get("adapter")),
   value(record.get("score"), fmt="%.3f"),
   value(record.get("confidence"), fmt="%.2f"),
   (record.get("sample_count") | string) ~ (" (+" ~ record.get("excluded_count") ~ " excluded)" if record.get("excluded_count") else ""),
@@ -50,7 +50,7 @@ A <code>user.*</code> record carries its goal hash, jury and calibration beside 
   staleness(record.get("explanation"))
 ]) %}
 {% endfor %}
-{{ table([{"label": "Capability", "mono": true}, {"label": "Subject", "mono": true}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile"}, {"label": "Machine"}, {"label": "Schema"}, {"label": "Staleness"}], rows, caption="Current records, by capability", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-evidence-1", sortable=true) }}
+{{ table([{"label": "Capability", "mono": true}, {"label": "Subject"}, {"label": "Score", "numeric": true}, {"label": "Confidence", "numeric": true}, {"label": "Samples", "numeric": true}, {"label": "Measured", "mono": true}, {"label": "Runtime profile", "hidden": true}, {"label": "Machine", "hidden": true}, {"label": "Schema"}, {"label": "Staleness"}], rows, caption="Current records, by capability", density="dense", complete=next_href is none, row_count=rows | length, table_id="fw-evidence-1", sortable=true) }}
 {% if next_href %}<p><a href="{{ next_href }}">Next page</a></p>{% endif %}
 
 <h3>Why each score is what it is</h3>
