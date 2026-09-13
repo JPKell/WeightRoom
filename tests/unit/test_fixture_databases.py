@@ -14,6 +14,7 @@ from pathlib import Path
 KNOWN_REVISIONS: tuple[tuple[str, str], ...] = (
     ("freeweight", "0009"),
     ("freeweight", "0010"),  # migration 0005, row WA1
+    ("freeweight", "0011"),  # migration 0009, row WY10
     ("loadcoach", "0015"),
     ("ideapress", "0010"),
     ("ideapress", "0011"),  # migration 0008, row W9

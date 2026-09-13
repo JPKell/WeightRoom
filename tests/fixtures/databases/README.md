@@ -5,13 +5,14 @@ One SQLite file per application, migrated to the exact revision `known_revisions
 kickoff already assumes exist. Each is empty (no application data, only the schema): W7 fills
 them with rows as its own tests need them.
 
-FreeWeight has two since row WA1: `0010` (migration `0005`) is its head and is what the
-never-writable guard test reads; `0009` stays, because `known_revisions` still lists it and the
+FreeWeight has three since row WY10: `0011` (migration `0009`) is its head; `0010` (migration `0005`,
+row WA1) is what the never-writable guard test reads; `0009` stays, because `known_revisions` still lists it and the
 database-page tests written at W7 read it.
 
 | File | Application | Revision | Rows |
 |---|---|---|---|
-| `freeweight-0010.sqlite3` | FreeWeight | `0010` (known head, row WA1) | none |
+| `freeweight-0011.sqlite3` | FreeWeight | `0011` (known head, row WY10: `machines.nickname`) | none |
+| `freeweight-0010.sqlite3` | FreeWeight | `0010` (still known; the never-writable guard test reads it) | none |
 | `freeweight-0009.sqlite3` | FreeWeight | `0009` (still known) | none |
 | `loadcoach-0015.sqlite3` | LoadCoach | `0015` (known head) | none |
 | `ideapress-0011.sqlite3` | IdeaPress | `0011` (known head, row W9: `attempts.prompt_source`) | none |

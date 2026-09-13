@@ -154,14 +154,16 @@ def render_shell_page(
             ``systemctl show`` launch — runs once per render rather than twice. Computed here,
             the ordinary way, when the caller has no reason to have them already.
     """
-    from weightroom.web.rendering import CONSOLE_SIDE_NAV
+    from weightroom.web.rendering import console_side_nav
 
     return render_form_page(
         request,
         template_name,
         views=views if views is not None else views_for_request(request),
         active_app=active_app,
-        nav_sections=nav_sections if nav_sections is not None else CONSOLE_SIDE_NAV,
+        nav_sections=nav_sections
+        if nav_sections is not None
+        else console_side_nav(request.url.path),
         nav_footer=nav_footer,
         side_nav_stubs=side_nav_stubs,
         show_telemetry_bar=True,

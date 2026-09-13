@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="/app-static/css/chat.css">
 {% endblock %}
 {% block page_content %}
-{{ page_nav(links=[{"label": "History", "href": "/chat/history"}],
+{{ page_nav(links=[{"label": "New conversation", "href": "/chat", "current": true}, {"label": "History", "href": "/chat/history"}],
             actions=[{"label": "JSON", "href": "/api/v1/chat/conversations"}]) }}
 <div class="chat-pane">
   <h2>New conversation</h2>

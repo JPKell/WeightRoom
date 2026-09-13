@@ -33,6 +33,7 @@ __all__ = [
     "app_side_nav",
     "app_side_nav_stubs",
     "canonical_name",
+    "console_side_nav",
     "docs_action",
     "pill_status",
     "pill_tone",
@@ -300,6 +301,37 @@ pages first, then the tools that reach across applications. Row WY1 took them of
 application's tab and the docs viewer, on the operator's instruction; those menus list only their
 own subject.
 """
+
+
+def console_side_nav(current_path: str) -> tuple[dict[str, Any], ...]:
+    """:data:`CONSOLE_SIDE_NAV` with the entry for ``current_path`` marked ``selected`` (row WY10).
+
+    An application's tab has always marked its page (:func:`app_side_nav`); the console's own menu
+    marked none, so a console page's bar could not link its own menu entry — the chat pages' *New
+    conversation* — without failing the page bar's duplicate rule, whose one exception is the
+    selected entry (row WY9).
+
+    Args:
+        current_path: The request path, e.g. ``/chat/history``.
+
+    Returns:
+        A copy of the menu. ``/`` is selected only on ``/``; any other entry is selected on its own
+        path and every path below it (``/chat`` on ``/chat/01…``). At most one entry is selected,
+        the longest match. Nothing is selected on a path no entry covers.
+    """
+
+    def covers(href: str) -> bool:
+        return current_path == href or (href != "/" and current_path.startswith(href + "/"))
+
+    matches = [link["href"] for section in CONSOLE_SIDE_NAV for link in section["links"]]
+    best = max((href for href in matches if covers(href)), key=len, default=None)
+    return tuple(
+        {
+            "title": section["title"],
+            "links": [{**link, "selected": link["href"] == best} for link in section["links"]],
+        }
+        for section in CONSOLE_SIDE_NAV
+    )
 
 
 PILL_TONES: dict[str, str] = {

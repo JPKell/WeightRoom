@@ -12,6 +12,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   link strip became a page bar (*Machines*, with *Jobs* and *Docs* as actions), and the *Refresh
   from provider* and *Scan for models* buttons on the FreeWeight and LoadCoach Models pages moved
   under the header.
+- **FreeWeight's live schema `0011` is known** (migration `0009`): `machines.nickname`, a nullable
+  column FreeWeight's own `PATCH /api/v1/machines/{id}` writes. FreeWeight's Database Tables and Query
+  pages read it instead of degrading by name as `SCHEMA_UNKNOWN`. `machines` stays in the guard's
+  *Subject identity* lock class, so no raw write reaches the new column.
+- **The console's own menu marks the page you are on** (`console_side_nav`), as an application's tab
+  always has, and every chat page's bar offers *New conversation* beside *History*.
+- **Metric keys, model names and IDs in a table no longer wrap one character per line.** A `.mono`
+  or `code` value inside a table cell breaks only when a single token is wider than the page.
 
 ### Changed (row WY1)
 - **The page bar.** `_app_page.html` gains `page_nav(links, actions)`: one bar at the top of a page

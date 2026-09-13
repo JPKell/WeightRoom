@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/app-static/css/chat.css">
 {% endblock %}
 {% block page_content %}
-{{ page_nav(links=[{"label": "History", "href": "/chat/history", "current": true}],
+{{ page_nav(links=[{"label": "New conversation", "href": "/chat"}, {"label": "History", "href": "/chat/history", "current": true}],
             actions=[{"label": "JSON", "href": "/api/v1/chat/conversations"}]) }}
 <h2>Chat history</h2>
 {% if conversations %}

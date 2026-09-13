@@ -14,6 +14,7 @@ from weightroom.services.docs_index import FTS5_SHADOW_TABLES
 EXPECTED_SEED = {
     ("freeweight", "0009"),
     ("freeweight", "0010"),  # migration 0005, row WA1
+    ("freeweight", "0011"),  # migration 0009, row WY10
     ("loadcoach", "0015"),
     ("ideapress", "0010"),
     ("ideapress", "0011"),  # migration 0008, row W9

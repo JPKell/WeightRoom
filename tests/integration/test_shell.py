@@ -64,8 +64,9 @@ def test_an_applications_own_tab_is_current_only_on_its_pages(tmp_path: Path) ->
     console.login()
     on_its_page = console.client.get("/apps/loadcoach", headers={"Accept": "text/html"}).text
     elsewhere = console.client.get("/apps", headers={"Accept": "text/html"}).text
-    # On an element, not in the stylesheet — the shell's CSS names the same attribute selector.
-    current = re.compile(r"<a [^>]*aria-current=\"page\"")
+    # On an application tab, not in the stylesheet (the shell's CSS names the same attribute
+    # selector) and not the console menu, which marks its own page since row WY10.
+    current = re.compile(r"<a href=\"/apps/[a-z]+\" aria-current=\"page\"")
     assert current.search(on_its_page)
     assert not current.search(elsewhere)
 
@@ -185,7 +186,10 @@ def test_only_the_consoles_own_pages_list_the_console_and_the_tools(tmp_path: Pa
             ("/backups", "Backups"),
             ("/chat", "Chat"),
         ):
-            assert (f'<a href="{href}">{label}</a>' in side) is listed, (path, href)
+            # Row WY10: the console menu marks the page you are on, so its own entry may carry
+            # aria-current.
+            link = re.compile(rf'<a href="{href}"( aria-current="page")?>{re.escape(label)}</a>')
+            assert bool(link.search(side)) is listed, (path, href)
 
 
 def test_chat_is_in_the_top_bar_and_current_on_its_own_pages(tmp_path: Path) -> None:

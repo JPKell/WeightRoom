@@ -62,11 +62,13 @@ def test_a_conversation_title_in_the_history_table_is_escaped(tmp_path: Path) ->
     assert "&lt;script&gt;evil&lt;/script&gt;" in page
 
 
-def test_no_page_bar_link_on_any_chat_page_repeats_the_left_menu(tmp_path: Path) -> None:
-    """The console's Tools section always links Chat -> /chat (row WY1's `CONSOLE_SIDE_NAV`), so
-    the page bar on every chat page must never offer that same href — `test_page_nav.py` proves
-    this for the whole app; this pins it for chat specifically, since the row's own kickoff named
-    a "New conversation -> /chat" page-bar link that would have repeated it (see WY7_HANDOFF.md).
+def test_every_chat_page_bar_offers_a_new_conversation_under_the_selected_chat_entry(
+    tmp_path: Path,
+) -> None:
+    """Row WY10, on the operator's decision: the bar's *New conversation* links ``/chat``, which is
+    the left menu's Chat entry — allowed because every chat page now marks that entry selected
+    (``console_side_nav``), the one exception `test_page_nav.py` makes (row WY9). WY7 shipped the
+    bar without it because the console menu marked nothing selected (WY7_HANDOFF.md).
     """
     console = _console(tmp_path)
     conversation_id = create_conversation(
@@ -77,4 +79,6 @@ def test_no_page_bar_link_on_any_chat_page_repeats_the_left_menu(tmp_path: Path)
         nav = page[
             page.index('class="page-nav"') : page.index("</nav>", page.index('class="page-nav"'))
         ]
-        assert 'href="/chat"' not in nav
+        assert '<a href="/chat"' in nav and ">New conversation</a>" in nav, path
+        side = page[page.index('class="side-nav"') :]
+        assert '<a href="/chat" aria-current="page">Chat</a>' in side, path
