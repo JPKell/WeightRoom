@@ -1,0 +1,31 @@
+{% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
+{% from "mirrorwall/components.html" import badge, empty_state, table %}
+{% block title %}Chat history — WeightRoomGym{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/app-static/css/chat.css">
+{% endblock %}
+{% block page_content %}
+{{ page_nav(links=[{"label": "History", "href": "/chat/history", "current": true}],
+            actions=[{"label": "JSON", "href": "/api/v1/chat/conversations"}]) }}
+<h2>Chat history</h2>
+{% if conversations %}
+{% set columns = [{"label": "Title"}, {"label": "Mode"}, {"label": "Messages", "numeric": true}, {"label": "Updated", "mono": true}] %}
+{% set rows = [] %}
+{% for one in conversations %}
+{% set _ = rows.append([
+  ('<a href="/chat/%s">%s</a>' | safe) | format(one.id, one.title),
+  badge(one.backend, tone="neutral"),
+  one.messages,
+  one.updated_at
+]) %}
+{% endfor %}
+{{ table(columns, rows, table_id="chat-history", density="dense", row_count=rows | length, sortable=true) }}
+{% else %}
+{{ empty_state("Nothing has been asked yet.", action_label="New conversation", action_href="/chat") }}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="/app-static/js/chat.js" defer></script>
+{% endblock %}

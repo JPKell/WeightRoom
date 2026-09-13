@@ -552,27 +552,22 @@ def test_chat_never_calls_a_provider_directly() -> None:
 # --- The page's shape (row WX4) --------------------------------------------------------------
 
 
-def test_the_chat_page_rails_the_conversations_and_pins_one_composer(tmp_path: Path) -> None:
+def test_the_chat_page_pins_one_composer_and_links_history(tmp_path: Path) -> None:
     console = _console(tmp_path)
-    first = _new(console, title="older")
-    second = _new(console, title="newer")
     page = console.client.get("/chat", headers={"Accept": "text/html"}).text
-    assert 'class="chat-rail"' in page
-    assert f'href="/chat/{first}"' in page and f'href="/chat/{second}"' in page
-    newest, oldest = page.index(f'href="/chat/{second}"'), page.index(f'href="/chat/{first}"')
-    assert newest < oldest, "newest first"
+    assert 'class="chat-rail"' not in page  # removed at WY7 for a dedicated history page
+    assert 'href="/chat/history"' in page
     assert 'class="chat-composer"' in page
     assert '<select id="chat-backend" name="backend">' in page  # the mode, chosen here
     assert "/app-static/css/chat.css" in page
 
 
-def test_the_thread_page_marks_the_open_conversation_and_fixes_its_mode(tmp_path: Path) -> None:
+def test_the_thread_page_fixes_its_mode_and_links_history(tmp_path: Path) -> None:
     console = _console(tmp_path)
-    other = _new(console, title="other")
     conversation_id = _new(console, title="open one")
     page = console.client.get(f"/chat/{conversation_id}", headers={"Accept": "text/html"}).text
-    assert f'href="/chat/{conversation_id}" aria-current="page"' in page
-    assert f'href="/chat/{other}" aria-current="page"' not in page
+    assert 'class="chat-rail"' not in page
+    assert 'href="/chat/history"' in page
     assert '<select id="chat-backend" disabled>' in page  # fixed per conversation
     assert 'name="backend"' not in page, "the thread page never submits a mode"
 

@@ -1,24 +1,20 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% from "mirrorwall/components.html" import badge %}
 {% block title %}{{ conversation.title }} — Chat — WeightRoomGym{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="/app-static/css/chat.css">
 {% endblock %}
 {% block page_content %}
-<div class="chat-layout">
-{% set current_id = conversation.id %}
-{% include "_chat_rail.html" %}
-
+{{ page_nav(links=[{"label": "History", "href": "/chat/history"}],
+            actions=[{"label": "JSON", "href": "/api/v1/chat/conversations/" ~ conversation.id}]) }}
 <div class="chat-pane">
 <div class="page-head">
   <h2>{{ conversation.title }} {{ badge(conversation.backend, tone="neutral") }}</h2>
-  <div class="page-actions">
-    <a href="/api/v1/chat/conversations/{{ conversation.id }}">JSON</a>
-    <form method="post" action="/chat/{{ conversation.id }}/delete">
-      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-      <button type="submit" data-variant="quiet">Delete</button>
-    </form>
-  </div>
+  <form method="post" action="/chat/{{ conversation.id }}/delete" class="chat-delete-inline">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <button type="submit" data-variant="quiet">Delete</button>
+  </form>
 </div>
 
 {% if error %}<p class="notice" role="alert"><strong>Refused.</strong> {{ error }}</p>{% endif %}
@@ -94,7 +90,6 @@
               placeholder="Ask something…" {% if unavailable or conversation.in_progress %}disabled{% endif %}></textarea>
     <button type="submit" {% if unavailable or conversation.in_progress %}disabled title="{{ unavailable or 'The previous reply is still streaming.' }}"{% endif %}>Send</button>
   </form>
-</div>
 </div>
 </div>
 

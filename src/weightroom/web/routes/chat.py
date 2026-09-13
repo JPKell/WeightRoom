@@ -331,7 +331,6 @@ def _render_thread(
         page="chat",
         principal=principal,
         conversation=view,
-        conversations=list_conversations(request.app.state.database),
         unavailable=_availability(request, view.backend),
         max_attachment_bytes=request.app.state.settings.chat.max_attachment_bytes,
         error=error,
@@ -356,6 +355,20 @@ def chat_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
         default_classification=settings.chat.default_classification,
         tool_names=tool_names,
         tools_unavailable=tools_unavailable,
+    )
+
+
+@ui_router.get("/chat/history", summary="Chat history", response_class=HTMLResponse)
+def chat_history_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """Every conversation, newest first, as a table; a row's title opens its thread."""
+    from weightroom.web.routes.apps import render_shell_page
+
+    return render_shell_page(
+        request,
+        "chat_history.html",
+        page="chat",
+        principal=principal,
+        conversations=list_conversations(request.app.state.database),
     )
 
 
