@@ -11,7 +11,7 @@
 |---|---|---|
 | FreeWeight | `5834046` | ADR-0144's configuration: `[providers.<name>]` profiles, `[provider] active`, the resolver, the two refusals, the document's `provider_profiles`, the active-profile write, the spec mirror, `CHANGELOG.md` |
 | FreeWeight | `4df7602` | The document lists the `default` profile first |
-| WeightRoom | *(see §7)* | ADR-0144, the FreeWeight spec, the console spec §7.4 and api.md §2, the profile cards, the *Add a profile* form, the re-recorded fixture and golden, `CHANGELOG.md` |
+| WeightRoom | `74cc100` | ADR-0144, the FreeWeight spec, the console spec §7.4 and api.md §2, the profile cards, the *Add a profile* form, the re-recorded fixture and golden, `CHANGELOG.md` |
 
 ## 2. The configuration shape, and the back-compat rule
 
@@ -152,8 +152,8 @@ themes.
 
 ## 7. What is left
 
-* **The commit on the WeightRoom branch.** Everything in §1's third row is committed on
-  `row/wx13-provider-profiles`; see `git log` there.
+* **Nothing here is merged, pushed or tagged.** Both branches are committed:
+  FreeWeight `5834046`, `4df7602`; WeightRoom `74cc100`.
 * **The GPU gate is the orchestrator's** (row WX14). Nothing in this row touched the GPU, and the
   live switch is the one thing the tests cannot prove. Exactly:
 
