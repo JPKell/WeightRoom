@@ -11,7 +11,7 @@ prepared) · **Branches:** `row/wx7-freeweight-api` and `row/wx7-freeweight-page
 | Repository | Commit | What |
 |---|---|---|
 | FreeWeight (`~/ai/worktrees/freeweight-wx7`) | `cc05f1a` | Six additive API surfaces (§2), one migration, ADR-0145's write, `docs/openapi.json` regenerated, docs mirrored byte-identical |
-| WeightRoom (`~/ai/worktrees/weightroom-wx7`) | see §1.1 | The four pages that consume them, ADR-0145, `api.md`/`spec.md`/`data-model.md` (canonical) |
+| WeightRoom (`~/ai/worktrees/weightroom-wx7`) | `b9eec2b` | The four pages that consume them, ADR-0145, `api.md`/`spec.md`/`data-model.md` (canonical) |
 
 Nothing pushed, tagged or published. `git status --short` is clean in both worktrees.
 
