@@ -58,6 +58,7 @@ __all__ = [
     "database_stats_api",
     "evidence_api",
     "evidence_record",
+    "heatmap_option",
     "export_params",
     "machine_api",
     "machine_db",
@@ -1160,6 +1161,87 @@ def compare_bar_options(
             }
         )
     return charts
+
+
+def heatmap_option(dashboard: Mapping[str, Any]) -> dict[str, Any] | None:
+    """``GET /dashboard``'s heatmap as an ECharts option (row WX8, ADR-0142), or ``None``.
+
+    **The colour is a position within one suite, never a value across suites.** A column is one
+    suite's headline metric in its own unit — ``tokens/s`` beside a ``ratio`` — and one colour
+    scale over both would paint the fast model dark and call the accurate one pale. So each suite's
+    column is normalised on its own: ``1`` is the best cell in that column, ``0`` the worst, and
+    ``higher_is_better`` decides which end is which. A column whose cells all read the same (one
+    model measured, or a tie) is all ``1`` — every one of them is the best there is.
+
+    A cell FreeWeight could not measure is left out of the series rather than plotted at zero
+    (ADR-0016): the square stays empty, as the table beside it stays ``—``. The table under the
+    chart carries every real figure and its run link, so a reader who never sees the drawing loses
+    nothing (ADR-0020 rule 5) — which is also why no figure is baked into the chart.
+
+    A row is labelled by the model's provider-side name (``smollm2:135m`` out of
+    ``ollama/smollm2:135m@sha256:…``) so the drawing is not two thirds axis, and by the whole
+    canonical ID the moment two models would share one label — a category that named two subjects
+    would draw their cells in one row. Each cell's hover carries the full identity either way.
+
+    Args:
+        dashboard: ``GET /dashboard``'s body.
+
+    Returns:
+        The option, carrying no colour — ``charts.js`` themes it at draw time — or ``None`` when
+        the heatmap has no numeric cell to draw.
+    """
+    heatmap = dashboard.get("heatmap") or {}
+    models = [str(one) for one in heatmap.get("models") or []]
+    suites = [str(one) for one in heatmap.get("suites") or []]
+    numeric: dict[tuple[str, str], tuple[float, str, bool]] = {}
+    for cell in heatmap.get("cells") or []:
+        value = cell.get("value")
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            continue
+        key = (str(cell.get("model")), str(cell.get("suite")))
+        numeric[key] = (
+            float(value),
+            str(cell.get("unit") or ""),
+            bool(cell.get("higher_is_better")),
+        )
+    if not numeric or not models or not suites:
+        return None
+    short = [model.rsplit("/", 1)[-1].split("@", 1)[0] for model in models]
+    labels = short if len(set(short)) == len(models) else models
+    points: list[dict[str, Any]] = []
+    for column, suite in enumerate(suites):
+        values = [numeric[(model, suite)][0] for model in models if (model, suite) in numeric]
+        low, high = min(values, default=0.0), max(values, default=0.0)
+        for row, model in enumerate(models):
+            found = numeric.get((model, suite))
+            if found is None:
+                continue
+            value, unit, higher_is_better = found
+            share = 1.0 if high == low else (value - low) / (high - low)
+            points.append(
+                {
+                    "value": [column, row, round(share if higher_is_better else 1.0 - share, 4)],
+                    "name": f"{model} · {suite} · {value:.4g} {unit}".strip(),
+                }
+            )
+    return {
+        "tooltip": {"formatter": "{b}"},
+        "grid": {"containLabel": True, "left": 8, "right": 8, "top": 8, "bottom": 56},
+        # No split-area shading: an alternating background paints an *unmeasured* square as
+        # convincingly as a measured one, and in the dark theme it read as a low value.
+        "xAxis": {"type": "category", "data": suites},
+        "yAxis": {"type": "category", "data": labels},
+        "visualMap": {
+            "min": 0,
+            "max": 1,
+            "calculable": False,
+            "orient": "horizontal",
+            "left": "center",
+            "bottom": 0,
+            "text": ["best in its suite", "worst in its suite"],
+        },
+        "series": [{"type": "heatmap", "data": points, "label": {"show": False}}],
+    }
 
 
 def export_params(form: Mapping[str, str]) -> dict[str, str]:

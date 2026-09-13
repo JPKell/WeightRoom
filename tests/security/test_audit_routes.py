@@ -956,6 +956,18 @@ EXERCISES.update(
             {"nickname": "the workstation"},
             reply=("PATCH", f"machines/{_FW_MACHINE}", 200, {"id": _FW_MACHINE}),
         ),
+        # Row WX8: a manifest *draft* beside an artifact with none (ADR-0145). Not security-
+        # relevant — the draft registers nothing, and keeping it is a rename at a terminal.
+        ("POST", "/apps/freeweight/adapters/{adapter}/draft"): _fw_form(
+            "/apps/freeweight/adapters/stray/draft",
+            {"base_model_name": "qwen3:8b"},
+            reply=(
+                "POST",
+                "adapters/stray/draft",
+                200,
+                {"adapter": "stray", "path": "/x/stray.manifest.draft.json"},
+            ),
+        ),
         # Changing kind and base_url re-authenticates: the password rides along, and the redaction
         # sweep proves it reaches no row and no log line.
         ("POST", "/apps/freeweight/provider"): _fw_form(

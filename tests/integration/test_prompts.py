@@ -252,3 +252,75 @@ def test_the_pages_show_the_rule_write_diff_and_delete(tmp_path: Path) -> None:
     assert _outcomes(console, "prompt.override") == ["ok", "refused"]
     overview = console.client.get("/apps/ideapress", headers=HTML).text
     assert 'href="/apps/ideapress/prompts"' in overview
+
+
+# --- The editor's named fields (row WX8) ----------------------------------------------------------
+
+
+def test_the_editor_names_the_three_fields_anyone_edits_and_patches_them_into_the_record(
+    tmp_path: Path,
+) -> None:
+    """The JSON box is still what is posted — the loader validates the patched record, not a
+    hand-typed one — so the named inputs are a convenience over the same round trip."""
+    console = _console(tmp_path)
+    editor = console.client.get("/apps/ideapress/prompts/stages.hello", headers=HTML).text
+    assert 'name="version" value="1.0.0"' in editor
+    assert 'name="change_reason" value="First version."' in editor
+    assert HELLO_RECORD["template"] in editor
+    assert "title" in editor  # the declared variables, in the template's hint
+    assert 'name="record"' in editor
+
+    saved = console.post_form(
+        "/apps/ideapress/prompts/stages.hello",
+        {
+            "record": json.dumps(HELLO_RECORD),
+            "version": "1.2.0",
+            "change_reason": "The operator's own greeting.",
+            "template": "Welcome the reader of {{ title }} in one sentence.",
+        },
+    )
+
+    assert saved.status_code == 200, saved.text
+    assert "Override written" in saved.text
+    written = json.loads(
+        (tmp_path / "config" / "ideapress" / "prompts" / "stages.hello.json").read_text()
+    )
+    assert written["version"] == "1.2.0"
+    assert written["metadata"]["change_reason"] == "The operator's own greeting."
+    assert written["template"] == "Welcome the reader of {{ title }} in one sentence."
+    # Everything the form does not name is the record's own.
+    assert written["system"] == HELLO_RECORD["system"]
+    assert written["metadata"]["owner"] == "ideapress"
+
+
+def test_a_blank_named_field_leaves_the_records_own_value(tmp_path: Path) -> None:
+    """Blank is "not given", not "clear it": the JSON box is where a key is removed."""
+    console = _console(tmp_path)
+    saved = console.post_form(
+        "/apps/ideapress/prompts/stages.hello",
+        {"record": json.dumps(_override()), "version": "", "change_reason": "", "template": ""},
+    )
+    assert "Override written" in saved.text
+    written = json.loads(
+        (tmp_path / "config" / "ideapress" / "prompts" / "stages.hello.json").read_text()
+    )
+    assert written["version"] == "1.1.0"
+    assert written["template"] == _override()["template"]
+
+
+def test_a_refused_patch_comes_back_with_what_was_typed_and_writes_nothing(tmp_path: Path) -> None:
+    console = _console(tmp_path)
+    refused = console.post_form(
+        "/apps/ideapress/prompts/stages.hello",
+        {
+            "record": json.dumps(HELLO_RECORD),
+            "version": "1.3.0",
+            "change_reason": "A variable nobody declared.",
+            "template": "Greet {{ nobody }}.",
+        },
+    )
+    assert refused.status_code == 200
+    assert "nobody" in refused.text
+    assert 'name="version" value="1.3.0"' in refused.text
+    assert not (tmp_path / "config" / "ideapress" / "prompts" / "stages.hello.json").exists()
+    assert _outcomes(console, "prompt.override") == ["refused"]

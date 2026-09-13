@@ -1,27 +1,30 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
 {% from "_fw.html" import link, short %}
 {% from "_fw_goals.html" import calibration, mix, csrf with context %}
 {% block title %}Goals — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
 {% set off = not sourced.live %}
-<div class="page-head">
-  <h2>Goals {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="#define">Define a goal</a> · <a href="#starters">Starters</a> · <a href="#import">Import</a> · <a href="/apps/freeweight/judges">Judges</a></div>
-</div>
+{% call app_page_header(view, "Goals", "Goals", "A benchmark you write: your criteria, scored by a rule where a rule can check them and by a jury where only judgement can.") %}
+  <a href="#results">Results</a> · <a href="#set-up">Set up a run</a> · <a href="#runs">Runs</a> ·
+  <a href="/apps/freeweight/judges">Judges</a> · {{ docs_link("freeweight") }}
+{% endcall %}
 {% include "_app_state.html" %}
 {% if done_message %}<p class="notice" role="status">{{ done_message }}</p>{% endif %}
-<p class="muted">A goal is a benchmark you write: criteria scored by a rule where a rule can check them and by a jury where only
-judgement can, with the jury calibrated against your own grades before its scores are believed. Each is a directory of JSON inside
-FreeWeight; its score method mix, its calibration and the <em>unforked</em> badge sit beside it wherever it appears.</p>
+<p class="muted">A jury is calibrated against your own grades before its scores are believed. Each goal is a directory of JSON
+inside FreeWeight; its score method mix, its calibration and the <em>unforked</em> badge sit beside it wherever it appears.</p>
 {{ refusal(action_error) }}
 {% set existing = ((action_error.details.get("app_details") or {}).get("existing_goal_hash")) if action_error else none %}
 {% if existing %}<p class="warning-state">The goal installed under that slug has <code>goal_hash</code> <span class="mono">{{ existing }}</span>.
 An import never overwrites a goal: import under another slug, or delete that goal first.</p>{% endif %}
 {{ refusal(sourced.error) }}
 {% if data is not none %}
+<section id="results" aria-labelledby="fw-goals-results">
+<h3 id="fw-goals-results">Results</h3>
+<p class="muted">Every goal installed here, with what its last calibration measured. A goal's own page holds its criteria,
+its tasks and the report of each run against it.</p>
 {% if data.get("goals") %}
 {% set rows = [] %}
 {% for goal in data.get("goals") %}
@@ -40,30 +43,14 @@ An import never overwrites a goal: import under another slug, or delete that goa
 {% else %}
 {{ empty_state("No goal yet. Define one, fork a starter, create one from a pack, or import a bundle.") }}
 {% endif %}
+</section>
 
-<h3 id="drafts">Drafts in progress</h3>
-{% if data.get("drafts") is none %}
-<p class="muted">Drafts are read only from FreeWeight's running API.</p>
-{% elif data.get("drafts") %}
-{% set rows = [] %}
-{% for draft in data.get("drafts") %}
-{% set _ = rows.append([
-  link("/apps/freeweight/goals/drafts/" ~ (draft.get("draft_id") | urlencode), draft.get("name") or draft.get("draft_id")),
-  draft.get("forked_from") or "—",
-  draft.get("criteria"),
-  draft.get("tasks"),
-  draft.get("updated_at") or "—",
-  draft.get("expires_at") or "—",
-  link("/apps/freeweight/goals/" ~ (draft.get("saved_slug") | urlencode), draft.get("saved_slug")) if draft.get("saved_slug") else "—"
-]) %}
-{% endfor %}
-{{ table([{"label": "Draft"}, {"label": "From starter", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Tasks", "numeric": true}, {"label": "Changed", "mono": true}, {"label": "Expires", "mono": true}, {"label": "Written as"}], rows, caption="FreeWeight's own drafts", density="dense", row_count=rows | length, table_id="fw-goals-2", sortable=true) }}
-<p class="muted">A draft is FreeWeight's row: a reload or a console restart loses nothing, and it expires after 30 days untouched.</p>
-{% else %}
-<p class="muted">No draft in progress.</p>
-{% endif %}
 
-<h3 id="define">Define a goal</h3>
+<section id="set-up" aria-labelledby="fw-goals-set-up">
+<h3 id="fw-goals-set-up">Set up a run</h3>
+<p class="muted">Four ways to a goal, in the order most people need them: answer the wizard's questions, fork a starter,
+hand FreeWeight a pack you wrote, or import a bundle exported from somewhere else. Nothing here writes until you say so.</p>
+<h4 id="define">Define a goal</h4>
 <p class="muted">FreeWeight's wizard: what you are trying to get, then your criteria with two questions asked of each, then the rules that
 could carry part of them, then your own tasks. Nothing is written until you save.</p>
 <form method="post" action="/apps/freeweight/goals/drafts" class="card kit-form">
@@ -74,7 +61,7 @@ could carry part of them, then your own tasks. Nothing is written until you save
   <div class="kit-wide"><button type="submit" data-variant="primary"{% if off %} disabled title="FreeWeight is not answering"{% endif %}>Begin the draft</button></div>
 </form>
 
-<h3 id="starters">Starters</h3>
+<h4 id="starters">Starters</h4>
 {% if data.get("starters") is none %}
 <p class="muted">The starters ship inside FreeWeight and are read only from its running API.</p>
 {% else %}
@@ -99,7 +86,7 @@ A fork is badged <em>unforked</em> until its criteria or tasks are edited; custo
 {% endfor %}
 {% endif %}
 
-<h3 id="create">Create from a pack</h3>
+<h4 id="create">Create from a pack</h4>
 <p class="muted">A pack written by hand is as first-class as the wizard's: <code>goal.json</code> and the task prompt records. FreeWeight
 validates and lints it, and a finding never blocks creation.</p>
 <form method="post" action="/apps/freeweight/goals" class="card kit-form">
@@ -111,7 +98,7 @@ validates and lints it, and a finding never blocks creation.</p>
   <div class="kit-wide"><button type="submit"{% if off %} disabled{% endif %}>Create</button></div>
 </form>
 
-<h3 id="import">Import a bundle</h3>
+<h4 id="import">Import a bundle</h4>
 <p class="muted">The bundle a goal's page exports — the file <code>freeweight goals export</code> writes. FreeWeight checks its size against
 <code>goals.max_pack_bytes</code>, every member's path and the bundle's hash before it writes anything, and never overwrites a goal in place.</p>
 <form method="post" action="/apps/freeweight/goals/import" enctype="multipart/form-data" class="card kit-form">
@@ -121,6 +108,34 @@ validates and lints it, and a finding never blocks creation.</p>
   <div class="field kit-wide"><label for="fw-import-text">…or paste it</label><textarea id="fw-import-text" name="bundle" rows="4" class="mono" spellcheck="false"></textarea></div>
   <div class="kit-wide"><button type="submit"{% if off %} disabled{% endif %}>Import</button></div>
 </form>
+</section>
+
+<section id="runs" aria-labelledby="fw-goals-runs">
+<h3 id="fw-goals-runs">Runs</h3>
+<p class="muted">A goal is run from its own page — calibrate the jury there, then run the goal and grade what comes back.
+What sits here is the wizard's unfinished work, which is FreeWeight's own row and not a file on disk.</p>
+<h4 id="drafts">Drafts in progress</h4>
+{% if data.get("drafts") is none %}
+<p class="muted">Drafts are read only from FreeWeight's running API.</p>
+{% elif data.get("drafts") %}
+{% set rows = [] %}
+{% for draft in data.get("drafts") %}
+{% set _ = rows.append([
+  link("/apps/freeweight/goals/drafts/" ~ (draft.get("draft_id") | urlencode), draft.get("name") or draft.get("draft_id")),
+  draft.get("forked_from") or "—",
+  draft.get("criteria"),
+  draft.get("tasks"),
+  draft.get("updated_at") or "—",
+  draft.get("expires_at") or "—",
+  link("/apps/freeweight/goals/" ~ (draft.get("saved_slug") | urlencode), draft.get("saved_slug")) if draft.get("saved_slug") else "—"
+]) %}
+{% endfor %}
+{{ table([{"label": "Draft"}, {"label": "From starter", "mono": true}, {"label": "Criteria", "numeric": true}, {"label": "Tasks", "numeric": true}, {"label": "Changed", "mono": true}, {"label": "Expires", "mono": true}, {"label": "Written as"}], rows, caption="FreeWeight's own drafts", density="dense", row_count=rows | length, table_id="fw-goals-2", sortable=true) }}
+<p class="muted">A draft is FreeWeight's row: a reload or a console restart loses nothing, and it expires after 30 days untouched.</p>
+{% else %}
+<p class="muted">No draft in progress.</p>
+{% endif %}
+</section>
 {% endif %}
 {{ page_source(sourced) }}
 {% endblock %}

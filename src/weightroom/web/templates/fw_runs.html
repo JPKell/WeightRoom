@@ -5,52 +5,15 @@
 {% block title %}Runs — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {{ filter_styles() }}
-{% call app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded, and the form that starts another.") %}
+{% call app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded; the form that starts another is on the Overview.") %}
   <a href="/apps/freeweight/models">Models</a> · <a href="/apps/freeweight/machines">Machines</a> · <a href="/jobs">Jobs</a> · {{ docs_link("freeweight") }}
 {% endcall %}
 {% include "_app_state.html" %}
 
-{% if runs.live %}
-<details class="card kit-form"{% if start_error %} open{% endif %}>
-  <summary><strong>Start a run</strong> <span class="muted">— one model against one suite, launched as the console's capped <code>freeweight_suite_run</code> job</span></summary>
-  {{ refusal(start_error) }}
-  <p class="muted">The run executes in a transient scope under the host memory cap (<code>[host] memory_high</code>/<code>memory_max</code>,
-  swap denied — ADR-0119), so a model that does not fit is killed rather than thrashing the machine. The page follows the job
-  until FreeWeight names the run, then opens it.</p>
-  <form method="post" action="/apps/freeweight/runs">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <div class="field"><label for="fw-start-model">Model</label>
-      {% if models %}
-      <select id="fw-start-model" name="model" required>
-        {% for one in models %}<option value="{{ one.get('canonical_id') }}"{{ " selected" if form.get("model") == one.get("canonical_id") else "" }}>{{ one.get("canonical_id") }}</option>{% endfor %}
-      </select>
-      <span class="field-hint">Enabled models only (ADR-0118).</span>
-      {% else %}
-      <input id="fw-start-model" name="model" value="{{ form.get('model', '') }}" required>
-      <span class="field-hint">No enabled model is listed; <a href="/apps/freeweight/models">refresh from the provider</a> first.</span>
-      {% endif %}</div>
-    <div class="field"><label for="fw-start-suite">Suite</label>
-      {% if benchmarks %}
-      <select id="fw-start-suite" name="suite" required>
-        {% for one in benchmarks %}<option value="{{ one.get('key') }}"{{ " selected" if form.get("suite") == one.get("key") else "" }}>{{ one.get("key") }} {{ one.get("version") or "" }} · {{ one.get("test_count") }} test{{ "" if one.get("test_count") == 1 else "s" }}</option>{% endfor %}
-      </select>
-      {% else %}
-      <input id="fw-start-suite" name="suite" value="{{ form.get('suite', '') }}" required placeholder="native.echo">
-      {% endif %}</div>
-    {% if adapters %}
-    <div class="field"><label for="fw-start-adapter">Adapter</label>
-      <select id="fw-start-adapter" name="adapter">
-        <option value="">none — the bare base</option>
-        {% for one in adapters %}<option value="{{ one.get('name') }}"{{ " selected" if form.get("adapter") == one.get("name") else "" }}>{{ one.get("name") }} · base {{ one.get("base_model_name") }}</option>{% endfor %}
-      </select>
-      <span class="field-hint">A run under an adapter measures a different subject, never the base (ADR-0058). Available adapters only.</span></div>
-    {% endif %}
-    <div class="field"><label for="fw-start-label">Label</label>
-      <input id="fw-start-label" name="label" value="{{ form.get('label', '') }}" maxlength="120"></div>
-    <div class="kit-wide"><button type="submit" data-variant="primary">Start run</button></div>
-  </form>
-</details>
-{% endif %}
+{# Row WX8 moved the Start form onto the Overview, where the dashboard's figures say what is
+   worth measuring next; this page keeps the way to it. #}
+<p><a href="/apps/freeweight#start" data-variant="primary">Start a run</a> — the form moved to the
+Overview, beside the figures it answers.</p>
 
 <form method="get" action="/apps/freeweight/runs" class="filter-bar" aria-label="Run filters">
   <div class="field"><label for="fw-runs-status">Status</label>

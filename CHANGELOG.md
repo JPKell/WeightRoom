@@ -6,6 +6,35 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WX8)
+- **FreeWeight's Overview is the Dashboard** (new `fw_overview.html`, in place of the generic
+  `app.html` for this one application; the *Dashboard* menu entry goes, and
+  `/apps/freeweight/dashboard` redirects to `/apps/freeweight` with its query intact). One page
+  now answers the tab's landing question: the dashboard's summary cards and filters, the
+  **Start a run** form moved from the Runs page (which keeps a link to it — a refused start now
+  comes back here), the comparison heatmap, the unit's own figures, controls and live log.
+- **A heatmap ↔ tests-matrix toggle**, two `<section>`s and a native radio pair with no
+  JavaScript: the *Suites* view draws FreeWeight's headline metric per suite as an **ECharts
+  heatmap** (ADR-0142) over the same dense table it always had, and the *Matrix* view renders
+  `GET /dashboard`'s `tests_matrix` (row WX7) — the same runs test by test, with each skip's
+  reason, which is the only view that shows a suite whose hardest test never ran. Colour in the
+  heatmap is each cell's position **within its own suite**, never across suites: the columns are
+  different units. A cell FreeWeight could not measure draws nothing rather than a zero
+  (ADR-0016), and a FreeWeight too old to answer `tests_matrix` leaves the suites view whole.
+- **The adapters page explains what a manifest is, and can draft one.** A *Without a manifest*
+  section says what the reviewed `<name>.manifest.json` asserts and why an artifact without one
+  is inert (ADR-0061), and each such artifact gets a **Draft manifest** form — the base model's
+  name, which is the one field no reader of a GGUF can establish — over FreeWeight's
+  `POST /api/v1/adapters/{name}/draft` (ADR-0145), audited as `freeweight.adapter_draft`. The
+  *Drafts* section names the review step that keeps one: a rename, at a terminal, by a person.
+- **Goals reads as three sections** — *Results*, *Set up a run*, *Runs* — with nothing moved
+  between routes and every form posting where it posted before.
+- **The prompt editor gets named fields** for `version`, `metadata.change_reason` and the template
+  body, with the whole record in a collapsed `<details>`. The JSON is still what is posted: the
+  named values are patched into it server-side and the application's own loader validates the
+  result, so "a record the editor accepts is one the application will load" is unchanged. A blank
+  named field leaves the record's own value.
+
 ### Added (row WX10)
 - **IdeaPress's Projects tab gets a top nav; Backends gets a LoadCoach-backed models table.**
   `ip_projects.html` and `ip_project.html` now carry a nav strip — the eight most recent projects

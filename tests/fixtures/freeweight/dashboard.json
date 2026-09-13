@@ -1,12 +1,12 @@
 {
   "cards": {
-    "completed_runs": 1,
-    "latest_run_at": "2026-09-12T04:37:47.832Z",
+    "completed_runs": 2,
+    "latest_run_at": "2026-09-13T00:46:59.743Z",
     "machines": 1,
     "models_measured": 1,
-    "samples_stored": 15,
-    "suites_run": 1,
-    "unsupported_metrics": 1
+    "samples_stored": 69,
+    "suites_run": 2,
+    "unsupported_metrics": 15
   },
   "filter": {
     "machine": null,
@@ -17,12 +17,27 @@
   "heatmap": {
     "cells": [
       {
+        "excluded_count": 21,
+        "higher_is_better": true,
+        "machine_fingerprint": "1faaa76899aa680991ba1fe70c98f5c520e191010c18b1033e17e41f0c9b1a09",
+        "metric_key": "decode_tokens_per_second",
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "run_test_id": null,
+        "sample_count": 0,
+        "suite": "native.performance",
+        "suite_version": "1.0.0",
+        "unavailable_reason": "no_usable_samples",
+        "unit": "tokens/s",
+        "value": "unsupported"
+      },
+      {
         "excluded_count": 0,
         "higher_is_better": true,
         "machine_fingerprint": "1faaa76899aa680991ba1fe70c98f5c520e191010c18b1033e17e41f0c9b1a09",
         "metric_key": "harness_roundtrip_success",
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
-        "run_id": "01M29YGGP7KTBC7TPARGX29T2D",
+        "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
         "run_test_id": null,
         "sample_count": 15,
         "suite": "native.echo",
@@ -33,14 +48,81 @@
       }
     ],
     "headline_metric": {
-      "native.echo": "harness_roundtrip_success"
+      "native.echo": "harness_roundtrip_success",
+      "native.performance": "decode_tokens_per_second"
     },
     "models": [
       "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e"
     ],
     "separated": false,
     "suites": [
-      "native.echo"
+      "native.echo",
+      "native.performance"
+    ]
+  },
+  "tests_matrix": {
+    "cells": [
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "echo.short"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "echo.long"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "performance.prompt_processing"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "performance.decode_throughput"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "performance.combined_request"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "performance.streaming_latency"
+      },
+      {
+        "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+        "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+        "skip_reason": null,
+        "status": "completed",
+        "test": "performance.cold_load"
+      }
+    ],
+    "models": [
+      "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e"
+    ],
+    "tests": [
+      "echo.long",
+      "echo.short",
+      "performance.cold_load",
+      "performance.combined_request",
+      "performance.decode_throughput",
+      "performance.prompt_processing",
+      "performance.streaming_latency"
     ]
   }
 }

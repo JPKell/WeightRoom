@@ -5,7 +5,7 @@
 {% block page_content %}
 <div class="page-head">
   <h2>System {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/dashboard">Dashboard</a> · <a href="/apps/freeweight/settings">Settings</a></div>
+  <div class="page-actions"><a href="/apps/freeweight">Overview</a> · <a href="/apps/freeweight/settings">Settings</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">Version, overall status and every health component — as FreeWeight's own System page shows

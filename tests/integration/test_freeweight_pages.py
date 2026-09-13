@@ -92,6 +92,8 @@ def mock_api(
         "adapters": fixture("adapters"),
         # The Runs page's Machine filter is a select over FreeWeight's own machines (row WX7).
         "machines": fixture("machines"),
+        # The Overview carries the dashboard since row WX8, and a refused start renders there.
+        "dashboard": fixture("dashboard"),
         f"machines/{MACHINE}": fixture("machine"),
         "runs": fixture("runs"),
         f"runs/{RUN}": fixture("run"),
@@ -325,21 +327,22 @@ def test_start_enqueues_the_capped_suite_run_job_and_the_page_follows_it_to_the_
 
 
 def test_the_start_form_offers_an_adapter_only_where_one_can_be_served(tmp_path: Path) -> None:
-    """Row WPF2, decision 3: the field lists what ``GET /adapters`` says is available *and*
-    servable. Under a provider that cannot apply a LoRA the directory is inert (ADR-0140), so the
-    field is absent rather than offering a run FreeWeight is bound to refuse."""
+    """Row WPF2, decision 3 (the form moved to the Overview at WX8): the field lists what
+    ``GET /adapters`` says is available *and* servable. Under a provider that cannot apply a LoRA
+    the directory is inert (ADR-0140), so the field is absent rather than offering a run FreeWeight
+    is bound to refuse."""
     from tests.integration.test_freeweight_adapters_provider import ADAPTERS
 
     console, _database = freeweight_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"adapters": ADAPTERS})
-        servable = page(console, f"{BASE}/runs")
+        servable = page(console, BASE)
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"adapters": {**ADAPTERS, "provider_can_serve": False}})
-        inert = page(console, f"{BASE}/runs")
+        inert = page(console, BASE)
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
-        off = page(console, f"{BASE}/runs")
+        off = page(console, BASE)
 
     assert 'name="adapter"' in servable
     assert '<option value="damaged"' in servable
@@ -767,7 +770,7 @@ def test_stopped_pages_read_the_database_with_a_start_beside_them(tmp_path: Path
     runs = page(console, f"{BASE}/runs")
     assert f'href="{BASE}/runs/{STOPPED_RUN}"' in runs
     assert "recorded before the stop" in runs
-    assert "Start a run" not in runs
+    assert 'id="fw-start-model"' not in runs  # the Start form is the Overview's (row WX8)
 
     run = page(console, f"{BASE}/runs/{STOPPED_RUN}")
     assert "Round trip" in run

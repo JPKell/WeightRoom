@@ -26,6 +26,7 @@ __all__ = [
     "FreeWeightFormInvalid",
     "cancel_run",
     "discover",
+    "draft_manifest",
     "provider_values",
     "repeat_run",
     "save_provider",
@@ -111,6 +112,44 @@ def set_machine_nickname(
     return _answer(
         call(client, settings, APP, "PATCH", f"machines/{segment(machine_id)}",
              body={"nickname": nickname.strip() or None},
+             timeout_seconds=_ACTION_TIMEOUT_SECONDS)
+    )  # fmt: skip
+
+
+def draft_manifest(
+    client: httpx.Client, settings: Settings, name: str, *, base_model_name: str
+) -> dict[str, Any]:
+    """``POST /adapters/{name}/draft``: a proposal beside the artifact, registered by nothing.
+
+    ADR-0061 rule 4 and ADR-0145: FreeWeight writes ``<name>.manifest.draft.json`` and the suffix
+    is the enforcement — nothing reads a draft as a manifest until a person has checked it and
+    renamed it. ``base_model_name`` is the one field nobody can read off a GGUF, so the form asks
+    for it and this refuses a blank one before FreeWeight is asked.
+
+    Args:
+        client: The pooled HTTP client.
+        settings: The validated settings.
+        name: The artifact's stem, as ``GET /adapters`` lists it under ``unmanifested``.
+        base_model_name: The base this adapter was trained against, as the provider names it.
+
+    Returns:
+        ``{"adapter", "path", "payload"}`` — what FreeWeight wrote and where.
+
+    Raises:
+        FreeWeightFormInvalid: ``base_model_name`` is blank; nothing was sent.
+        AppRefused: ``409 DRAFT_REFUSED`` — no such unmanifested artifact, a manifest or draft is
+            already there, or adapters are off — in FreeWeight's words.
+        AppUnreachable: It did not answer.
+    """
+    if not base_model_name.strip():
+        message = (
+            "A draft needs the base model's name: it is the one fact no reader of a GGUF can "
+            "establish."
+        )
+        raise FreeWeightFormInvalid(message, details={"field": "base_model_name"})
+    return _answer(
+        call(client, settings, APP, "POST", f"adapters/{segment(name)}/draft",
+             body={"base_model_name": base_model_name.strip()},
              timeout_seconds=_ACTION_TIMEOUT_SECONDS)
     )  # fmt: skip
 
