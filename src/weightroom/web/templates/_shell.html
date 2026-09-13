@@ -41,6 +41,9 @@
   {% endfor %}
 </nav>
 <div class="masthead-end">
+  {# Row WY1, on the operator's instruction: Chat is in the top bar as well as the left menu's
+     Tools section, so it is one tap from an application's tab, whose menu no longer lists it. #}
+  <a class="console-chat" href="/chat"{% if current_path is defined and current_path.startswith("/chat") %} aria-current="page"{% endif %}>Chat</a>
   <a class="console-alerts" href="/alerts" data-open="{{ 'true' if alert_banner and alert_banner.count else 'false' }}" title="Alerts nobody has acknowledged">⚠ {{ alert_banner.count if alert_banner else "—" }}</a>
   <button type="button" class="icon-button telemetry-toggle" aria-controls="mw-telemetry-bar" aria-pressed="true" aria-label="Telemetry" title="Hide telemetry">
     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M1 8.5h3l2-5 3 9 2-4.5h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>

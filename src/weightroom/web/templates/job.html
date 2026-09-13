@@ -1,4 +1,5 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% from "mirrorwall/components.html" import badge %}
 {% block title %}Job {{ job.id }} — WeightRoom{% endblock %}
 {% block extra_head %}
@@ -8,10 +9,10 @@
 {% endblock %}
 {% block page_content %}
 {% set tones = {"completed": "success", "running": "warning", "queued": "neutral", "failed": "danger", "cancelled": "neutral"} %}
+{{ page_nav(actions=[{"label": "JSON", "href": "/api/v1/jobs/" ~ job.id}]) }}
 <div class="page-head">
   <h2>{{ job.kind }} <code>{{ job.id }}</code></h2>
   {{ badge(job.state, tone=tones.get(job.state, "neutral")) }}
-  <div class="page-actions"><a href="/jobs">All jobs</a><a href="/api/v1/jobs/{{ job.id }}">JSON</a></div>
 </div>
 <table data-density="dense">
   <tbody>

@@ -1,13 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import measure %}
 {% block title %}Evidence store — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data %}
-{% call app_page_header(view, "Evidence store", "Evidence", "What the store holds, where it came from, and how to put more in it.") %}
-  <a href="/apps/loadcoach/evidence">Records</a> · <a href="/apps/loadcoach/models">Models</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Store and import", "href": "/apps/loadcoach/evidence/admin", "current": true}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Evidence store", "Evidence", "What the store holds, where it came from, and how to put more in it.") }}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if imported %}

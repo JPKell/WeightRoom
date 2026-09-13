@@ -1,11 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, kv_list %}
-{% from "_app_page.html" import refusal %}
+{% from "_app_page.html" import refusal, page_nav %}
 {% block title %}Starting a run — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(links=([{"label": "The job", "href": "/jobs/" ~ (job.id | urlencode)}] if job else [])) }}
 <div class="page-head">
   <h2>Starting a run {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/runs">Runs</a>{% if job %} · <a href="/jobs/{{ job.id | urlencode }}">The job</a>{% endif %}</div>
 </div>
 {{ refusal(error) }}
 {% if job %}

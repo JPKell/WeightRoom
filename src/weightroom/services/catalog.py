@@ -1,49 +1,25 @@
 """weightroom.services.catalog — every model FreeWeight and LoadCoach know, joined by identity.
 
-Spec §7.9, api.md §5. Only these two applications own a ``models`` table at all (ADR-0008,
-ADR-0118) — IdeaPress and PromptCadence carry none of their own and route every model call through
-LoadCoach — so the join is over two databases, read the way ``services/overview.py`` reads every
-other application's database: tables reflected on the read-only engine ``services/db_reader.py``
-already opens for each application, never a second registry (the kickoff's own words).
+The console's Catalog page is gone (ADR-0146); what stays here is what a remaining path calls.
+:func:`set_enabled` is ADR-0118's switch on the LoadCoach and FreeWeight tabs, and it still audits
+as ``catalog.enabled``. :func:`catalog_entries` is the join ``model_refresh`` reports after each
+refresh.
 
-**Evidence freshness is always FreeWeight's answer** (spec §7.9), even for a row LoadCoach also
-knows: FreeWeight is where a benchmark run lands, and LoadCoach's own ``capability_evidence`` is an
-import of the same fact, so reading it twice would only risk the two going out of step.
+Only these two applications own a ``models`` table at all (ADR-0008, ADR-0118), so the join is
+over two databases, read on the read-only engine ``services/db_reader.py`` opens for each.
+Evidence freshness is always FreeWeight's answer; residency comes first from LoadCoach's own
+``residency`` table and, for an Ollama-kind row LoadCoach does not carry, from ModelRack's
+``/api/ps`` client (``services/ollama.resident_models``).
 
-**Residency** comes first from LoadCoach's own ``residency`` table — a fact it already tracks per
-model, not a name match — and only for a row LoadCoach does not carry (typically one FreeWeight
-knows and LoadCoach has never routed to) does an Ollama-kind row fall back to a live
-``/api/ps``-style check through :func:`~weightroom.services.ollama.resident_models`, which is
-ModelRack's own client, never a second one (ADR-0125 rule 4's reasoning, applied here too).
-
-**A pull is a ``catalog_pull`` job** (row W9, ``services/job_kinds.py``): queued, leased, audited
-and recovered like every other job, its outcome and a summary of its progress on the job's row.
-The byte-by-byte progress an open Catalog page watches is held in memory (:class:`PullRegistry`),
-keyed by the job's id, for the life of the process executing it — progress lines at Ollama's rate
-do not belong in the database, and the job row answers once the process is gone. Ollama's own HTTP
-API (``/api/pull``, streamed newline-delimited JSON) is used directly: pulling a model is not in
-ModelRack's scope (its spec's explicit non-goal list), so there is no client to reuse here as there
-is for residency.
-
-**A slow call is not a refusal here either** (row WPF11, the rule ``app_api`` already carries for
-every application call, WPF1's own §2 item 3). ``set_enabled`` and the two Ollama calls in the
-delete path raise :class:`~weightroom.services.app_api.AppTimedOut` on a timeout and this module's
-own :class:`CatalogRefused` for anything the far side actually answered no to; each route audits
-the result with ``app_api.outcome_of``, the same function every other application call already
-uses — no second vocabulary. The pull's own request only enqueues a ``catalog_pull`` job (row W9)
-and never talks to Ollama itself, so it cannot time out at that layer — see
-``docs/history/handoffs/WPF11_HANDOFF.md``.
+**A slow call is not a refusal** (row WPF11): ``set_enabled`` raises
+:class:`~weightroom.services.app_api.AppTimedOut` on a timeout and :class:`CatalogRefused` for
+anything the far side actually answered no to; callers audit with ``app_api.outcome_of``.
 """
 
 from __future__ import annotations
 
-import json
-import logging
-import shutil
-import threading
-from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
-from pathlib import Path
+from dataclasses import dataclass, replace
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 import httpx
@@ -52,13 +28,11 @@ from sqlalchemy import func, select
 
 from weightroom.services.app_api import AppTimedOut
 from weightroom.services.apps import bearer_token
-from weightroom.services.db_curated import CuratedResult, delete_results
 from weightroom.services.db_reader import AppDatabaseUnavailable, open_app_database, reflect_table
 from weightroom.services.ollama import resident_models
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
-    from typing import BinaryIO
 
     from sqlalchemy import Engine
 
@@ -68,55 +42,21 @@ if TYPE_CHECKING:
 
 __all__ = [
     "CATALOG_APPS",
-    "GGUF_MAGIC",
     "CatalogAppRow",
-    "CatalogDeletePreview",
-    "CatalogDeleteResult",
-    "CatalogDropinRefused",
     "CatalogEntry",
     "CatalogRefused",
-    "DropinResult",
-    "LlamaCppTarget",
-    "PullEvent",
-    "PullJob",
-    "PullRegistry",
-    "catalog_delete_confirm",
-    "catalog_delete_preview",
     "catalog_entries",
-    "find_entry",
-    "llamacpp_targets",
-    "perform_dropin_path",
-    "perform_dropin_stream",
     "set_enabled",
-    "validate_gguf",
 ]
 
-logger = logging.getLogger(__name__)
-
 CATALOG_APPS: Final[tuple[str, ...]] = ("freeweight", "loadcoach")
-GGUF_MAGIC: Final = b"GGUF"
-_MIN_GGUF_BYTES: Final = 1024
-"""Anything smaller is not a weights file — catches an empty or truncated upload cheaply, before
-the magic-byte read."""
-
 _HTTP_TIMEOUT_SECONDS: Final = 10.0
-_DISCOVER_TIMEOUT_SECONDS: Final = 120.0
-_MIN_FREE_BYTES_FOR_PULL: Final = 2 * 1024 * 1024 * 1024
-"""A floor, not a per-model estimate — Ollama does not report a manifest's size before pulling it.
-Below this, a pull is refused outright rather than left to fail Ollama-side partway through."""
 
 
 class CatalogRefused(SuiteError):
-    """A catalog action asked for wrongly: an unknown app, a bad confirmation, no target model."""
+    """An application answered an enable or disable with an error, or did not answer at all."""
 
     code: ClassVar[str] = "VALIDATION_ERROR"
-
-
-class CatalogDropinRefused(SuiteError):
-    """A GGUF drop-in this console will not perform (spec §14): bad magic, oversize, escaping
-    the configured directory, or no directory configured at all."""
-
-    code: ClassVar[str] = "CATALOG_DROPIN_REFUSED"
 
 
 # --- The join -------------------------------------------------------------------------------
@@ -154,20 +94,6 @@ class CatalogAppRow:
     resident: bool | None
     evidence_measured_at: datetime | None
 
-    def as_json(self) -> dict[str, Any]:
-        """The api.md §5 per-application shape."""
-        return {
-            "model_id": self.model_id,
-            "enabled": self.enabled,
-            "available": self.available,
-            "size_bytes": self.size_bytes,
-            "max_context": self.max_context,
-            "resident": self.resident,
-            "evidence_measured_at": (
-                self.evidence_measured_at.isoformat() if self.evidence_measured_at else None
-            ),
-        }
-
 
 @dataclass(frozen=True, slots=True)
 class CatalogEntry:
@@ -189,17 +115,6 @@ class CatalogEntry:
     family: str | None
     quantization: str | None
     apps: Mapping[str, CatalogAppRow]
-
-    def as_json(self) -> dict[str, Any]:
-        """The api.md §5 ``GET /catalog`` row shape."""
-        return {
-            "canonical_id": self.canonical_id,
-            "provider_kind": self.provider_kind,
-            "provider_model_name": self.provider_model_name,
-            "family": self.family,
-            "quantization": self.quantization,
-            "apps": {name: row.as_json() for name, row in self.apps.items()},
-        }
 
 
 def _freeweight_rows(
@@ -378,20 +293,6 @@ def catalog_entries(
     return tuple(sorted(entries, key=lambda entry: entry.canonical_id))
 
 
-def find_entry(entries: tuple[CatalogEntry, ...], canonical_id: str) -> CatalogEntry:
-    """The one row named ``canonical_id``.
-
-    Raises:
-        CatalogRefused: No such row in ``entries``.
-    """
-    for entry in entries:
-        if entry.canonical_id == canonical_id:
-            return entry
-    raise CatalogRefused(
-        f"{canonical_id} is not in the catalog.", details={"canonical_id": canonical_id}
-    )
-
-
 # --- Talking to the two applications ----------------------------------------------------------
 
 
@@ -415,39 +316,6 @@ def _timed_out(app: str, method: str, path: str) -> AppTimedOut:
         f"nothing was sent again. Check the page again shortly.",
         details={"app": app, "path": path, "timeout_seconds": _HTTP_TIMEOUT_SECONDS},
     )
-
-
-def _call(
-    settings: Settings,
-    app: str,
-    method: str,
-    path: str,
-    *,
-    client: httpx.Client,
-    json_body: Mapping[str, Any] | None = None,
-    timeout: float = _HTTP_TIMEOUT_SECONDS,
-) -> dict[str, Any] | None:
-    """One call to ``app``'s own API; ``None`` on anything short of a successful JSON object."""
-    base_url = getattr(settings.apps, app).base_url
-    if not base_url:
-        return None
-    headers = {}
-    token = bearer_token(settings, app)
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    try:
-        response = client.request(
-            method,
-            f"{base_url.rstrip('/')}{path}",
-            json=json_body,
-            headers=headers,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        body = response.json()
-    except (httpx.HTTPError, ValueError):
-        return None
-    return body if isinstance(body, dict) else None
 
 
 def set_enabled(
@@ -488,487 +356,3 @@ def set_enabled(
         return dict(response.json())
     except ValueError:
         return {}
-
-
-# --- GGUF drop-in ------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class LlamaCppTarget:
-    """One application's llama.cpp provider, live, naming its own ``model_directory``."""
-
-    app: str
-    provider_name: str
-    model_directory: Path
-
-
-def llamacpp_targets(settings: Settings, *, client: httpx.Client) -> tuple[LlamaCppTarget, ...]:
-    """Every llama.cpp-configured provider across FreeWeight and LoadCoach, read live.
-
-    FreeWeight names one provider at ``GET /api/v1/provider``; LoadCoach may name several named
-    registrations at ``GET /api/v1/providers``. An application that is stopped, not llama.cpp, or
-    names no directory contributes nothing.
-    """
-    targets: list[LlamaCppTarget] = []
-    freeweight = _call(settings, "freeweight", "GET", "/api/v1/provider", client=client)
-    provider = freeweight.get("provider") if freeweight else None
-    if (
-        isinstance(provider, dict)
-        and provider.get("kind") == "llamacpp"
-        and provider.get("model_directory")
-    ):
-        targets.append(
-            LlamaCppTarget("freeweight", "", Path(str(provider["model_directory"])).expanduser())
-        )
-    loadcoach = _call(settings, "loadcoach", "GET", "/api/v1/providers", client=client)
-    registrations = loadcoach.get("registrations") if loadcoach else None
-    if isinstance(registrations, list):
-        for registration in registrations:
-            if not isinstance(registration, dict):
-                continue
-            if registration.get("kind") == "llamacpp" and registration.get("model_directory"):
-                targets.append(
-                    LlamaCppTarget(
-                        "loadcoach",
-                        str(registration.get("name", "")),
-                        Path(str(registration["model_directory"])).expanduser(),
-                    )
-                )
-    return tuple(targets)
-
-
-def _single_directory(targets: tuple[LlamaCppTarget, ...]) -> Path:
-    if not targets:
-        raise CatalogDropinRefused(
-            "No application configures a llama.cpp model_directory; there is nowhere to drop a "
-            "GGUF file in."
-        )
-    directories = {target.model_directory.resolve() for target in targets}
-    if len(directories) > 1:
-        raise CatalogDropinRefused(
-            "The configured llama.cpp applications name different model_directory paths: "
-            + ", ".join(sorted(str(one) for one in directories))
-            + ". Point them at the same directory before dropping a file in from here.",
-            details={"directories": sorted(str(one) for one in directories)},
-        )
-    return next(iter(directories))
-
-
-def _resolve_within(directory: Path, filename: str) -> Path:
-    """``directory / filename``, containment-checked (spec §14)."""
-    safe_name = Path(filename).name
-    if not safe_name or safe_name in {".", ".."}:
-        raise CatalogDropinRefused(f"{filename!r} is not a usable file name.")
-    target = (directory / safe_name).resolve()
-    if not (target == directory or target.is_relative_to(directory)):
-        raise CatalogDropinRefused(
-            f"{filename!r} would land outside the configured model directory.",
-            details={"directory": str(directory), "filename": filename},
-        )
-    return target
-
-
-def validate_gguf(path: Path) -> int:
-    """Check ``path``'s magic bytes and size; return its size in bytes.
-
-    Raises:
-        CatalogDropinRefused: It cannot be read, is too small to be real weights, or does not
-            start with the GGUF magic bytes.
-    """
-    try:
-        size_bytes = path.stat().st_size
-    except OSError as exc:
-        raise CatalogDropinRefused(
-            f"{path} does not exist or cannot be read: {exc}", details={"path": str(path)}
-        ) from exc
-    if size_bytes < _MIN_GGUF_BYTES:
-        raise CatalogDropinRefused(
-            f"{path} is only {size_bytes} bytes; too small to be a GGUF weights file.",
-            details={"path": str(path), "size_bytes": size_bytes},
-        )
-    with path.open("rb") as handle:
-        magic = handle.read(len(GGUF_MAGIC))
-    if magic != GGUF_MAGIC:
-        raise CatalogDropinRefused(
-            f"{path} does not start with the GGUF magic bytes.",
-            details={"path": str(path), "magic": magic.hex()},
-        )
-    return size_bytes
-
-
-@dataclass(frozen=True, slots=True)
-class DropinResult:
-    """What a GGUF drop-in did."""
-
-    destination: Path
-    size_bytes: int
-    refreshed: tuple[str, ...]
-    """Every application ``POST /models/discover`` was called on afterwards."""
-
-    def as_json(self) -> dict[str, Any]:
-        """The api.md §5 ``POST /catalog/dropin`` response shape."""
-        return {
-            "path": str(self.destination),
-            "size_bytes": self.size_bytes,
-            "refreshed": list(self.refreshed),
-        }
-
-
-def _refresh_after_dropin(
-    settings: Settings, targets: tuple[LlamaCppTarget, ...], *, client: httpx.Client
-) -> tuple[str, ...]:
-    refreshed = []
-    for target in targets:
-        answered = _call(
-            settings,
-            target.app,
-            "POST",
-            "/api/v1/models/discover",
-            client=client,
-            timeout=_DISCOVER_TIMEOUT_SECONDS,
-        )
-        # Only an application that answered is named as refreshed. A discovery pass that timed
-        # out or failed left `_call` with `None`, and reporting it as refreshed told the operator
-        # the new file had been seen when it had not (row WPF1; WP6 finding 3's neighbour).
-        if answered is not None:
-            refreshed.append(target.app)
-    return tuple(refreshed)
-
-
-def perform_dropin_path(settings: Settings, *, source: str, client: httpx.Client) -> DropinResult:
-    """The ``{"path": …}`` form: copy a file already on the host into the model directory."""
-    source_path = Path(source).expanduser()
-    size_bytes = validate_gguf(source_path)
-    targets = llamacpp_targets(settings, client=client)
-    directory = _single_directory(targets)
-    directory.mkdir(parents=True, exist_ok=True)
-    destination = _resolve_within(directory, source_path.name)
-    shutil.copy2(source_path, destination)
-    refreshed = _refresh_after_dropin(settings, targets, client=client)
-    return DropinResult(destination, size_bytes, refreshed)
-
-
-def perform_dropin_stream(
-    settings: Settings, *, filename: str, stream: BinaryIO, client: httpx.Client
-) -> DropinResult:
-    """The multipart-upload form: written to the model directory, then validated in place."""
-    targets = llamacpp_targets(settings, client=client)
-    directory = _single_directory(targets)
-    directory.mkdir(parents=True, exist_ok=True)
-    destination = _resolve_within(directory, filename)
-    with destination.open("wb") as handle:
-        shutil.copyfileobj(stream, handle)
-    try:
-        size_bytes = validate_gguf(destination)
-    except CatalogDropinRefused:
-        destination.unlink(missing_ok=True)
-        raise
-    refreshed = _refresh_after_dropin(settings, targets, client=client)
-    return DropinResult(destination, size_bytes, refreshed)
-
-
-# --- Ollama, over its own HTTP API --------------------------------------------------------------
-
-
-def _ollama_tag_exists(settings: Settings, name: str, *, client: httpx.Client) -> bool:
-    """Whether Ollama's own ``/api/tags`` names ``name``.
-
-    Raises:
-        AppTimedOut: Ollama did not answer within the timeout (row WPF11) — whether the tag is
-            still there is unknown, not ``False``; a preview must not tell the operator there is
-            nothing to remove when the truth is that the check gave up waiting. Every other
-            failure (Ollama unreachable, a bad body) still degrades to ``False``: the preview is a
-            best-effort read, and only a timeout is the *pending* case app_api's vocabulary means.
-    """
-    try:
-        response = client.get(
-            f"{settings.host.ollama_base_url.rstrip('/')}/api/tags", timeout=_HTTP_TIMEOUT_SECONDS
-        )
-        response.raise_for_status()
-        body = response.json()
-    except httpx.TimeoutException as exc:
-        raise _timed_out("ollama", "GET", "/api/tags") from exc
-    except (httpx.HTTPError, ValueError):
-        return False
-    models = body.get("models") if isinstance(body, dict) else None
-    if not isinstance(models, list):
-        return False
-    return any(isinstance(one, dict) and one.get("name") == name for one in models)
-
-
-def _ollama_delete_tag(settings: Settings, name: str, *, client: httpx.Client) -> bool:
-    """``DELETE /api/delete`` on Ollama's own API; ``True`` when it answered success.
-
-    Raises:
-        AppTimedOut: Ollama did not answer within the timeout (row WPF11) — the deletion may have
-            landed; reporting ``ollama_removed=False`` on a timeout would tell the operator
-            nothing happened when it might still be running. Every other failure still degrades to
-            ``False`` (Database Standards §8's own carve-out for a call that answered no).
-    """
-    try:
-        response = client.request(
-            "DELETE",
-            f"{settings.host.ollama_base_url.rstrip('/')}/api/delete",
-            json={"name": name},
-            timeout=_HTTP_TIMEOUT_SECONDS,
-        )
-    except httpx.TimeoutException as exc:
-        raise _timed_out("ollama", "DELETE", "/api/delete") from exc
-    except httpx.HTTPError:
-        return False
-    return response.is_success
-
-
-# --- Delete with cleanup -------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class CatalogDeletePreview:
-    """What ``DELETE /catalog/{ref}`` with ``preview: true`` would remove, and from where."""
-
-    canonical_id: str
-    ollama_tag_found: bool
-    gguf_path: Path | None
-    freeweight: CuratedResult | None
-
-    def as_json(self) -> dict[str, Any]:
-        """The api.md §5 preview shape."""
-        return {
-            "canonical_id": self.canonical_id,
-            "ollama_tag_found": self.ollama_tag_found,
-            "gguf_path": str(self.gguf_path) if self.gguf_path else None,
-            "freeweight": self.freeweight.as_json() if self.freeweight else None,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class CatalogDeleteResult:
-    """What ``DELETE /catalog/{ref}`` with a typed confirmation actually removed."""
-
-    canonical_id: str
-    ollama_removed: bool
-    gguf_removed: Path | None
-    freeweight: CuratedResult | None
-
-    def as_json(self) -> dict[str, Any]:
-        """The api.md §5 deletion result shape."""
-        return {
-            "canonical_id": self.canonical_id,
-            "ollama_removed": self.ollama_removed,
-            "gguf_removed": str(self.gguf_removed) if self.gguf_removed else None,
-            "freeweight": self.freeweight.as_json() if self.freeweight else None,
-        }
-
-
-def _gguf_candidate(
-    settings: Settings, entry: CatalogEntry, *, client: httpx.Client
-) -> Path | None:
-    if entry.provider_kind != "llamacpp":
-        return None
-    for target in llamacpp_targets(settings, client=client):
-        candidate = target.model_directory / entry.provider_model_name
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def catalog_delete_preview(
-    settings: Settings, entry: CatalogEntry, *, client: httpx.Client
-) -> CatalogDeletePreview:
-    """Preview a catalog delete: what an ``ollama rm``/file removal and FreeWeight's own
-    deletion would each do, without doing any of it (Database Standards §8)."""
-    ollama_found = (
-        _ollama_tag_exists(settings, entry.provider_model_name, client=client)
-        if entry.provider_kind == "ollama"
-        else False
-    )
-    gguf_path = _gguf_candidate(settings, entry, client=client)
-    freeweight = (
-        delete_results(settings, client, "freeweight", scope="model", selector=entry.canonical_id)
-        if "freeweight" in entry.apps
-        else None
-    )
-    return CatalogDeletePreview(entry.canonical_id, ollama_found, gguf_path, freeweight)
-
-
-def catalog_delete_confirm(
-    settings: Settings, entry: CatalogEntry, *, typed: str, token: str, client: httpx.Client
-) -> CatalogDeleteResult:
-    """Remove the Ollama tag or the GGUF file, then FreeWeight's own stored results.
-
-    Args:
-        settings: The validated settings.
-        entry: The catalog row to remove, already resolved by canonical id.
-        typed: Must equal ``entry.canonical_id`` — the confirmation, never assumed.
-        token: FreeWeight's preview token, from a fresh :func:`catalog_delete_preview`.
-        client: The console's HTTP client.
-
-    Raises:
-        CatalogRefused: ``typed`` does not match.
-    """
-    if typed.strip() != entry.canonical_id:
-        raise CatalogRefused(
-            f"Type {entry.canonical_id} to delete it: this removes the weights and every stored "
-            "result FreeWeight holds for it.",
-            details={"canonical_id": entry.canonical_id, "typed": typed},
-        )
-    ollama_removed = False
-    gguf_removed: Path | None = None
-    if entry.provider_kind == "ollama":
-        ollama_removed = _ollama_delete_tag(settings, entry.provider_model_name, client=client)
-    elif entry.provider_kind == "llamacpp":
-        candidate = _gguf_candidate(settings, entry, client=client)
-        if candidate is not None:
-            candidate.unlink()
-            gguf_removed = candidate
-    freeweight = (
-        delete_results(
-            settings,
-            client,
-            "freeweight",
-            scope="model",
-            selector=entry.canonical_id,
-            token=token,
-            typed=entry.canonical_id,
-        )
-        if "freeweight" in entry.apps
-        else None
-    )
-    return CatalogDeleteResult(entry.canonical_id, ollama_removed, gguf_removed, freeweight)
-
-
-# --- The pull job: a thread, until W9 hosts it as a real one -----------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class PullEvent:
-    """One line of Ollama's own pull progress, or this console's own terminal event."""
-
-    id: int
-    status: str
-    digest: str | None = None
-    total: int | None = None
-    completed: int | None = None
-    error: str | None = None
-
-    def as_json(self) -> dict[str, Any]:
-        """One SSE frame's payload."""
-        return {
-            "status": self.status,
-            "digest": self.digest,
-            "total": self.total,
-            "completed": self.completed,
-            "error": self.error,
-        }
-
-
-@dataclass
-class PullJob:
-    """One ``ollama pull``, running in its own thread; ``events`` only ever grows."""
-
-    id: str
-    name: str
-    started_at: datetime
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
-    events: list[PullEvent] = field(default_factory=list)
-    finished: bool = False
-    ok: bool = False
-
-    def _append(self, status: str, **fields: Any) -> None:
-        with self._lock:
-            self.events.append(PullEvent(len(self.events) + 1, status, **fields))
-
-    def events_after(self, after_id: int) -> list[PullEvent]:
-        """Every event after ``after_id``, for the SSE route's replay."""
-        with self._lock:
-            return list(self.events[after_id:])
-
-    def _finish(self, *, ok: bool) -> None:
-        with self._lock:
-            self.finished = True
-            self.ok = ok
-
-
-def _home_free_bytes() -> int:
-    return shutil.disk_usage(Path.home()).free
-
-
-def run_pull(
-    job: PullJob,
-    *,
-    client: httpx.Client,
-    base_url: str,
-    free_bytes: Callable[[], int] = _home_free_bytes,
-    cancelled: Callable[[], bool] = lambda: False,
-) -> None:
-    try:
-        free = free_bytes()
-        if free < _MIN_FREE_BYTES_FOR_PULL:
-            job._append(  # noqa: SLF001 — this module's own worker
-                "failed", error=f"only {free} bytes free; refusing to start a pull"
-            )
-            job._finish(ok=False)  # noqa: SLF001
-            return
-        with client.stream(
-            "POST",
-            f"{base_url.rstrip('/')}/api/pull",
-            json={"name": job.name, "stream": True},
-            timeout=None,
-        ) as response:
-            response.raise_for_status()
-            for line in response.iter_lines():
-                if cancelled():
-                    job._append("cancelled", error="cancelled by the operator")  # noqa: SLF001
-                    job._finish(ok=False)  # noqa: SLF001
-                    return
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(data, dict):
-                    continue
-                error = data.get("error")
-                job._append(  # noqa: SLF001
-                    str(data.get("status", "")),
-                    digest=data.get("digest"),
-                    total=data.get("total"),
-                    completed=data.get("completed"),
-                    error=str(error) if error else None,
-                )
-                if error:
-                    job._finish(ok=False)  # noqa: SLF001
-                    return
-        job._finish(ok=True)  # noqa: SLF001
-    except httpx.HTTPError as exc:
-        job._append("failed", error=str(exc))  # noqa: SLF001
-        job._finish(ok=False)  # noqa: SLF001
-    except Exception:
-        logger.exception("catalog.pull_worker_crashed", extra={"job_id": job.id, "name": job.name})
-        job._append("failed", error="the pull worker crashed; see the server log")  # noqa: SLF001
-        job._finish(ok=False)  # noqa: SLF001
-
-
-class PullRegistry:
-    """The live progress of every pull this process has executed, keyed by the job's id.
-
-    Not persisted (module docstring): the ``catalog_pull`` job's row is the durable record.
-    """
-
-    def __init__(self) -> None:
-        """An empty registry — one lives on ``app.state`` for the process's lifetime."""
-        self._jobs: dict[str, PullJob] = {}
-        self._lock = threading.Lock()
-
-    def adopt(self, job_id: str, name: str) -> PullJob:
-        """Register the progress holder for the ``catalog_pull`` job ``job_id`` and return it."""
-        job = PullJob(id=job_id, name=name, started_at=datetime.now(UTC))
-        with self._lock:
-            self._jobs[job.id] = job
-        return job
-
-    def get(self, job_id: str) -> PullJob | None:
-        """The job, or ``None`` when this process never started one by that id."""
-        with self._lock:
-            return self._jobs.get(job_id)

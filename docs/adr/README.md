@@ -180,6 +180,7 @@ an ADR is superseded rather than edited.
 | [0143](0143-a-workflow-is-a-stored-versioned-record-a-project-pins.md) | An IdeaPress workflow is a versioned JSON record in a `workflows` table, never edited in place; a project pins `workflow_id@version` and the stage executor reads the bound definition rather than the `STAGES` table; a workflow chooses which model stages run and with what prompt, rounds and model hint, never their order and never the four gates, which are not in the record at all | Accepted |
 | [0144](0144-freeweight-keeps-several-provider-profiles-and-runs-one.md) | FreeWeight keeps several `[providers.<name>]` profiles and runs exactly one, named by `[provider] active`; a bare `[provider]` block is the profile `default`, so every existing file resolves unchanged (amends ADR-0077; row WX13) | Accepted |
 | [0145](0145-freeweight-drafts-an-adapter-manifest-and-still-trusts-nothing.md) | FreeWeight writes an adapter manifest *draft* on request — `data_classification: confidential`, reviewed by a person before it becomes a manifest — reversing ADR-0061 rule 4's "FreeWeight writes no drafts" (row WX7) | Accepted |
+| [0146](0146-the-console-has-no-catalog.md) | The console has no catalog: the `/catalog` page, its API, and the console's pull, drop-in and delete leave; enable/disable stays on the LoadCoach and FreeWeight tabs, and the `catalog.*` audit names and `catalog_pull` job-kind name stay readable (row WY1) | Accepted |
 
 ## Writing a new ADR
 

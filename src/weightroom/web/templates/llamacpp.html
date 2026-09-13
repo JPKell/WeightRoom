@@ -1,7 +1,9 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
 {% block title %}llama.cpp — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": setup_document, "href": "/docs/page?path=" ~ setup_document}]) }}
 <div class="page-head">
   <h2>llama.cpp
     {{ badge((report.servers | length | string) ~ " running", tone="success" if report.servers else "neutral") }}
@@ -10,10 +12,6 @@
              tone="success" if report.safe else "danger") }}
     {% endif %}
   </h2>
-  <div class="page-actions">
-    <a href="/docs/page?path={{ setup_document }}">{{ setup_document }}</a> ·
-    <a href="/ollama">Ollama</a>
-  </div>
 </div>
 
 <p class="muted"><strong>This page reads and never acts.</strong> A <code>llama-server</code> is

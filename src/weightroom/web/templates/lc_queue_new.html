@@ -1,10 +1,9 @@
 {% extends "_shell.html" %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% block title %}New job — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "New job", "Queue", "One job, queued and dispatched by class and priority, and routed like any other — nothing here bypasses routing.") %}
-  <a href="/apps/loadcoach/queue">Current</a> · <a href="/apps/loadcoach/queue/history">History</a> · <a href="/apps/loadcoach/routing">Explain a route first</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "History", "href": "/apps/loadcoach/queue/history"}, {"label": "New job", "href": "/apps/loadcoach/queue/new", "current": true}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "New job", "Queue", "One job, queued and dispatched by class and priority, and routed like any other — nothing here bypasses routing.") }}
 {% include "_app_state.html" %}
 {{ refusal(submit_error) }}
 {% if live %}

@@ -1,12 +1,13 @@
 {% extends "_shell.html" %}
+{% from "_ip.html" import project_bar %}
 {% from "mirrorwall/components.html" import badge, empty_state %}
 {% from "_app_page.html" import page_source, refusal %}
 {% block title %}Export — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
 {% set proj = "/apps/ideapress/projects/" ~ (project_id | urlencode) %}
+{{ project_bar(project_id, "export") }}
 <div class="page-head">
   <h2>Export {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ proj }}">The project</a> · <a href="{{ proj }}/workspace">Workspace</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

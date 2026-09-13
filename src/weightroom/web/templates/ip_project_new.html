@@ -3,10 +3,8 @@
 {% from "_ip.html" import projects_nav %}
 {% block title %}New project — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "New project", "Projects", "IdeaPress derives the slug from the title, and compiles requirements from the brief when you plan it.") %}
-<a href="/apps/ideapress/projects">All projects</a>
-{% endcall %}
 {{ projects_nav(nav, "new") }}
+{{ app_page_header(view, "New project", "Projects", "IdeaPress derives the slug from the title, and compiles requirements from the brief when you plan it.") }}
 {% include "_app_state.html" %}
 {{ refusal(create_error) }}
 {% if sourced.live %}

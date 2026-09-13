@@ -1,13 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer, chart_container %}
-{% from "_app_page.html" import page_source, refusal, context_k, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, context_k, app_page_header, page_nav %}
 {% from "_fw.html" import run_link, value, machine_link, filter_styles %}
 {% block title %}Compare — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {{ filter_styles() }}
-{% call app_page_header(view, "Compare", "Results", "Runs set side by side, aligned by metric — with FreeWeight's own verdict on which of them may be read against each other.") %}
-  <a href="/apps/freeweight/results">Results</a> · <a href="/apps/freeweight/models">Models</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Compare", "href": "/apps/freeweight/results/compare", "current": true}], actions=[docs_action("freeweight")]) }}
+{{ app_page_header(view, "Compare", "Results", "Runs set side by side, aligned by metric — with FreeWeight's own verdict on which of them may be read against each other.") }}
 {% include "_app_state.html" %}
 <p class="muted">FreeWeight never averages across a boundary it marks separate: where two columns cannot be read against each
 other, the row says so, each cell names its group, and the fingerprint fields that separate them are listed with the reason.</p>

@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import link, run_link, short, value, yes_no %}
 {% from "_fw_goals.html" import calibration, mix, percent, csrf with context %}
 {% block title %}Goal — FreeWeight — WeightRoom{% endblock %}
@@ -8,14 +8,9 @@
 {% set data = sourced.data or {} %}
 {% set goal = data.get("goal") %}
 {% set here = "/apps/freeweight/goals/" ~ (slug | urlencode) %}
+{{ page_nav(links=[{"label": "Goal", "href": here, "current": true}] + ([{"label": "Edit", "href": here ~ "/edit"}] if sourced.live else []) + [{"label": "Calibration", "href": here ~ "/calibration"}, {"label": "Grade", "href": here ~ "/grade"}, {"label": "Report", "href": here ~ "/report"}, {"label": "Judges", "href": "/apps/freeweight/judges?goal=" ~ (slug | urlencode)}], actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>{{ goal.get("name") if goal else slug }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/freeweight/goals">Every goal</a>
-    {% if sourced.live %} · <a href="{{ here }}/edit">Edit</a>{% endif %}
-    · <a href="{{ here }}/calibration">Calibration</a> · <a href="{{ here }}/grade">Grade</a> · <a href="{{ here }}/report">Report</a>
-    · <a href="/apps/freeweight/judges?goal={{ slug | urlencode }}">Judges</a>
-  </div>
 </div>
 {% include "_app_state.html" %}
 {% if done_message %}<p class="notice" role="status">{{ done_message }}</p>{% endif %}

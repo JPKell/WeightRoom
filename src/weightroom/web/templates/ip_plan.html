@@ -1,14 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
 {% from "_app_page.html" import page_source, refusal %}
-{% from "_ip.html" import short, state_badge, measure %}
+{% from "_ip.html" import short, state_badge, measure, project_bar %}
 {% from "_pc.html" import verdict_badge %}
 {% block title %}Plan — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
 {% set here = "/apps/ideapress/projects/" ~ (project_id | urlencode) %}
+{{ project_bar(project_id, "plan") }}
 <div class="page-head">
   <h2>Plan {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ here }}">The project</a> · <a href="{{ here }}/workspace">Workspace</a> · <a href="{{ here }}/export">Export</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

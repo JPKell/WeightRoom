@@ -1,12 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import stat, num, measure, breaker_badge, profile_link %}
 {% block title %}Reliability — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Reliability", "Reliability", "Production evidence per model and task profile: what happened when jobs ran. Below its minimum a value is a dash carrying the reason, never a number — hover a dash to read it.") %}
-  <a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/routing">Routing</a> · <a href="/apps/loadcoach/queue">Queue</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Reliability", "Reliability", "Production evidence per model and task profile: what happened when jobs ran. Below its minimum a value is a dash carrying the reason, never a number — hover a dash to read it.") }}
 {% include "_app_state.html" %}
 <form class="filter-bar" action="/apps/loadcoach/reliability" method="get" role="search">
   <div class="field"><label for="lc-rel-task">Task profile</label>

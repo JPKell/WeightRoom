@@ -68,12 +68,12 @@ JOB_KINDS: Final[tuple[str, ...]] = (
     "retention_trim",
     "backup",
     "model_refresh",
-    "catalog_pull",
     "docs_index",
     "self_restore",
 )
 """Spec §7.10's four, the two earlier rows left as callables, and WeightRoomGym's own restore
-(ADR-0136)."""
+(ADR-0136). ``catalog_pull`` left with the catalog (ADR-0146): it can no longer be queued, and a
+stored row of it still lists, renders and cancels — nothing that reads a job checks its kind."""
 
 JOB_STATES: Final[tuple[str, ...]] = ("queued", "running", "completed", "failed", "cancelled")
 TERMINAL_STATES: Final[frozenset[str]] = frozenset({"completed", "failed", "cancelled"})
@@ -91,7 +91,7 @@ TRANSITIONS: Final[frozenset[tuple[str, str]]] = frozenset(
 """Every legal move; anything else is refused by :func:`require_transition`."""
 
 IDEMPOTENT_KINDS: Final[frozenset[str]] = frozenset(
-    {"retention_trim", "backup", "model_refresh", "catalog_pull", "docs_index"}
+    {"retention_trim", "backup", "model_refresh", "docs_index"}
 )
 """Kinds whose second execution is harmless, so a lost lease requeues them.
 
@@ -239,7 +239,6 @@ def cap_output(text: str, cap_bytes: int) -> str:
 # --- Parameters -----------------------------------------------------------------------------------
 
 _SUITE_KEY: Final = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)+$")
-_PULL_NAME: Final = re.compile(r"^[A-Za-z0-9._/:-]{1,256}$")
 _GOAL_SLUG: Final = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 """FreeWeight's own slug pattern (``domain/goals/pack.SLUG_PATTERN``); it is one CLI argument."""
 _ADAPTER_NAME: Final = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
@@ -344,7 +343,6 @@ _PARAMS: Final[Mapping[str, Mapping[str, tuple[_Check, Any]]]] = {
     },
     "backup": {"apps": (_targets(BACKUP_TARGETS), list(BACKUP_TARGETS))},
     "model_refresh": {"apps": (_targets(REFRESH_TARGETS), list(REFRESH_TARGETS))},
-    "catalog_pull": {"name": (_text(_PULL_NAME, max_chars=256), _REQUIRED)},
     "docs_index": {},
     "self_restore": {"file": (_text(max_chars=4096), _REQUIRED)},
 }

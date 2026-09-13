@@ -1,12 +1,11 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_lc.html" import job_link, measure %}
 {% block title %}Job history — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Job history", "Queue", "Every job LoadCoach has taken, newest first — every transition persisted with a reason, never inferred from the last state seen.") %}
-  <a href="/apps/loadcoach/queue">Current</a> · <a href="/apps/loadcoach/queue/new">New job</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "History", "href": "/apps/loadcoach/queue/history", "current": true}, {"label": "New job", "href": "/apps/loadcoach/queue/new"}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Job history", "Queue", "Every job LoadCoach has taken, newest first — every transition persisted with a reason, never inferred from the last state seen.") }}
 {% include "_app_state.html" %}
 <form class="filter-bar" action="/apps/loadcoach/queue/history#jobs" method="get" role="search">
   <div class="field"><label for="lc-jobs-state">State</label>

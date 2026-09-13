@@ -1,9 +1,10 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% block title %}Prompts — {{ app | app_label }} — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(actions=[{"label": "JSON", "href": "/api/v1/apps/" ~ app ~ "/prompts"}]) }}
 <div class="page-head">
   <h2>{{ app | app_label }} prompts</h2>
-  <div class="page-actions"><a href="/api/v1/apps/{{ app }}/prompts">JSON</a></div>
 </div>
 {% if error %}<p class="notice" role="alert"><strong><code>{{ error.code }}</code></strong> {{ error.message }}</p>{% endif %}
 {% if pack %}

@@ -60,7 +60,7 @@ Index `(expires_at)`.
 | `actor` | text | `operator` \| `job` \| `alerts` \| `cli` |
 | `at` | timestamp | |
 | `app` | text, null | `freeweight` … \| `weightroom` \| `ollama` \| `host` |
-| `action` | text | `unit.start`, `settings.write`, `db.guarded_write`, `db.dry_run`, `db.query`, `db.curated`, `catalog.pull`, `prompt.override`, `prompt.delete`, `job.run`, `job.enqueue`, `job.cancel`, `job.schedule`, `alert.ack`, `login`, `logout`, `tls.rotate`, … a closed vocabulary asserted by test |
+| `action` | text | `unit.start`, `settings.write`, `db.guarded_write`, `db.dry_run`, `db.query`, `db.curated`, `catalog.pull` (historical rows only, ADR-0146), `prompt.override`, `prompt.delete`, `job.run`, `job.enqueue`, `job.cancel`, `job.schedule`, `alert.ack`, `login`, `logout`, `tls.rotate`, … a closed vocabulary asserted by test |
 | `target` | text, null | the unit, key list, table, model ref, prompt id, job id |
 | `params` | json | redacted: tokens, passwords and URL credentials replaced before the row is written |
 | `outcome` | text | `pending` \| `ok` \| `failed` \| `refused` |
@@ -118,7 +118,7 @@ completion into `messages.text`/`thinking` and the delta rows dropped; the struc
 | Column | Type | Notes |
 |---|---|---|
 | `id` | ULID pk | |
-| `kind` | text | `freeweight_suite_run` \| `retention_trim` \| `backup` \| `model_refresh` \| `catalog_pull` \| `docs_index` \| `self_restore` ([ADR-0136](../../adr/0136-weightroom-restores-its-own-database-through-a-job-handed-to-a-transient-unit.md)) |
+| `kind` | text | `freeweight_suite_run` \| `retention_trim` \| `backup` \| `model_refresh` \| `catalog_pull` (historical rows only, ADR-0146) \| `docs_index` \| `self_restore` ([ADR-0136](../../adr/0136-weightroom-restores-its-own-database-through-a-job-handed-to-a-transient-unit.md)) |
 | `params` | json | validated per kind, defaults filled in (`domain/jobs.validate_params`) |
 | `state` | text | `queued` \| `running` \| `completed` \| `failed` \| `cancelled` — a check constraint |
 | `schedule_id` | fk, null | `ON DELETE SET NULL` |

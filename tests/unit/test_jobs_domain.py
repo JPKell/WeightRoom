@@ -253,8 +253,7 @@ def test_parameters_are_filled_with_defaults_and_unknown_keys_refused() -> None:
         ("model_refresh", {"apps": ["ideapress"]}),
         ("retention_trim", {"freeweight_older_than_days": 0}),
         ("retention_trim", {"freeweight_older_than_days": True}),
-        ("catalog_pull", {"name": "two words"}),
-        ("catalog_pull", {}),
+        ("catalog_pull", {"name": "gemma3:1b"}),  # ADR-0146: no longer a kind at all
         ("self_restore", {"file": ""}),
     ],
 )

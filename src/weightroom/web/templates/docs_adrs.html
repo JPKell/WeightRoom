@@ -1,7 +1,6 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import side_nav %}
 {% from "_docs_tree.html" import docs_side_menu %}
-{% block side_menu %}{{ docs_side_menu(docs_sections, docs_current_key) }}{{ side_nav(console_nav_sections, label="Console") }}{% endblock %}
+{% block side_menu %}{{ docs_side_menu(docs_sections, docs_current_key) }}{% endblock %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
 {% block title %}ADR index — WeightRoom{% endblock %}
 {% block page_content %}

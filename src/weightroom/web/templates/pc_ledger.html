@@ -1,12 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, card, table, empty_state, pagination %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_pc.html" import short, measure, trajectory_link %}
 {% block title %}Ledger — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(links=[{"label": "Costs, every application", "href": "/costs"}], actions=[docs_action("promptcadence")]) }}
 <div class="page-head">
   <h2>Ledger {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/costs">Costs, every application</a> · <a href="/apps/promptcadence/settings">Ceilings</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">What was spent, and what each ceiling said at the moment it was spent. Money is never

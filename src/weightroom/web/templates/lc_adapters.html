@@ -7,7 +7,6 @@
 {% set data = sourced.data %}
 <div class="page-head">
   <h2>Adapters {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/models">Models</a> · <a href="/apps/loadcoach/routing">Routing</a> · <a href="/apps/loadcoach/providers">Providers</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">LoRA adapters from the operator's reviewed directory (ADR-0061). Each is classified and served

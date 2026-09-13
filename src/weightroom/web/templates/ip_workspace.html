@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, kv_list, table, empty_state %}
 {% from "_app_page.html" import page_source, refusal %}
-{% from "_ip.html" import state_badge, measure %}
+{% from "_ip.html" import state_badge, measure, project_bar %}
 {% block title %}Workspace — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
 {% set w = sourced.data or {} %}
@@ -17,9 +17,9 @@
   .ip-content pre { white-space: pre-wrap; }
   .ip-diff td { white-space: pre-wrap; }
 </style>
+{{ project_bar(project_id, "workspace") }}
 <div class="page-head">
   <h2>Workspace{% if (w.get("project") or {}).get("title") %} — {{ w.get("project").get("title") }}{% endif %} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ proj }}">The project</a> · <a href="{{ proj }}/plan">Plan</a> · <a href="{{ proj }}/export">Export</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">IdeaPress's own workspace: read a unit, judge what is wrong with it and what it still misses, and direct it — one page.</p>

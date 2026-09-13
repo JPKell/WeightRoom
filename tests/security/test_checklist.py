@@ -122,15 +122,13 @@ def test_a_failed_login_logs_the_address_never_the_password(
 
 
 # §14: archive handling — W6's chat attachments (text and markdown, capped, never unpacked:
-# tests/integration/test_chat_loadcoach.py refuses a .pdf, binary and oversize) and W8's GGUF
-# drop-in (magic bytes, size and containment checked — services/catalog.py), and nothing else.
+# tests/integration/test_chat_loadcoach.py refuses a .pdf, binary and oversize), and the bundles
+# below. W8's GGUF drop-in left with the catalog (ADR-0146).
 
 UPLOAD_ROUTES = frozenset(
     {
         "/api/v1/chat/conversations/{conversation_id}/attachments",
         "/chat/{conversation_id}/attachments",
-        "/api/v1/catalog/dropin",
-        "/catalog/dropin-form",
         # WP2: an evidence bundle, parsed as JSON and handed to LoadCoach, which validates it
         # (tests/integration/test_loadcoach_queue_evidence.py refuses a file that is not JSON).
         "/apps/loadcoach/evidence/import",

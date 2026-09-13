@@ -1,12 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, kv_list %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_lc.html" import mapping_list, num %}
 {% block title %}Task profile — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
+{{ page_nav(links=[{"label": "Task profiles", "href": "/apps/loadcoach/routing#task-profiles"}, {"label": "Its reliability", "href": "/apps/loadcoach/reliability?task=" ~ (profile_id | urlencode)}], actions=[docs_action("loadcoach")]) }}
 <div class="page-head">
   <h2>Task profile {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/loadcoach/routing#task-profiles">Every task profile</a> · <a href="/apps/loadcoach/reliability?task={{ profile_id | urlencode }}">Its reliability</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}

@@ -1,14 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, kv_list, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import run_link %}
 {% from "_fw_goals.html" import figure %}
 {% block title %}Judges — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data or {} %}
+{{ page_nav(links=[{"label": "Judges", "href": "/apps/freeweight/judges", "current": true}] + ([{"label": goal, "href": "/apps/freeweight/goals/" ~ (goal | urlencode)}] if goal else []), actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Judges {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/goals">Goals</a>{% if goal %} · <a href="/apps/freeweight/goals/{{ goal | urlencode }}">{{ goal }}</a>{% endif %}</div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">The models FreeWeight may seat on a jury, why each refused one is refused, and each one's own <code>native.judge</code> figures —

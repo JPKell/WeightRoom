@@ -32,6 +32,7 @@ __all__ = [
     "PILL_TONES",
     "app_side_nav",
     "app_side_nav_stubs",
+    "docs_action",
     "pill_status",
     "pill_tone",
     "render",
@@ -57,7 +58,6 @@ CONSOLE_PAGES: tuple[dict[str, str], ...] = (
     {"label": "Chat", "href": "/chat"},
     {"label": "Docs", "href": "/docs"},
     {"label": "Database", "href": "/database"},
-    {"label": "Catalog", "href": "/catalog"},
     {"label": "Costs", "href": "/costs"},
     {"label": "Backups", "href": "/backups"},
     {"label": "Jobs", "href": "/jobs"},
@@ -214,13 +214,28 @@ def app_label(name: str) -> str:
     return APP_LABELS.get(name, name)
 
 
+def docs_action(app_name: str) -> dict[str, str]:
+    """The page bar's *Docs* action for an application's page (row WY1).
+
+    Args:
+        app_name: The lowercase identifier (``loadcoach``).
+
+    Returns:
+        ``{"label": "Docs", "href": …}`` pointing at the application's folder in the docs tree
+        (``folder_anchor`` in ``_docs_tree.html``). A docs root without that folder still opens;
+        the anchor matches nothing, which is never a 500 (row WX2).
+    """
+    return {"label": "Docs", "href": f"/docs?section=apps#docs-apps-{app_name}"}
+
+
 def app_side_nav(app_name: str, *, selected: str = "Overview") -> tuple[dict[str, Any], ...]:
     """The sections :func:`~mirrorwall.side_nav` renders under an application's tab.
 
     The application's own subjects come first under its name, then the macro's rule, then the
-    administrative pages (:data:`_ADMIN_PAGES`, design brief §4), then :data:`CONSOLE_SIDE_NAV` —
-    the console's own pages and tools, appended since row WX3 so that an application's tab is not
-    the one place in the console from which Docs, Jobs or Settings cannot be reached. The macro's
+    administrative pages (:data:`_ADMIN_PAGES`, design brief §4). Nothing of the console's own:
+    row WY1 stopped appending :data:`CONSOLE_SIDE_NAV` here on the operator's instruction,
+    reversing WX3 — the brand links to ``/`` and Chat is in the top bar, so the tab is no dead
+    end. The macro's
     ``link`` shape has no inert state, so a page this build has not shipped yet is never handed to
     it as a dead ``href=""`` link — :func:`app_side_nav_stubs` renders those separately, in
     WeightRoomGym's own markup (design brief §5: one consumer stays here).
@@ -239,7 +254,6 @@ def app_side_nav(app_name: str, *, selected: str = "Overview") -> tuple[dict[str
             "links": [x for x in links if x["label"] not in _ADMIN_PAGES],
         },
         {"title": "", "links": [x for x in links if x["label"] in _ADMIN_PAGES]},
-        *CONSOLE_SIDE_NAV,
     )
 
 
@@ -277,13 +291,13 @@ CONSOLE_SIDE_NAV: tuple[dict[str, Any], ...] = (
         ],
     },
 )
-"""The console's own navigation, in two sections, on **every** page (row WX3).
+"""The console's own navigation, in two sections, on the console's own pages (row WX3).
 
-The top bar carried the tools until this row and dropped them into a *Menu* dropdown below
-1080 px, so which pages existed depended on the window's width. They are a left-menu section now:
-the host's own pages first, then the tools that reach across applications. An application's tab
-appends both sections under its own menu (:func:`app_side_nav`), and the docs viewer's templates
-append them under the documentation tree, so no page in the console is a dead end.
+The top bar carried the tools until WX3 and dropped them into a *Menu* dropdown below 1080 px, so
+which pages existed depended on the window's width. They are a left-menu section: the host's own
+pages first, then the tools that reach across applications. Row WY1 took them off an
+application's tab and the docs viewer, on the operator's instruction; those menus list only their
+own subject.
 """
 
 
@@ -333,10 +347,9 @@ def templates() -> Environment:
             "product_version": "",
             "console_version": __version__,
             "nav_items": NAV_ITEMS,
-            # The console's own navigation, for the four docs templates: they override the
-            # shell's `side_menu` block with the documentation tree, so they append these two
-            # sections themselves rather than losing them (row WX3).
-            "console_nav_sections": CONSOLE_SIDE_NAV,
+            # A page bar's Docs action (`_app_page.html` `page_nav`, row WY1): one application's
+            # entry in the docs tree, the same anchor `docs_link` renders.
+            "docs_action": docs_action,
             "theme_storage_key": "weightroom-theme",
             # ADR-0128: every fragment swap and SSE region in the shell is htmx, vendored by
             # MirrorWall 0.3 and opt-in per page — WeightRoomGym opts every page in at once

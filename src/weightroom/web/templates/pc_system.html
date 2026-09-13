@@ -6,7 +6,6 @@
 {% block page_content %}
 <div class="page-head">
   <h2>System {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/approvals">Approvals</a> · <a href="/apps/promptcadence/ledger">Ledger</a> · <a href="/apps/promptcadence/tokens">Tokens</a></div>
 </div>
 {% include "_app_state.html" %}
 <p class="muted">Health, what is running and waiting, today's position, the last recovery pass and the

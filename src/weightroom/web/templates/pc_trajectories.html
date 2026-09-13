@@ -1,17 +1,12 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import table, empty_state, pagination %}
-{% from "_app_page.html" import app_page_header, page_source, refusal %}
+{% from "_app_page.html" import app_page_header, page_source, refusal, page_nav %}
 {% from "_pc.html" import trajectory_link, state_badge %}
 {% block title %}Trajectories — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "Trajectories", "Trajectories", "Newest first. Each row opens the whole record — the plan, every turn, every tool call, every debit and every egress verdict — as PromptCadence itself explains it.") %}
-<a href="/apps/promptcadence/approvals">Approvals</a> · <a href="/apps/promptcadence/ledger">Ledger</a> · <a href="/chat">Chat</a>
-{% endcall %}
+{{ page_nav(links=[{"label": "New", "href": "/apps/promptcadence/trajectories/new"}], actions=[docs_action("promptcadence")]) }}
+{{ app_page_header(view, "Trajectories", "Trajectories", "Newest first. Each row opens the whole record — the plan, every turn, every tool call, every debit and every egress verdict — as PromptCadence itself explains it.") }}
 {% include "_app_state.html" %}
-<nav class="page-actions" aria-label="Trajectories views">
-  <a href="/apps/promptcadence/trajectories" aria-current="page">History</a> ·
-  <a href="/apps/promptcadence/trajectories/new">New</a>
-</nav>
 
 <form class="filter-bar" action="/apps/promptcadence/trajectories" method="get" role="search">
   <div class="field">

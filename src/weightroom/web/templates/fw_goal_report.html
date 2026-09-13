@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw_goals.html" import figure, percent %}
 {% block title %}Agreement — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
@@ -8,10 +8,9 @@
 {% set goal = data.get("goal") or {} %}
 {% set report = data.get("report") %}
 {% set here = "/apps/freeweight/goals/" ~ (slug | urlencode) %}
+{{ page_nav(links=[{"label": "Goal", "href": here}, {"label": "Calibration", "href": here ~ "/calibration"}, {"label": "Grade", "href": here ~ "/grade"}, {"label": "Report", "href": here ~ "/report", "current": true}], actions=([{"label": "Calibration report", "href": here ~ "/report/export"}] if sourced.live and report and report.get("criteria") else []) + [docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Agreement — {{ goal.get("name") or slug }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ here }}">The goal</a> · <a href="{{ here }}/calibration">Calibration</a> · <a href="{{ here }}/grade">Grade</a>
-  {% if sourced.live and report and report.get("criteria") %} · <a href="{{ here }}/report/export"><code>benchmark.calibration_report</code></a>{% endif %}</div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

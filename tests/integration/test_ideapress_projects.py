@@ -81,7 +81,9 @@ def test_the_running_projects_page_lists_from_the_api_with_the_nav(
     assert f'<a href="{BASE}/projects" aria-current="page">Projects</a>' in page
     # Row WX10: the top nav — the recent projects, All, New.
     assert f'href="/apps/ideapress/projects/{PROJECT}"' in page
-    assert '<a href="/apps/ideapress/projects" aria-current="page">All</a>' in page
+    # Row WY1: the recent projects are the page bar, and *All* left it — the left menu's Projects.
+    assert '<nav class="page-nav" aria-label="Page sections">' in page
+    assert ">All</a>" not in page
     assert '<a href="/apps/ideapress/projects/new">New</a>' in page
 
 

@@ -1,20 +1,21 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state, kv_list, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import short, status_badge, value, chart, styles, link %}
 {% block title %}Run — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {{ styles() }}
 {% set data = sourced.data or {} %}
 {% set run = data.get("run") %}
+{% set suite_key = ((run.get("suite") or {}).get("key") or "") if run else "" %}
+{{ page_nav(links=([{"label": "Its machine", "href": "/apps/freeweight/machines?fingerprint=" ~ (run.get("machine_fingerprint") | urlencode)}] if run and run.get("machine_fingerprint") else [])
+  + ([{"label": "Its results", "href": "/apps/freeweight/results?model=" ~ ((run.get("model") or "") | urlencode) ~ "&suite=" ~ (suite_key | urlencode)}] if run else [])
+  + ([{"label": "Grade its human criteria", "href": "/apps/freeweight/runs/" ~ ((run.get("id") or run_id) | urlencode) ~ "/grade"},
+      {"label": "Its goal", "href": "/apps/freeweight/goals/" ~ (suite_key[5:] | urlencode)}] if run and suite_key.startswith("goal.") else []),
+  actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Run {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/freeweight/runs">Every run</a>
-    {% if run and run.get("machine_fingerprint") %} · <a href="/apps/freeweight/machines?fingerprint={{ run.get('machine_fingerprint') | urlencode }}">Its machine</a>{% endif %}
-    {% if run %} · <a href="/apps/freeweight/results?model={{ (run.get('model') or '') | urlencode }}&amp;suite={{ ((run.get('suite') or {}).get('key') or '') | urlencode }}">Its results</a>{% endif %}
-    {% if run and ((run.get("suite") or {}).get("key") or "").startswith("goal.") %} · <a href="/apps/freeweight/runs/{{ (run.get('id') or run_id) | urlencode }}/grade">Grade its human criteria</a>
-    · <a href="/apps/freeweight/goals/{{ ((run.get('suite') or {}).get('key') or '')[5:] | urlencode }}">Its goal</a>{% endif %}
+  <div class="kit-actions">
     {% if run and sourced.live and run.get("status") not in terminal %}
     <form method="post" action="/apps/freeweight/runs/{{ (run.get('id') or run_id) | urlencode }}/cancel" class="kit-inline">
       <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">

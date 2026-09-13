@@ -135,21 +135,25 @@ def test_the_top_bar_keeps_four_things_and_overflows_only_the_tabs(tmp_path: Pat
     assert "@media (max-width: 1080px) {" in css
 
 
-def test_every_page_reaches_the_console_pages_and_the_tools_from_the_left_menu(
-    tmp_path: Path,
-) -> None:
-    """Row WX3: Console and Tools are appended to whatever menu a page already has.
-
-    An application's tab, a console page and the docs viewer each have their own left menu; the
-    two console sections go under all three, so no page in the console is a dead end.
+def test_only_the_consoles_own_pages_list_the_console_and_the_tools(tmp_path: Path) -> None:
+    """Row WX3 put Console and Tools under every menu; row WY1 reversed that on the operator's
+    instruction. An application's tab and the docs viewer list only their own subject — the brand
+    links home and Chat is in the top bar, so neither is a dead end.
     """
     console = _console(tmp_path)
     console.login()
-    for path in ("/", "/apps/loadcoach", "/docs", "/docs/adrs", "/llamacpp"):
+    for path, listed in (
+        ("/", True),
+        ("/llamacpp", True),
+        ("/apps/loadcoach", False),
+        ("/apps/loadcoach/settings", False),
+        ("/docs", False),
+        ("/docs/adrs", False),
+    ):
         page = console.client.get(path, headers={"Accept": "text/html"}).text
         side = page[page.index('class="shell-side"') : page.index('class="shell-main"')]
-        assert '<p class="side-nav-title">Console</p>' in side, path
-        assert '<p class="side-nav-title">Tools</p>' in side, path
+        assert ('<p class="side-nav-title">Console</p>' in side) is listed, path
+        assert ('<p class="side-nav-title">Tools</p>' in side) is listed, path
         for href, label in (
             ("/ollama", "Ollama"),
             ("/llamacpp", "llama.cpp"),
@@ -157,8 +161,22 @@ def test_every_page_reaches_the_console_pages_and_the_tools_from_the_left_menu(
             ("/docs", "Docs"),
             ("/jobs", "Jobs"),
             ("/backups", "Backups"),
+            ("/chat", "Chat"),
         ):
-            assert f'<a href="{href}">{label}</a>' in side, (path, href)
+            assert (f'<a href="{href}">{label}</a>' in side) is listed, (path, href)
+
+
+def test_chat_is_in_the_top_bar_and_current_on_its_own_pages(tmp_path: Path) -> None:
+    """Row WY1: Chat in the top bar, before the alerts count, as well as in the Tools section."""
+    console = _console(tmp_path)
+    console.login()
+    for path, current in (("/apps/loadcoach", False), ("/", False), ("/chat", True)):
+        page = console.client.get(path, headers={"Accept": "text/html"}).text
+        masthead = page[page.index("<header") : page.index("</header>")]
+        link = '<a class="console-chat" href="/chat"'
+        assert link in masthead, path
+        assert masthead.index(link) < masthead.index('class="console-alerts"'), path
+        assert (f'{link} aria-current="page">' in masthead) is current, path
 
 
 def test_an_applications_side_nav_names_its_built_pages_and_the_unbuilt_ones(

@@ -1,6 +1,6 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, card, kv_list, table, empty_state, chart_container %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% from "_fw.html" import filter_styles, run_link, value, status_badge %}
 {% block title %}FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
@@ -23,11 +23,8 @@
   [data-table="fw-dashboard"] td:first-child,
   [data-table="fw-tests-matrix"] td:first-child { white-space: nowrap; }
 </style>
-{% call app_page_header(view, "Overview", "Overview", "") %}
-  <a href="/apps/freeweight/runs">Runs</a> · <a href="/apps/freeweight/results">Results</a> ·
-  <a href="/apps/freeweight/results/compare">Compare</a> · <a href="/apps/freeweight/evidence">Evidence</a> ·
-  <a href="/api/v1/apps/freeweight">JSON</a> · {{ docs_link("freeweight") }}
-{% endcall %}
+{{ page_nav(links=[{"label": "Compare", "href": "/apps/freeweight/results/compare"}], actions=[{"label": "JSON", "href": "/api/v1/apps/freeweight"}, docs_action("freeweight")]) }}
+{{ app_page_header(view, "Overview", "Overview", "") }}
 {% with full_controls = true %}{% include "_app_state.html" %}{% endwith %}
 
 <form method="get" action="/apps/freeweight" class="filter-bar" aria-label="Dashboard filters">

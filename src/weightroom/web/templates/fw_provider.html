@@ -6,7 +6,6 @@
 {% set data = sourced.data %}
 <div class="page-head">
   <h2>Provider {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/models">Models</a> · <a href="/apps/freeweight/adapters">Adapters</a> · <a href="/apps/freeweight/settings">Every other key</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}

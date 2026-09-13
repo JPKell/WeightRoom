@@ -29,7 +29,6 @@ should read into its output, checks ``context.cancelled()`` between steps, and r
   API, previewed and confirmed with its token (ADR-0134 rule 2). LoadCoach and PromptCadence trim
   their own content inside their own processes (``storage.content_retention_hours``); IdeaPress
   keeps everything. This kind reaches no further than that.
-* ``catalog_pull`` — Ollama's ``/api/pull``; its live progress in the catalog's ``PullRegistry``.
 * ``docs_index`` — the documentation search index rebuilt from ``[docs] root``.
 * ``self_restore`` — handed to a transient unit (``services/self_restore.py``, ADR-0136).
 """
@@ -47,7 +46,7 @@ from baseaicore import SuiteError
 from weightroom.config import APPLICATIONS
 from weightroom.domain.jobs import SUITE_RUN_SCOPE_PREFIX
 from weightroom.services.apps import AppNotInstalled
-from weightroom.services.catalog import catalog_entries, run_pull
+from weightroom.services.catalog import catalog_entries
 from weightroom.services.db_curated import delete_results, run_curated, run_self_curated
 from weightroom.services.db_guard import list_backups
 from weightroom.services.docs import DocsRootMissing, resolve_docs_root
@@ -56,7 +55,6 @@ from weightroom.services.jobs import (
     FINISHED_RETENTION_DAYS,
     Executor,
     Outcome,
-    enqueue,
     run_streaming,
     trim_finished_jobs,
 )
@@ -71,7 +69,6 @@ if TYPE_CHECKING:
 __all__ = [
     "EXECUTORS",
     "backup",
-    "catalog_pull",
     "docs_index",
     "freeweight_goal_calibrate",
     "freeweight_suite_run",
@@ -374,35 +371,6 @@ def retention_trim(context: JobContext) -> Outcome:
     return Outcome("failed", failure) if failure else Outcome("completed")
 
 
-def catalog_pull(context: JobContext) -> Outcome:
-    """Ollama's ``/api/pull``, with its live progress held for the Catalog page's stream."""
-    name = str(context.job.params["name"])
-    pull = context.services.pulls.adopt(context.job.id, name)
-    run_pull(
-        pull,
-        client=context.services.ollama_http or context.services.http,
-        base_url=context.settings.host.ollama_base_url,
-        cancelled=context.cancelled,
-    )
-    events = pull.events_after(0)
-    shown = None
-    for event in events:
-        text = event.status + (f" — {event.error}" if event.error else "")
-        if text != shown:
-            context.output.line(text)
-            shown = text
-    if pull.ok:
-        # A pull changes Ollama, not FreeWeight's or LoadCoach's models tables; the model reaches
-        # the catalog only once they refresh (W9 §5 item 5f), so that refresh is queued here.
-        follow_up = enqueue(context.database, kind="model_refresh", params=None, now=context.now())
-        context.output.line(f"queued model_refresh {follow_up.id}")
-        return Outcome("completed")
-    if events and events[-1].status == "cancelled":
-        return Outcome("cancelled", "the pull stopped on the operator's cancel")
-    final = events[-1].error if events and events[-1].error else "the pull did not finish"
-    return Outcome("failed", final)
-
-
 def docs_index(context: JobContext) -> Outcome:
     """Rebuild the documentation search index."""
     try:
@@ -420,7 +388,6 @@ EXECUTORS: Final[dict[str, Executor]] = {
     "retention_trim": retention_trim,
     "backup": backup,
     "model_refresh": model_refresh,
-    "catalog_pull": catalog_pull,
     "docs_index": docs_index,
     "self_restore": hand_off,
 }

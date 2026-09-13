@@ -87,6 +87,11 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
   font-size: var(--mw-font-size-sm, 12px); text-decoration: none;
 }
 .console-alerts:hover { color: var(--mw-text); }
+.console-chat {
+  padding: 4px var(--mw-space-2, 8px); border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-muted); font-size: var(--mw-font-size-sm, 12px); text-decoration: none;
+}
+.console-chat:hover, .console-chat[aria-current="page"] { color: var(--mw-text); background: var(--mw-accent-soft); }
 .console-alerts[data-open="true"] { color: var(--mw-status-degraded); }
 
 /* The alert banner (ADR-0137): one line under the top bar while an alert is unacknowledged. */
@@ -213,6 +218,22 @@ body > header { position: sticky; top: 0; z-index: 5; background: var(--mw-bg); 
 }
 .page-actions a { color: var(--mw-text-muted); text-decoration: none; }
 .page-actions a:hover { color: var(--mw-text); }
+
+/* The page bar (`_app_page.html` `page_nav`, row WY1): a page's own subsections on the left, its
+   JSON/Docs actions muted at the right, one rule under both. It wraps rather than scrolls. */
+.page-nav {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--mw-space-1, 4px) var(--mw-space-4, 16px);
+  margin: 0 0 var(--mw-space-3, 12px); padding-bottom: var(--mw-space-2, 8px);
+  border-bottom: 1px solid var(--mw-border);
+}
+.page-nav ul { display: flex; flex-wrap: wrap; gap: var(--mw-space-1, 4px); margin: 0; padding: 0; list-style: none; }
+.page-nav .page-nav-actions { margin-left: auto; font-size: var(--mw-font-size-sm, 12px); }
+.page-nav a {
+  display: block; padding: 4px var(--mw-space-2, 8px); border-radius: var(--mw-radius-sm, 6px);
+  color: var(--mw-text-muted); text-decoration: none;
+}
+.page-nav a:hover { color: var(--mw-text); background: var(--mw-surface); }
+.page-nav-links a[aria-current="page"] { color: var(--mw-text); background: var(--mw-accent-soft); font-weight: 600; }
 
 .shell-menu > summary { display: none; }
 /* A config path or a command is one unbroken token; on a phone it would push the page sideways
@@ -359,7 +380,8 @@ h3.docs-folder-title {
    a discovered server's argv is a long single token that must wrap rather than scroll the page. */
 .llamacpp-argv { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
 
-/* A page with an `app_page_header` (row WX3) already carries its docs link among the header's
-   actions; the standalone link `_app_state.html` adds for header-less pages (row WX2) would be
-   the second "Docs" on the same screen (found at WX14). Hidden where a header precedes it. */
-.app-page-intro ~ .app-docs-link { display: none; }
+/* A page bar (row WY1) carries the application's Docs action; the standalone link
+   `_app_state.html` adds (row WX2) would be the second "Docs" on the same screen. Hidden where a
+   bar precedes it. The caller slot of `app_page_header` still carries one until WY10. */
+.page-nav ~ .app-docs-link,
+.app-page-intro:has(.app-page-actions) ~ .app-docs-link { display: none; }

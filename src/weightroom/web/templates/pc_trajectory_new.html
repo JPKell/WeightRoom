@@ -1,15 +1,10 @@
 {% extends "_shell.html" %}
-{% from "_app_page.html" import app_page_header, refusal %}
+{% from "_app_page.html" import app_page_header, refusal, page_nav %}
 {% block title %}New trajectory — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, "New trajectory", "Trajectories", "PromptCadence plans it, runs every model call through LoadCoach, and asks a person where its policy says so.") %}
-<a href="/apps/promptcadence/trajectories">All trajectories</a>
-{% endcall %}
+{{ page_nav(links=[{"label": "New", "href": "/apps/promptcadence/trajectories/new", "current": true}], actions=[docs_action("promptcadence")]) }}
+{{ app_page_header(view, "New trajectory", "Trajectories", "PromptCadence plans it, runs every model call through LoadCoach, and asks a person where its policy says so.") }}
 {% include "_app_state.html" %}
-<nav class="page-actions" aria-label="Trajectories views">
-  <a href="/apps/promptcadence/trajectories">History</a> ·
-  <a href="/apps/promptcadence/trajectories/new" aria-current="page">New</a>
-</nav>
 
 <style>
   .pc-check { display: inline-flex; align-items: center; gap: 4px; margin: 0 12px 4px 0; }

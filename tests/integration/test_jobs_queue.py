@@ -23,7 +23,6 @@ from weightroom.config import Settings, load_settings
 from weightroom.domain.jobs import JobInvalidState, JobParamsInvalid
 from weightroom.infrastructure.db.models import AuditLog
 from weightroom.services import audit
-from weightroom.services.catalog import PullRegistry
 from weightroom.services.database import Database, ensure_ready
 from weightroom.services.db_reader import DatabaseUrlCache
 from weightroom.services.jobs import (
@@ -74,7 +73,6 @@ def services_for() -> JobServices:
     return JobServices(
         controller=FakeSystemdController(),
         http=httpx.Client(),
-        pulls=PullRegistry(),
         urls=DatabaseUrlCache(),
     )
 

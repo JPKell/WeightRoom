@@ -68,18 +68,15 @@ value is `404 APP_UNKNOWN`.
 | `PUT /apps/{app}/prompts/{id}` | `{"record": {…}}` — the whole record, validated with the application's own loader (`setspec.prompts.load_record`) before it is written; `400 VALIDATION_ERROR` in the loader's words, or for a record that declares another `prompt_id` or a prompt shipped in several versions. The response is the detail plus `written` (the path) and `marked: "user_override"`; one `prompt.override` audit row |
 | `DELETE /apps/{app}/prompts/{id}/override` | Removes the override, so the application renders the shipped record (after a restart, for IdeaPress); `404 NOT_FOUND` when there is none; one `prompt.delete` audit row |
 
-## 5. Ollama, catalog, costs
+## 5. Ollama, costs
+
+The `/catalog` routes were removed at row WY1 ([ADR-0146](../../adr/0146-the-console-has-no-catalog.md)); enable and disable a model on the LoadCoach or FreeWeight tab.
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /ollama` | Unit state, the `Memory*`/`ManagedOOM*`/`Environment` lines found, the [`MEMORY_SAFETY.md` §2.1](../../MEMORY_SAFETY.md) checklist as findings, whether the polkit rule is present |
 | `GET /ollama/ps` | `/api/ps` through ModelRack |
 | `POST /ollama/restart` | `systemctl restart ollama.service` when permitted; otherwise `OLLAMA_RESTART_NOT_PERMITTED` with `command` and the rule text ([ADR-0125](../../adr/0125-weightroom-drives-the-applications-through-systemd-user-units-it-writes.md) rule 5) |
-| `GET /catalog` | Models across applications joined by canonical identity; per row `apps: {name: {enabled, evidence, resident}}` |
-| `POST /catalog/pull` · `GET /catalog/pull/{id}/stream` | `{"name": "gemma4:12b-it-q8_0"}` → the id of a queued `catalog_pull` job (row W9); `GET /catalog/pull/{id}/stream` is its live progress while this process executes it, `queued` before, and the job's own `done` after |
-| `POST /catalog/dropin` | Multipart upload or `{"path": …}` on the host; validated GGUF; copied into the model directory; each llama.cpp-configured application's `models refresh` is run |
-| `POST /catalog/{ref}/enabled` | `{"app": …, "enabled": false}` → that application's `POST /models/{ref}/enabled` |
-| `DELETE /catalog/{ref}` | `{"preview": true}` first (what would be removed where), then `{"confirm": "<ref typed>"}` |
 | `GET /costs` · `GET /costs/{app}` | LoadLedger balances per application and window with `unpriced_count`, the configured ceilings, and each ceiling's verdict |
 
 ## 6. Chat
@@ -97,7 +94,7 @@ value is `404 APP_UNKNOWN`.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /jobs` · `POST /jobs` · `GET /jobs/{id}` · `POST /jobs/{id}/cancel` | The queue, newest first, filtered by `state` and `kind`. `POST` takes `{"kind", "params"}` — `freeweight_suite_run` (`model`, `suite`, `allow_prompt_override`, `label`), `freeweight_goal_calibrate` (`goal`, `graded_by`), `retention_trim` (`guarded_backup_days`, `freeweight_older_than_days`), `backup` (`apps`), `model_refresh` (`apps`), `catalog_pull` (`name`), `docs_index`, `self_restore` (`file`, plus `"name_typed": "weightroom"`) — or `{"schedule_id"}` to run a schedule now; `202` with the job. `self_restore`, and a `retention_trim` that sets `freeweight_older_than_days`, need a fresh `POST /reauth` (ADR-0136, ADR-0134 rule 2). A job carries its captured `output` (the tail, capped at `jobs.output_cap_bytes`), `error`, `attempt`, `lease_expires_at`, `cancel_requested_at` and `audit_id`. Cancelling a queued job cancels it; a running one gets `cancel_requested_at` and stops; a finished one is `409 JOB_INVALID_STATE`; an unknown id is `404 JOB_NOT_FOUND` |
+| `GET /jobs` · `POST /jobs` · `GET /jobs/{id}` · `POST /jobs/{id}/cancel` | The queue, newest first, filtered by `state` and `kind`. `POST` takes `{"kind", "params"}` — `freeweight_suite_run` (`model`, `suite`, `allow_prompt_override`, `label`), `freeweight_goal_calibrate` (`goal`, `graded_by`), `retention_trim` (`guarded_backup_days`, `freeweight_older_than_days`), `backup` (`apps`), `model_refresh` (`apps`), `docs_index`, `self_restore` (`file`, plus `"name_typed": "weightroom"`) — or `{"schedule_id"}` to run a schedule now; `202` with the job. `catalog_pull` is refused since ADR-0146; a stored job of that kind still reads. `self_restore`, and a `retention_trim` that sets `freeweight_older_than_days`, need a fresh `POST /reauth` (ADR-0136, ADR-0134 rule 2). A job carries its captured `output` (the tail, capped at `jobs.output_cap_bytes`), `error`, `attempt`, `lease_expires_at`, `cancel_requested_at` and `audit_id`. Cancelling a queued job cancels it; a running one gets `cancel_requested_at` and stops; a finished one is `409 JOB_INVALID_STATE`; an unknown id is `404 JOB_NOT_FOUND` |
 | `GET /jobs/schedules` · `PUT /jobs/schedules/{id}` | `{"timezone": "UTC", "schedules": […]}`, each with `cron`, `params`, `enabled`, `next_run_at`, `last_run_at`, `last_job_id` and `problem` (why it cannot be enabled). `PUT` takes any of `cron`, `enabled`, `params`; enabling validates the parameters, and a `retention_trim` whose parameters delete FreeWeight results needs a fresh re-authentication |
 | `GET /alerts` · `POST /alerts/{id}/acknowledge` · `GET /alerts/history` | `{"alerts": […], "banner": {"count", "newest"}}` — every active alert (`source`, `label`, `subject`, `severity`, `state`, `opened_at`, `last_seen_at`, `acknowledged_at`, `acknowledged_by`, `summary`, `detail`) and what the banner shows. Acknowledging records the operator and time: a `memory_cap` alert closes, a condition stays active off the banner until it clears ([ADR-0137](../../adr/0137-an-alert-is-an-episode-a-condition-clears-itself-an-event-waits-for-acknowledgement.md)); an unknown id is `404 NOT_FOUND`. The history is every `opened`/`seen`/`acknowledged`/`cleared` event, newest first, paged with a cursor |
 | `GET /audit?app=&action=&since=` · `GET /audit/{id}` | The trail; a row carries `operator`, `at`, `app`, `action`, `target`, `params` (redacted), `outcome`, `backup_path`, `dry_run_count`, `actual_count` |

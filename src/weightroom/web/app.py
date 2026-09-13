@@ -38,7 +38,6 @@ from weightroom.__about__ import __version__
 from weightroom.config import LOOPBACK_HOSTS, Settings, data_dir, resolve_config_path
 from weightroom.services.alerts import AlertEvaluator, default_sources, sampler_temperature
 from weightroom.services.apps import VersionCache
-from weightroom.services.catalog import PullRegistry
 from weightroom.services.chat import ChatRunner, recover_interrupted
 from weightroom.services.database import Database
 from weightroom.services.db_reader import DatabaseUrlCache
@@ -56,7 +55,6 @@ from weightroom.web.routes import alerts as alerts_routes
 from weightroom.web.routes import apps as apps_routes
 from weightroom.web.routes import audit as audit_routes
 from weightroom.web.routes import backups as backups_routes
-from weightroom.web.routes import catalog as catalog_routes
 from weightroom.web.routes import chat as chat_routes
 from weightroom.web.routes import costs as costs_routes
 from weightroom.web.routes import databases as databases_routes
@@ -297,7 +295,6 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         JobServices(
             controller=app.state.controller,
             http=app.state.http,
-            pulls=app.state.catalog_pulls,
             urls=app.state.database_urls,
             ollama_http=app.state.ollama_http,
             config_path=app.state.config_path,
@@ -375,9 +372,7 @@ def create_app(
     # the data root with generated names (spec §14). Both overridable, so a test never writes to
     # the operator's home.
     app.state.chat = ChatRunner()
-    # The live progress of the pulls this process executes as `catalog_pull` jobs (row W9); the
-    # job row is the durable answer. The worker is built by the lifespan, which tests never enter.
-    app.state.catalog_pulls = PullRegistry()
+    # The worker is built by the lifespan, which tests never enter.
     app.state.jobs = None
     app.state.alerts = None
     app.state.attachments_root = data_dir() / "attachments"
@@ -420,7 +415,6 @@ def create_app(
     app.include_router(ollama_routes.router, prefix="/api/v1")
     app.include_router(docs_routes.router, prefix="/api/v1")
     app.include_router(databases_routes.router, prefix="/api/v1")
-    app.include_router(catalog_routes.router, prefix="/api/v1")
     app.include_router(costs_routes.router, prefix="/api/v1")
     app.include_router(backups_routes.router, prefix="/api/v1")
     app.include_router(jobs_routes.router, prefix="/api/v1")
@@ -440,7 +434,6 @@ def create_app(
     app.include_router(system_routes.ui_router)
     app.include_router(docs_routes.ui_router)
     app.include_router(databases_routes.ui_router)
-    app.include_router(catalog_routes.ui_router)
     app.include_router(costs_routes.ui_router)
     app.include_router(backups_routes.ui_router)
     app.include_router(jobs_routes.ui_router)

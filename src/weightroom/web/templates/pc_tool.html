@@ -3,9 +3,7 @@
 {% from "_app_page.html" import app_page_header, page_source, refusal %}
 {% block title %}Tool {{ tool_name }} — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-{% call app_page_header(view, tool_name, "Tools", "One tool's registry entry: what it does, its risk and egress class, and the argument schema PromptCadence gives the model.") %}
-<a href="/apps/promptcadence/tools">All tools</a>
-{% endcall %}
+{{ app_page_header(view, tool_name, "Tools", "One tool's registry entry: what it does, its risk and egress class, and the argument schema PromptCadence gives the model.") }}
 {% include "_app_state.html" %}
 
 {% if sourced.error and sourced.error.details.get("app_code") == "TOOL_NOT_FOUND" %}

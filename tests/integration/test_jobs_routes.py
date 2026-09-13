@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from sqlalchemy import select
 
 from tests.support import JSON_HEADERS, PASSWORD, Console, build_console
 from weightroom.infrastructure.db.models import AuditLog
+from weightroom.services.db_reader import DatabaseUrlCache
 from weightroom.services.jobs import claim_next, finish
+from weightroom.services.processes import FakeSystemdController
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -169,21 +172,52 @@ def test_the_page_forms_queue_a_job_and_save_a_schedule(tmp_path: Path) -> None:
     assert "not JSON" in bad.text
 
 
-def test_a_pull_is_a_queued_job_and_its_stream_answers_from_the_job_once_it_ends(
-    tmp_path: Path,
-) -> None:
+def test_a_stored_catalog_pull_job_still_lists_renders_and_fails_cleanly(tmp_path: Path) -> None:
+    """ADR-0146: the kind can no longer be queued, and a row the catalog left behind never 500s.
+
+    The row is written as W9 wrote it, with no route: `enqueue` now refuses the kind.
+    """
+    from weightroom.infrastructure.db.models import Job
+    from weightroom.services.jobs import JobServices, JobWorker
+
     console = _console(tmp_path)
-    started = _post(console, "/api/v1/catalog/pull", {"name": "gemma3:1b"})
-    assert started.status_code == 202
-    job_id = started.json()["job_id"]
-    job = console.client.get(f"/api/v1/jobs/{job_id}").json()
-    assert (job["kind"], job["params"]) == ("catalog_pull", {"name": "gemma3:1b"})
-    assert claim_next(console.database, now=console.now, lease_seconds=60) is not None
-    finish(
-        console.database, job_id, state="failed", now=console.now, output="", error="no Ollama here"
+    refused = _post(console, "/api/v1/jobs", {"kind": "catalog_pull", "params": {"name": "x"}})
+    assert refused.status_code == 400
+    with console.database.write() as session:
+        session.add(
+            Job(
+                id="01HISTORICALPULL0000000001",
+                kind="catalog_pull",
+                params={"name": "gemma3:1b"},
+                state="completed",
+                queued_at=console.now,
+                output="pulling manifest\nsuccess",
+            )
+        )
+        session.add(
+            Job(id="01HISTORICALPULL0000000002", kind="catalog_pull", params={"name": "qwen3:8b"},
+                state="queued", queued_at=console.now)
+        )  # fmt: skip
+    for path in ("/jobs", "/jobs/01HISTORICALPULL0000000001", "/jobs/01HISTORICALPULL0000000002"):
+        page = console.client.get(path, headers={"Accept": "text/html"})
+        assert page.status_code == 200, path
+        assert "catalog_pull" in page.text, path
+    detail = console.client.get("/api/v1/jobs/01HISTORICALPULL0000000001")
+    assert detail.status_code == 200
+    assert detail.json()["kind"] == "catalog_pull"
+    listed = console.client.get("/api/v1/jobs")
+    assert listed.status_code == 200
+    assert "01HISTORICALPULL0000000002" in listed.text
+    # A queued one left behind is failed by the worker with its reason, not crashed on.
+    worker = JobWorker(
+        console.database,
+        console.settings,
+        JobServices(
+            controller=FakeSystemdController(), http=httpx.Client(), urls=DatabaseUrlCache()
+        ),
+        clock=lambda: console.now,
     )
-    stream = console.client.get(f"/api/v1/catalog/pull/{job_id}/stream")
-    assert "done" in stream.text
-    assert "no Ollama here" in stream.text
-    unknown = console.client.get("/api/v1/catalog/pull/01NOSUCHJOB000000000000000/stream")
-    assert "no pull job" in unknown.text
+    worker.run_once()
+    failed = console.client.get("/api/v1/jobs/01HISTORICALPULL0000000002").json()
+    assert failed["state"] == "failed"
+    assert "no executor for kind 'catalog_pull'" in failed["error"]

@@ -1,14 +1,14 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "_app_page.html" import page_source, refusal, page_nav %}
 {% from "_fw.html" import run_link, status_badge, value, link %}
 {% block title %}Samples — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {% set data = sourced.data or {} %}
 {% set test = data.get("test") or {} %}
+{{ page_nav(links=[{"label": "The run", "href": "/apps/freeweight/runs/" ~ (run_id | urlencode) ~ "#tests"}], actions=[docs_action("freeweight")]) }}
 <div class="page-head">
   <h2>Samples {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/freeweight/runs/{{ run_id | urlencode }}#tests">The run</a></div>
 </div>
 {% include "_app_state.html" %}
 {{ refusal(sourced.error) }}

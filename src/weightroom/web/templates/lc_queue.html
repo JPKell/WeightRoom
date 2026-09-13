@@ -1,20 +1,21 @@
 {% extends "_shell.html" %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, docs_link %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
 {% block title %}Queue — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {% set flags = (report.data or {}).get("flags") or {} %}
-{% call app_page_header(view, "Queue", "Queue", "Queued work, dispatched by class and priority. This page is what the queue is doing now, and it updates while LoadCoach streams it.") %}
-  <a href="/apps/loadcoach/queue/new">New job</a> · <a href="/apps/loadcoach/queue/history">History</a> · <a href="/apps/loadcoach/reliability">Reliability</a> · {{ docs_link("loadcoach") }}
-  {% if report.live %}
+{{ page_nav(links=[{"label": "History", "href": "/apps/loadcoach/queue/history"}, {"label": "New job", "href": "/apps/loadcoach/queue/new"}], actions=[docs_action("loadcoach")]) }}
+{{ app_page_header(view, "Queue", "Queue", "Queued work, dispatched by class and priority. This page is what the queue is doing now, and it updates while LoadCoach streams it.") }}
+{% if report.live %}
+<div class="kit-actions">
   {% for verb, label, off in [("pause", "Pause dispatch", flags.get("paused")), ("drain", "Drain", flags.get("draining")), ("resume", "Resume", not flags.get("paused") and not flags.get("draining"))] %}
-  <form method="post" action="/apps/loadcoach/queue/control" class="kit-inline">
+  <form method="post" action="/apps/loadcoach/queue/control">
     <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
     <input type="hidden" name="verb" value="{{ verb }}">
     <button type="submit"{% if verb == "resume" %} data-variant="primary"{% endif %}{% if off %} disabled{% endif %}>{{ label }}</button>
   </form>
   {% endfor %}
-  {% endif %}
-{% endcall %}
+</div>
+{% endif %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if confirm %}
