@@ -1,17 +1,14 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, kv_list, empty_state %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "mirrorwall/components.html" import badge, table, empty_state, kv_list %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
 {% from "_ip.html" import state_badge, measure %}
+{% from "_lc.html" import model_link %}
 {% block title %}Backends — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Backends {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/ideapress/projects">Projects</a> · <a href="/apps/ideapress/settings">Settings</a></div>
-</div>
+{% call app_page_header(view, "Backends", "Backends", "Where IdeaPress sends a prompt: the selected backend and its fallback. A remote one carries the author's content off this machine, and says so below. Reachability is a live probe, so this page reads only IdeaPress's running API.") %}
+<a href="/apps/ideapress/projects">Projects</a> · <a href="/apps/ideapress/settings">Settings</a>
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">Where IdeaPress sends a prompt: the selected backend and its fallback. A remote one carries the
-author's content off this machine, and says so here. Reachability is a live probe, so this page reads
-only IdeaPress's running API.</p>
 {{ refusal(action_error) }}
 {% if tested %}
 <section class="card" role="status">
@@ -29,39 +26,98 @@ only IdeaPress's running API.</p>
 {% endif %}
 {{ refusal(sourced.error) }}
 {% if sourced.data is not none %}
-{% for b in sourced.data["backends"] %}
-<section class="card">
-  <h3>{{ b.get("mode") or "—" }}
-    {% if b.get("selected") %}{{ badge("selected", tone="success") }}{% endif %}
-    {% if b.get("fallback") %}{{ badge("fallback") }}{% endif %}
-    {% if b.get("pinned") %}{{ badge("pinned") }}{% endif %}
-    {% if b.get("egress") is none %}{{ badge("egress unknown", tone="warning") }}
-    {% elif b.get("egress") %}{{ badge("sends content off this machine", tone="warning") }}
-    {% else %}{{ badge("stays on this machine", tone="success") }}{% endif %}</h3>
-  {{ kv_list([
-    {"label": "Reachable", "value": "yes" if b.get("available") else "no"},
-    {"label": "Status", "value": b.get("status") or "—"},
-    {"label": "Endpoint", "value": b.get("base_url") or "—"},
-    {"label": "Models", "value": measure(b.get("model_count"))},
-    {"label": "Latency", "value": measure(b.get("latency_ms"), "ms")},
-    {"label": "Detail", "value": b.get("detail") or "—"},
-  ]) }}
-  {% if b.get("capabilities") %}
-  <p class="muted">Capabilities:
-  {% for name, on in b.get("capabilities") | dictsort %}{{ badge(name ~ (" yes" if on else " no"), tone="neutral") }} {% endfor %}</p>
-  {% endif %}
-  {% if sourced.live %}
-  <form method="post" action="/apps/ideapress/backends/test" class="kit-actions">
-    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-    <input type="hidden" name="mode" value="{{ b.get('mode') or '' }}">
-    <button type="submit">Test {{ b.get("mode") }}</button>
-    <span class="muted">A health check and the model list; nothing is generated.</span>
-  </form>
-  {% endif %}
-</section>
+{% set found = sourced.data["backends"] %}
+{% if found %}
+{% set rows = [] %}
+{% for b in found %}
+{% set state %}
+{{ badge("reachable", tone="success") if b.get("available") else badge("unreachable", tone="danger") }}
+{%- if b.get("selected") %} {{ badge("selected", tone="success") }}{% endif %}
+{%- if b.get("fallback") %} {{ badge("fallback") }}{% endif %}
+{%- if b.get("pinned") %} {{ badge("pinned") }}{% endif %}
+{% endset %}
+{% set egress %}
+{% if b.get("egress") is none %}{{ badge("egress unknown", tone="warning") }}
+{% elif b.get("egress") %}{{ badge("sends content off this machine", tone="warning") }}
+{% else %}{{ badge("stays on this machine", tone="success") }}{% endif %}
+{% endset %}
+{% set test_form %}
+{% if sourced.live %}
+<form method="post" action="/apps/ideapress/backends/test" class="kit-inline">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <input type="hidden" name="mode" value="{{ b.get('mode') or '' }}">
+  <button type="submit">Test {{ b.get("mode") }}</button>
+</form>
+{% endif %}
+{% endset %}
+{% set _ = rows.append([
+  b.get("mode") or "—",
+  state,
+  egress,
+  b.get("base_url") or "—",
+  measure(b.get("model_count")),
+  measure(b.get("latency_ms"), "ms"),
+  (b.get("detail") or "—") | cell_text,
+  test_form
+]) %}
+{% endfor %}
+{{ table([
+  {"label": "Mode"}, {"label": "State"}, {"label": "Egress"}, {"label": "Endpoint", "mono": true},
+  {"label": "Models", "numeric": true}, {"label": "Latency", "numeric": true}, {"label": "Detail"},
+  {"label": ""}
+], rows, caption="Configured backends, one line each", density="dense", complete=true, row_count=rows | length, table_id="ip-backends", sortable=true) }}
+{% for b in found %}
+{% if b.get("capabilities") %}
+<p class="muted"><strong>{{ b.get("mode") }}</strong> capabilities:
+{% for name, on in b.get("capabilities") | dictsort %}{{ badge(name ~ (" yes" if on else " no"), tone="neutral") }} {% endfor %}</p>
+{% endif %}
+{% endfor %}
 {% else %}
 {{ empty_state("No backend is configured.") }}
-{% endfor %}
 {% endif %}
+{% endif %}
+
+<h3>Models available in LoadCoach</h3>
+<p class="muted">LoadCoach's own registry, read live (row WX10) — independent of whether IdeaPress itself is
+answering. A model IdeaPress can actually reach is one LoadCoach reports both <strong>available</strong> and
+<strong>enabled</strong>; the stage(s) below a model are the <span class="mono">[models.stages]</span> bindings
+that name it, changed only on <a href="/apps/ideapress/settings">Settings</a> — this page never writes.</p>
+{% if loadcoach_models is none %}
+{{ empty_state("LoadCoach could not be read.") }}
+{% elif not loadcoach_models %}
+{{ empty_state("LoadCoach has discovered no model yet.", "LoadCoach's Models page", "/apps/loadcoach/models") }}
+{% else %}
+{% set rows = [] %}
+{% for m in loadcoach_models %}
+{% set usable = m.get("available") and m.get("enabled") %}
+{% set prefix = (m.get("canonical_id") or "").split("@")[0] %}
+{% set stages = stage_bindings.get(prefix) %}
+{% set name %}
+{% if usable %}{{ model_link(m.get("model_ref"), m.get("canonical_id")) }}
+{% else %}<span class="muted">{{ model_link(m.get("model_ref"), m.get("canonical_id")) }}</span>{% endif %}
+{% endset %}
+{% set bound %}
+{% if stages %}{{ stages | join(", ") }} · <a href="/apps/ideapress/settings">Settings</a>
+{% else %}—{% endif %}
+{% endset %}
+{% set use %}
+{% if not usable and m.get("model_ref") %}<a href="/apps/loadcoach/models/{{ m.get('model_ref') | urlencode }}">Enable in LoadCoach</a>
+{% else %}—{% endif %}
+{% endset %}
+{% set _ = rows.append([
+  name,
+  m.get("provider_name") or "—",
+  badge("available", tone="success") if m.get("available") else badge("unavailable", tone="danger", title=m.get("unavailable_reason")),
+  badge("enabled", tone="success") if m.get("enabled") else badge("disabled", tone="neutral"),
+  bound,
+  use
+]) %}
+{% endfor %}
+{{ table([
+  {"label": "Model"}, {"label": "Provider"}, {"label": "Available"}, {"label": "Enabled"},
+  {"label": "Bound stage(s)"}, {"label": "Use"}
+], rows, caption="LoadCoach's registry, matched to IdeaPress's stage bindings by canonical id", density="dense", complete=true, row_count=rows | length, table_id="ip-backends-lc-models", sortable=true) }}
+{% endif %}
+
 {{ page_source(sourced) }}
 {% endblock %}

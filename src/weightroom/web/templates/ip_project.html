@@ -1,15 +1,15 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, kv_list, table, empty_state, card, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
-{% from "_ip.html" import short, state_badge, measure %}
+{% from "mirrorwall/components.html" import kv_list, table, empty_state, card, json_viewer %}
+{% from "_app_page.html" import page_source, refusal, app_page_header %}
+{% from "_ip.html" import short, state_badge, measure, projects_nav %}
 {% block title %}{{ (((sourced.data or {}).get("project") or {}).get("title")) or project_id }} — IdeaPress — WeightRoom{% endblock %}
 {% block page_content %}
 {% set p = (sourced.data or {}).get("project") or {} %}
 {% set here = "/apps/ideapress/projects/" ~ (project_id | urlencode) %}
-<div class="page-head">
-  <h2>{{ p.get("title") or project_id }} {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="{{ here }}/plan">Plan</a> · <a href="{{ here }}/workspace">Workspace</a> · <a href="/apps/ideapress/units?project={{ project_id | urlencode }}">Units</a> · <a href="{{ here }}/export">Export</a> · <a href="/apps/ideapress/projects">All projects</a></div>
-</div>
+{% call app_page_header(view, p.get("title") or project_id, "Projects", none) %}
+<a href="{{ here }}/plan">Plan</a> · <a href="{{ here }}/workspace">Workspace</a> · <a href="/apps/ideapress/units?project={{ project_id | urlencode }}">Units</a> · <a href="{{ here }}/export">Export</a>
+{% endcall %}
+{{ projects_nav(nav, project_id) }}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if saved %}<p class="notice" role="status">Saved. IdeaPress never recompiles requirements on a save: plan the project again to compile them from the brief as it now stands.</p>{% endif %}

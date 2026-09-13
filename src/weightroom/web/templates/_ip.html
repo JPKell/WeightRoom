@@ -20,6 +20,21 @@
 <a href="/apps/ideapress/projects/{{ project.get('id') | urlencode }}">{{ project.get("title") or project.get("id") or "—" }}</a>
 {%- endmacro %}
 
+{% macro projects_nav(nav, current) -%}
+{#- Row WX10: the eight most recent projects, *All* and *New*, on Projects and every one project's
+    page — `nav` is a first-page, unfiltered read of `GET /projects` (up to eight), so the strip
+    never depends on the page's own filters or which project it names. `current` is a project's
+    id, the string ``"new"`` on the create page, or ``none`` on the list. A `nav` that could not be
+    read (`nav.data is none`) still shows *All* and *New*: only the recent-project links are lost. -#}
+<nav class="page-actions" aria-label="Recent projects">
+  {% for one in ((nav.data or {}).get("items") or [])[:8] %}
+  <a href="/apps/ideapress/projects/{{ one.get('id') | urlencode }}"{% if one.get('id') == current %} aria-current="page"{% endif %}>{{ one.get("title") or one.get("id") }}</a> ·
+  {% endfor %}
+  <a href="/apps/ideapress/projects"{% if current is none %} aria-current="page"{% endif %}>All</a> ·
+  <a href="/apps/ideapress/projects/new"{% if current == "new" %} aria-current="page"{% endif %}>New</a>
+</nav>
+{%- endmacro %}
+
 {% macro measure(value, unit="") -%}
 {#- A number with its unit, or an em dash for one nobody reported — never a fabricated zero
     (ADR-0016). -#}

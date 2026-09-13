@@ -36,6 +36,7 @@ __all__ = [
     "APP",
     "ProjectNotRecorded",
     "backends_api",
+    "loadcoach_bindings",
     "project_api",
     "project_db",
     "projects_api",
@@ -337,6 +338,33 @@ def backends_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
             call(client, settings, APP, "GET", "backends", timeout_seconds=30.0), "backends"
         )
     }
+
+
+def loadcoach_bindings(defaults: Mapping[str, Any] | None) -> dict[str, list[str]]:
+    """Which ``models.stages.*`` stage(s) point at each bound model string (row WX10).
+
+    A binding's value is IdeaPress's own model reference (``ollama/gemma4:12b``), with no digest —
+    the ``[models.stages]`` table in ``config.py``, exposed live through ``GET /settings``. Matching
+    it to one of LoadCoach's models is the caller's job (its ``canonical_id`` carries the digest,
+    ADR-0024); this only inverts the settings document into *value -> stages*, since more than one
+    stage can share a binding.
+
+    Args:
+        defaults: ``settings_api``'s document, or ``None`` when it could not be read.
+
+    Returns:
+        Each distinct binding value mapped to the stage name(s) (``models.stages.`` stripped) that
+        hold it, in the order ``GET /settings`` listed them.
+    """
+    values = (defaults or {}).get("settings") if defaults else None
+    bindings: dict[str, list[str]] = {}
+    for key, value in (values or {}).items():
+        is_binding = (
+            isinstance(key, str) and key.startswith("models.stages.") and isinstance(value, str)
+        )
+        if is_binding and value:
+            bindings.setdefault(value, []).append(key.removeprefix("models.stages."))
+    return bindings
 
 
 def settings_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:

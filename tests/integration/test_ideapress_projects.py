@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from typing import Any
 
 import httpx
 import respx
@@ -49,7 +50,7 @@ def _rows(console: Console, action: str) -> list[AuditLog]:
 # --- Projects -------------------------------------------------------------------------------------
 
 
-def test_the_running_projects_page_lists_from_the_api_with_the_create_form(
+def test_the_running_projects_page_lists_from_the_api_with_the_nav(
     tmp_path: Path,
 ) -> None:
     console, _database = ideapress_console(tmp_path, state="active")
@@ -61,9 +62,31 @@ def test_the_running_projects_page_lists_from_the_api_with_the_create_form(
     assert "A second project" in page
     assert f'href="{BASE}/projects/{PROJECT}"' in page
     assert "From the API" in page
-    assert "New project" in page
-    assert '<option value="standard"' in page, "the workflow comes from GET /workflows"
     assert f'<a href="{BASE}/projects" aria-current="page">Projects</a>' in page
+    # Row WX10: the top nav — the recent projects, All, New.
+    assert f'href="/apps/ideapress/projects/{PROJECT}"' in page
+    assert '<a href="/apps/ideapress/projects" aria-current="page">All</a>' in page
+    assert '<a href="/apps/ideapress/projects/new">New</a>' in page
+
+
+def test_the_new_project_page_shows_the_create_form(tmp_path: Path) -> None:
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(router)
+        page = _page(console, f"{BASE}/projects/new")
+    assert '<option value="standard"' in page, "the workflow comes from GET /workflows"
+    assert 'action="/apps/ideapress/projects"' in page
+    assert '<a href="/apps/ideapress/projects/new" aria-current="page">New</a>' in page
+    # The nav's recent projects still show, alongside the form.
+    assert "Local inference for writers" in page
+
+
+def test_a_stopped_new_project_page_says_creating_needs_the_api(tmp_path: Path) -> None:
+    console, _database = ideapress_console(tmp_path, state="inactive")
+    page = _page(console, f"{BASE}/projects/new")
+    assert "needs IdeaPress's own API" in page
+    assert 'action="/apps/ideapress/projects"' not in page
 
 
 def test_the_list_sends_its_filters_and_follows_ideapress_cursor(tmp_path: Path) -> None:
@@ -74,13 +97,16 @@ def test_the_list_sends_its_filters_and_follows_ideapress_cursor(tmp_path: Path)
         mock_loadcoach(router)
         routes = mock_ideapress(router, bodies={"projects": listing})
         page = _page(console, f"{BASE}/projects?status=planning&content_type=article&archived=true")
-    sent = routes["projects"].calls.last.request.url.params
+    # The page's own (filtered) read is the first call; the top nav's unfiltered, 8-row read of
+    # the same path follows it (row WX10) — `.calls[0]` is the one this test means to inspect.
+    sent = routes["projects"].calls[0].request.url.params
     assert (sent["status"], sent["content_type"], sent["include_archived"], sent["limit"]) == (
         "planning",
         "article",
         "true",
         "50",
     )
+    assert routes["projects"].calls[-1].request.url.params["limit"] == "8"
     assert "cursor=eyJvZmZzZXQiOjUwfQ" in page
 
 
@@ -93,7 +119,8 @@ def test_a_stopped_projects_page_reads_the_database_with_a_start_beside_it(
     assert "A second project" in page
     assert "From the database at revision 0011" in page
     assert 'value="start"' in page
-    assert "New project" not in page, "creating needs IdeaPress's API"
+    # The nav's recent-projects read falls back to the database exactly like the list itself.
+    assert '<a href="/apps/ideapress/projects/new">New</a>' in page
 
 
 def test_one_running_project_shows_its_plan_units_stage_history_and_forms(tmp_path: Path) -> None:
@@ -110,6 +137,8 @@ def test_one_running_project_shows_its_plan_units_stage_history_and_forms(tmp_pa
     assert f'action="{BASE}/projects/{PROJECT}/edit"' in page
     assert "never recompiles requirements" in page
     assert "Delete this project" in page
+    # Row WX10: this project is the nav's current entry.
+    assert f'href="/apps/ideapress/projects/{PROJECT}" aria-current="page"' in page
 
 
 def test_one_stopped_project_reads_its_rows_and_offers_no_action(tmp_path: Path) -> None:
@@ -285,11 +314,21 @@ def test_workflows_show_stage_order_gates_bindings_and_limits(tmp_path: Path) ->
     assert "Workflow standard" in one
 
 
-def test_backends_show_egress_and_the_round_trip_test(tmp_path: Path) -> None:
+LOADCOACH_MODELS = Path(__file__).resolve().parents[1] / "fixtures" / "loadcoach" / "models.json"
+
+
+def _mock_loadcoach_models(router: Any, *, base_url: str = "http://127.0.0.1:8766") -> Any:
+    """``GET /models`` mocked with LoadCoach's own recorded registry (row WX10)."""
+    body = json.loads(LOADCOACH_MODELS.read_text(encoding="utf-8"))
+    return router.get(f"{base_url}/api/v1/models").mock(return_value=httpx.Response(200, json=body))
+
+
+def test_backends_show_egress_the_round_trip_test_and_loadcoachs_models(tmp_path: Path) -> None:
     console, _database = ideapress_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
         mock_loadcoach(router)
         mock_ideapress(router)
+        _mock_loadcoach_models(router)
         tested = router.post(f"{API}/backends/test").mock(
             return_value=httpx.Response(200, json=ideapress_fixture("backend-test"))
         )
@@ -304,6 +343,24 @@ def test_backends_show_egress_and_the_round_trip_test(tmp_path: Path) -> None:
     (row,) = _rows(console, "ideapress.backend_test")
     assert isinstance(row.params, dict)
     assert (row.outcome, row.params["status"]) == ("ok", "ok")
+    # Row WX10: LoadCoach's models, matched to `[models.stages]` from `GET /settings`.
+    assert "Models available in LoadCoach" in page
+    assert "ollama/qwen3.5:9b-q8_0@sha256:441ec31e4d2a" in page
+    assert "draft" in page, "models.stages.draft binds ollama/gemma4:12b, an unavailable model"
+    assert 'href="/apps/loadcoach/models/' in page
+    assert "Enable in LoadCoach" in page
+    assert 'href="/apps/ideapress/settings"' in page
+
+
+def test_a_backend_page_with_no_binding_still_reads_loadcoach(tmp_path: Path) -> None:
+    """A model LoadCoach carries but no stage binds still shows, ``Bound stage(s)`` an em dash."""
+    console, _database = ideapress_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_loadcoach(router)
+        mock_ideapress(router)
+        _mock_loadcoach_models(router)
+        page = _page(console, f"{BASE}/backends")
+    assert "ollama/smollm2:135m@sha256:9077fe9d2ae1" in page
 
 
 def test_stopped_workflows_and_backends_say_they_read_only_the_api(tmp_path: Path) -> None:
