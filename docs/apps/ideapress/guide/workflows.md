@@ -33,6 +33,50 @@ that has not passed deterministic validation, and no model decides that anything
 not a property of the prompts — it is a property of the stage list, and it is what "Python owns the
 control flow" means concretely.
 
+## Which stages your project actually runs
+
+Since 1.5 the sixteen above are the *vocabulary*; what a project runs is its **workflow**, a stored
+record it pins by name and version. `standard 1.0` is every existing project's, and it lists
+everything editable — so nothing changed for a project made before 1.5.
+
+```bash
+ideapress workflow list
+ideapress workflow show standard
+ideapress workflow save fast-draft.json   # a new workflow, or the next version of one
+```
+
+A workflow document is the stages it runs, in the order above, each optionally naming a prompt
+record, a revision bound and a model:
+
+```json
+{
+  "id": "fast-draft",
+  "title": "Draft and stop",
+  "stages": [
+    {"kind": "requirements"},
+    {"kind": "outline"},
+    {"kind": "draft", "model_hint": "ollama/gemma4:12b"}
+  ]
+}
+```
+
+That one drafts, validates, checks coverage and commits — two stage runs, plan then draft, and no
+audit, fact check, critique or revision at all. Three rules are worth knowing before you write one:
+
+* **The four gates are not in a workflow.** `validate`, `coverage`, `commit` and `export` always
+  run; naming one is refused. They are what "Python owns the control flow" means, and they are not
+  yours to switch off.
+* **You choose membership, not order.** The stages run in the order of the table above whatever
+  order you list them in — and a document that lists them out of order is refused rather than
+  quietly reordered.
+* **A workflow is never edited in place.** Saving writes the next version; a project keeps the
+  version it was created on, so nothing you save can change a project already under way.
+
+Anything a run could not execute is refused when you save, with the field named: a kind that is not
+a stage, a gate, a duplicate, a `revise` with no `critique`, a prompt whose variables do not match
+the stage's. **Dropping `audit_fast` also drops the attestation below**, so a requirement with no
+deterministic check can then never be satisfied and its unit will pause at the coverage gate.
+
 ## What a model is never allowed to do
 
 * Decide that a stage is complete.
