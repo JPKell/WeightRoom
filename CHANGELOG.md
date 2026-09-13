@@ -6,6 +6,24 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row WY7)
+- **Chat history moved off `/chat` onto its own page, `GET /chat/history`** (registered ahead of
+  `GET /chat/{conversation_id}` so the literal path is never read as an id). It renders a dense,
+  sortable table (`table_id="chat-history"`) — Title (linked to the thread), Mode, Messages,
+  Updated — from the same `list_conversations` call the old rail used; an empty history shows
+  `empty_state` with a link to start one. Clicking anywhere in a row opens its thread
+  (`chat.js`, delegated), with the title's own link kept for no-JS and keyboard use.
+- The conversation rail (`_chat_rail.html`) is removed from `chat.html` and `chat_thread.html`;
+  both pages, plus the new history page, carry the page bar (`page_nav`, row WY1) with a `History`
+  link and a `JSON` action instead. **The bar does not also offer `New conversation -> /chat`**,
+  as the row's own kickoff described: the console's left menu already links `Chat -> /chat` on
+  every page (`CONSOLE_SIDE_NAV`'s Tools section, row WX3), unconditionally — including the chat
+  pages themselves — so that link would have repeated the left menu and failed
+  `test_page_nav.py`'s duplicate check. See `WY7_HANDOFF.md` for the decision.
+- On a conversation, the JSON link moved into the page bar's actions; Delete stays a CSRF POST
+  form, now inline at the end of `.page-head`'s heading row (`display: inline-flex`) instead of
+  on its own line below.
+
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

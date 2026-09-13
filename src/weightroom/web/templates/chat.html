@@ -1,19 +1,14 @@
 {% extends "_shell.html" %}
+{% from "_app_page.html" import page_nav %}
 {% block title %}Chat — WeightRoomGym{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="/app-static/css/chat.css">
 {% endblock %}
 {% block page_content %}
-<div class="chat-layout">
-{% set current_id = "" %}
-{% include "_chat_rail.html" %}
-
+{{ page_nav(links=[{"label": "History", "href": "/chat/history"}],
+            actions=[{"label": "JSON", "href": "/api/v1/chat/conversations"}]) }}
 <div class="chat-pane">
   <h2>New conversation</h2>
-  <p class="muted">A conversation goes through <strong>LoadCoach</strong> or <strong>PromptCadence</strong>
-  and nothing else — this console is never a provider client (spec §3). Every reply shows the model
-  LoadCoach chose and what it cost. The mode is fixed for the life of a conversation, so it is chosen
-  here and nowhere else. <a href="/api/v1/chat/conversations">JSON</a></p>
 
   {% if not conversations %}
   <p class="muted">Nothing has been asked yet. Type below.</p>
@@ -88,7 +83,6 @@
       <button type="submit">Send</button>
     </div>
   </form>
-</div>
 </div>
 {% endblock %}
 {% block scripts %}
