@@ -253,13 +253,13 @@ needs only gate A's macro, and WY1's later gates touch no wave-2 file.
 
 | Row | Status | Branch head | Handoff |
 |---|---|---|---|
-| WY1 | planned | — | — |
-| WY2 | planned | — | — |
-| WY3 | planned | — | — |
-| WY4 | planned | — | — |
-| WY5 | planned | — | — |
-| WY6 | planned | — | — |
-| WY7 | planned | — | — |
-| WY8 | planned | — | — |
-| WY9 | planned | — | — |
-| WY10 | planned | — | — |
+| WY1 | done · merged 2026-09-13 | row/wy1-shell-nav `8128ec1` → WeightRoom `4188e32` | [`WY1_HANDOFF.md`](../history/handoffs/WY1_HANDOFF.md) |
+| WY2 | done · merged 2026-09-13 | row/wy2-logs-settings `5ca6104` → WeightRoom `56d8404` | [`WY2_HANDOFF.md`](../history/handoffs/WY2_HANDOFF.md) |
+| WY3 | done · merged 2026-09-13 | row/wy3-overview `9924f50` → WeightRoom `d9c2ae5` | [`WY3_HANDOFF.md`](../history/handoffs/WY3_HANDOFF.md) |
+| WY4 | done · merged 2026-09-13 | MirrorWall row/wy4-chart-fill `9d56bd9` → `7ea1ae5`; WeightRoom row/wy4-telemetry `3d3de80` → `35e2d10` | [`WY4_HANDOFF.md`](../history/handoffs/WY4_HANDOFF.md) |
+| WY5 | done · merged 2026-09-13 | MirrorWall row/wy5-table-sort `677b580` → `411274c` | [`WY5_HANDOFF.md`](../history/handoffs/WY5_HANDOFF.md) |
+| WY6 | done · merged 2026-09-13 | FreeWeight row/wy6-health-under-load `a502bdb` → `6898f92` | [`WY6_HANDOFF.md`](../history/handoffs/WY6_HANDOFF.md) |
+| WY7 | done · merged 2026-09-13 | row/wy7-chat-history `ddb0f41` → WeightRoom `61ffe1e` | [`WY7_HANDOFF.md`](../history/handoffs/WY7_HANDOFF.md) |
+| WY8 | done · merged 2026-09-13 | row/wy8-model-tables `3482ca8` → WeightRoom `9b1c755` | [`WY8_HANDOFF.md`](../history/handoffs/WY8_HANDOFF.md) |
+| WY9 | done · merged 2026-09-13 | row/wy9-database-subpages `8f6d366` → WeightRoom `094ac11` | [`WY9_HANDOFF.md`](../history/handoffs/WY9_HANDOFF.md) |
+| WY10 | done 2026-09-13; resize defect and FreeWeight schema 0011 left for the operator | `main` · slot removal `33cd84c` | [`WY_HANDOFF.md`](../history/handoffs/WY_HANDOFF.md) |
