@@ -128,6 +128,11 @@ def test_running_pages_read_promptcadences_api(tmp_path: Path) -> None:
     assert "target_not_remote" in detail  # the egress decision the explanation holds
     assert "Every persisted event, in sequence order" in detail
     assert "data-log-stream" not in detail  # a completed trajectory has no live pane
+    # Row WX11: a jump nav of the section ids, and the request as one two-column table.
+    assert '<a href="#pc-plan">Plan</a>' in detail
+    assert '<a href="#pc-events">Events</a>' in detail
+    assert '<h3 id="pc-request">The request</h3>' in detail
+    assert '<table data-table="pc-trajectory-0"' in detail
     assert "Nothing is waiting for a person." in approvals
     assert "From the database" not in approvals  # both halves read the API since row WPC1
     assert approvals.count("From the API") == 2
@@ -136,6 +141,103 @@ def test_running_pages_read_promptcadences_api(tmp_path: Path) -> None:
     assert "read_file" in tools
     assert "at most 20 USD" in ledger
     assert "tier:local_fast" in ledger
+
+
+def test_the_new_trajectory_page_is_its_own_route_with_the_history_new_nav(tmp_path: Path) -> None:
+    """Row WX11: Trajectories splits into a History listing and a standalone New form."""
+    console, _database = _console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        _mock_api(router)
+        listing = _page(console, f"{BASE}/trajectories")
+        new_page = _page(console, f"{BASE}/trajectories/new")
+    assert 'name="task"' not in listing
+    assert 'name="task"' in new_page
+    assert '<a href="/apps/promptcadence/trajectories" aria-current="page">History</a>' in listing
+    assert '<a href="/apps/promptcadence/trajectories/new" aria-current="page">New</a>' in new_page
+    # The left-menu entry stays "Trajectories" for both halves of the tab's own nav.
+    assert (
+        '<a href="/apps/promptcadence/trajectories" aria-current="page">Trajectories</a>'
+        in new_page
+    )
+
+
+def test_a_stopped_promptcadences_new_page_says_nothing_can_be_submitted(tmp_path: Path) -> None:
+    console, _database = _console(tmp_path, state="inactive")
+    page = _page(console, f"{BASE}/trajectories/new")
+    assert "is not answering, so nothing can be submitted" in page
+    assert 'name="task"' not in page
+
+
+def test_the_tools_page_links_each_name_and_drops_the_inline_schema_dump(tmp_path: Path) -> None:
+    """Row WX11: the tool name links to its own page; the per-row ``json_viewer`` dump leaves
+    the list."""
+    console, _database = _console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        _mock_api(router)
+        tools = _page(console, f"{BASE}/tools")
+    assert f'href="{BASE}/tools/read_file"' in tools
+    assert '<a href="#pc-tools-registry">Registry</a>' in tools
+    assert '<a href="#pc-tools-create">Create a tool</a>' in tools
+    assert "read_file arguments" not in tools
+
+
+def test_a_registered_tools_page_shows_its_argument_schema_as_a_table(tmp_path: Path) -> None:
+    console, _database = _console(tmp_path, state="active")
+    tool_entry = _fixture("tools")["tools"][0]
+    assert tool_entry["name"] == "read_file"
+    with respx.mock(assert_all_called=False) as router:
+        _mock_api(router)
+        router.get(f"{PROMPTCADENCE_URL}/api/v1/tools/read_file").mock(
+            return_value=httpx.Response(200, json=tool_entry)
+        )
+        page = _page(console, f"{BASE}/tools/read_file")
+    assert tool_entry["description"] in page
+    assert "read_only" in page
+    assert "The file to read, relative to the workspace root or absolute." in page
+
+
+def test_an_unknown_tool_name_renders_the_pages_not_found_state(tmp_path: Path) -> None:
+    console, _database = _console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        _mock_api(router)
+        router.get(f"{PROMPTCADENCE_URL}/api/v1/tools/rm").mock(
+            return_value=httpx.Response(
+                422,
+                json={
+                    "error": {
+                        "code": "TOOL_NOT_FOUND",
+                        "message": "no tool named 'rm' is configured",
+                    }
+                },
+            )
+        )
+        page = _page(console, f"{BASE}/tools/rm")
+    assert "No tool named rm is configured" in page
+    assert "TOOL_NOT_FOUND" not in page  # the not-found state replaces the raw refusal box
+
+
+def test_a_withheld_tool_is_found_and_says_why(tmp_path: Path) -> None:
+    console, _database = _console(tmp_path, state="active")
+    withheld = {
+        "name": "run_command",
+        "description": "Run one command, isolated and without network.",
+        "registered": False,
+        "risk_class": None,
+        "egress": None,
+        "requires_isolation": False,
+        "redact_args": False,
+        "withheld_cause": "no isolation rung is available",
+        "parameters": None,
+    }
+    with respx.mock(assert_all_called=False) as router:
+        _mock_api(router)
+        router.get(f"{PROMPTCADENCE_URL}/api/v1/tools/run_command").mock(
+            return_value=httpx.Response(200, json=withheld)
+        )
+        page = _page(console, f"{BASE}/tools/run_command")
+    assert "withheld" in page
+    assert "no isolation rung is available" in page
+    assert "No argument schema" in page
 
 
 def test_the_ledger_pages_cursor_reaches_the_api_and_the_next_link(tmp_path: Path) -> None:
@@ -372,6 +474,10 @@ def test_stopped_pages_read_the_database_with_a_start_beside_them(tmp_path: Path
     detail = _page(console, f"{BASE}/trajectories/{STOPPED}")
     assert "the answer read from the database" in detail
     assert "PromptCadence is not answering" in detail
+    # Row WX11: the stopped branch's jump nav names its own (shorter) section set.
+    assert '<a href="#pc-turns">Turns</a>' in detail
+    assert '<a href="#pc-plan">Plan</a>' not in detail
+    assert '<h3 id="pc-request">The request</h3>' in detail
     assert "the plan needs a person" in _page(console, f"{BASE}/approvals")
     ledger = _page(console, f"{BASE}/ledger")
     assert "tier:recorded" in ledger

@@ -137,6 +137,12 @@ class Overview:
     source_detail: str
     figures: tuple[Figure, ...]
     table: OverviewTable
+    promptcadence_figures: tuple[Figure, ...] = ()
+    """Row WX11: Active, Pending approvals and Spending today — PromptCadence-only, read from the
+    same ``/system/status`` body ``figures`` already fetched (which embeds its own
+    ``ledger_view()`` under ``"ledger"``, the same document ``GET /ledger`` answers), so this adds
+    no second call. Empty for the other three applications and whenever PromptCadence did not
+    answer."""
 
 
 def _dash_figures(app: str) -> tuple[Figure, ...]:
@@ -186,6 +192,31 @@ def _figures_from_status(app: str, body: dict[str, Any]) -> tuple[Figure, ...]:
     return tuple(
         Figure(label=label, value=_shown(_dig(body, path), how))
         for label, path, how in _STATUS_FIGURES.get(app, ())
+    )
+
+
+def _promptcadence_figures(body: dict[str, Any]) -> tuple[Figure, ...]:
+    """Row WX11's PromptCadence-only section: Active, Pending approvals, Spending today.
+
+    ``body`` is the same ``GET /system/status`` document ``_figures_from_status`` already read;
+    its ``ledger`` key is ``runtime.budget.ledger_view(trajectory=None).as_json()``, the same
+    method ``GET /ledger`` calls, so the per-day headroom here is not re-derived (ADR-0030).
+    """
+    active = body.get("active_trajectories")
+    pending = body.get("pending_approvals")
+    day = _dig(body, ("ledger", "day"))
+    display = day.get("money_remaining_display") if isinstance(day, dict) else None
+    return (
+        Figure(label="Active", value=str(len(active)) if isinstance(active, list) else "—"),
+        Figure(
+            label="Pending approvals",
+            value=str(len(pending)) if isinstance(pending, list) else "—",
+        ),
+        Figure(
+            label="Spending today",
+            value=str(display) if display is not None else "—",
+            note="ceiling exceeded" if isinstance(day, dict) and day.get("exceeded") else None,
+        ),
     )
 
 
@@ -284,11 +315,14 @@ def overview_for(
     # when the application is running and reachable but its status call failed, so that case
     # renders dashes (the API is the only source running/reachable implies) rather than quietly
     # substituting the database's numbers for what the application itself could not answer.
+    promptcadence_figures: tuple[Figure, ...] = ()
     if view.running and view.reachable:
         body = _fetch_status(settings, app, view, client=client)
         figures_from_api = body is not None
         figures_resolved = True
         figures = _dash_figures(app) if body is None else _figures_from_status(app, body)
+        if app == "promptcadence" and body is not None:
+            promptcadence_figures = _promptcadence_figures(body)
     else:
         figures_from_api = False
         figures_resolved = False
@@ -305,6 +339,7 @@ def overview_for(
             *_compose(figures_from_api, table_phrase=f"unavailable: {database_error}"),
             figures=figures,
             table=table,
+            promptcadence_figures=promptcadence_figures,
         )
 
     # Read-only, like every connection to another application's database (ADR-0124).
@@ -335,6 +370,7 @@ def overview_for(
         ),
         figures=figures,
         table=table,
+        promptcadence_figures=promptcadence_figures,
     )
 
 

@@ -13,6 +13,15 @@
   {% endfor %}
 </ul>
 
+{% if overview.promptcadence_figures %}
+<h3>PromptCadence</h3>
+<ul class="card-grid">
+  {% for figure in overview.promptcadence_figures %}
+  {{ card(figure.label, figure.value, note=figure.note, kind="figure") }}
+  {% endfor %}
+</ul>
+{% endif %}
+
 {% with full_controls = true %}{% include "_app_state.html" %}{% endwith %}
 
 {{ kv_list([

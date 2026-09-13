@@ -86,14 +86,7 @@ def _audit(
 
 
 def _trajectories(
-    request: Request,
-    principal: Principal,
-    *,
-    state: str | None,
-    cursor: str | None,
-    page: int,
-    submit_error: SuiteError | None = None,
-    form: Mapping[str, Any] | None = None,
+    request: Request, principal: Principal, *, state: str | None, cursor: str | None, page: int
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = request.app.state.http, request.app.state.settings
@@ -125,10 +118,6 @@ def _trajectories(
         state=state or "",
         states=pc.TRAJECTORY_STATES,
         next_href=next_href,
-        options=actions.submission_options(client, settings) if sourced.live else None,
-        classifications=actions.CLASSIFICATIONS,
-        submit_error=submit_error,
-        form=dict(form or {}),
     )
 
 
@@ -140,8 +129,39 @@ def trajectories_page(
     cursor: str | None = None,
     page: int = 1,
 ) -> HTMLResponse:
-    """Every trajectory, newest first, filterable by state; and the New-trajectory form."""
+    """Every trajectory, newest first, filterable by state — the History half of the tab's nav."""
     return _trajectories(request, principal, state=state or None, cursor=cursor or None, page=page)
+
+
+def _trajectory_new(
+    request: Request,
+    principal: Principal,
+    *,
+    submit_error: SuiteError | None = None,
+    form: Mapping[str, Any] | None = None,
+) -> HTMLResponse:
+    view = app_view(request, APP)
+    client, settings = request.app.state.http, request.app.state.settings
+    live = view.running and view.reachable
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "pc_trajectory_new.html",
+        selected="Trajectories",
+        view=view,
+        live=live,
+        options=actions.submission_options(client, settings) if live else None,
+        classifications=actions.CLASSIFICATIONS,
+        submit_error=submit_error,
+        form=dict(form or {}),
+    )
+
+
+@ui_router.get(f"{BASE}/trajectories/new", summary="New trajectory", response_class=HTMLResponse)
+def trajectories_new_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
+    """The New-trajectory form, on its own page — the New half of the tab's nav."""
+    return _trajectory_new(request, principal)
 
 
 @ui_router.post(f"{BASE}/trajectories", summary="Submit a trajectory from the page")
@@ -209,9 +229,7 @@ def submit_from_page(  # noqa: PLR0913 — one parameter per form field, as Fast
             request, principal, "trajectory.submit", target=None, outcome=outcome_of(exc),
             params=params, message=exc.message,
         )  # fmt: skip
-        return _trajectories(
-            request, principal, state=None, cursor=None, page=1, submit_error=exc, form=form
-        )
+        return _trajectory_new(request, principal, submit_error=exc, form=form)
     trajectory_id = str(document.get("trajectory_id") or "")
     _audit(
         request, principal, "trajectory.submit", target=trajectory_id or None, outcome="ok",
@@ -490,6 +508,26 @@ def tools_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
     )
     return render_app_page(
         request, principal, APP, "pc_tools.html", selected="Tools", view=view, sourced=sourced
+    )
+
+
+@ui_router.get(f"{BASE}/tools/{{name}}", summary="One tool", response_class=HTMLResponse)
+def tool_page(request: Request, principal: CurrentOperator, name: str) -> HTMLResponse:
+    """One tool by exact name: its description, risk class, egress, and its argument schema."""
+    view = app_view(request, APP)
+    client, settings = request.app.state.http, request.app.state.settings
+    sourced = read_app_page(
+        request, view, api=lambda: pc.tool_api(client, settings, name), database=None
+    )
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "pc_tool.html",
+        selected="Tools",
+        view=view,
+        sourced=sourced,
+        tool_name=name,
     )
 
 

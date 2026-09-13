@@ -139,7 +139,12 @@ def test_a_refusal_comes_back_in_promptcadences_words_with_the_form_kept(tmp_pat
     assert "TOOL_NOT_FOUND" in response.text
     assert "no tool named &#39;rm&#39; is configured" in response.text
     assert TASK in response.text  # the operator's text survives the refusal
-    assert '<details class="card pc-submit" open>' in response.text
+    # Row WX11: the refusal redisplays the standalone New page, not the History listing.
+    assert (
+        '<a href="/apps/promptcadence/trajectories/new" aria-current="page">New</a>'
+        in response.text
+    )
+    assert '<section class="card pc-submit">' in response.text
     (row,) = _audit(console, "trajectory.submit")
     assert row["outcome"] == "refused"
 
@@ -291,12 +296,14 @@ def test_the_pages_offer_the_forms_only_where_they_can_work(tmp_path: Path) -> N
     with respx.mock(assert_all_called=False) as router:
         _mock_api(router, approvals=pending)
         approvals = console.client.get(f"{BASE}/approvals", headers=HTML).text
-        listing = console.client.get(f"{BASE}/trajectories", headers=HTML).text
+        new_page = console.client.get(f"{BASE}/trajectories/new", headers=HTML).text
         record = console.client.get(f"{BASE}/trajectories/{TRAJECTORY}", headers=HTML).text
     assert f'action="{BASE}/approvals/{TRAJECTORY}/grant"' in approvals
     assert f'action="{BASE}/approvals/{TRAJECTORY}/deny"' in approvals
-    assert 'name="tools" value="read_file"' in listing  # the registered tools, from GET /tools
-    assert '<option value="local_large"' in listing  # the configured tiers, from GET /tiers
+    assert 'name="tools" value="read_file"' in new_page  # the registered tools, from GET /tools
+    assert '<option value="local_large"' in new_page  # the configured tiers, from GET /tiers
     assert "/cancel" not in record  # the recorded trajectory is completed
     stopped, _database = _console(tmp_path / "stopped", state="inactive")
-    assert "New trajectory" not in stopped.client.get(f"{BASE}/trajectories", headers=HTML).text
+    stopped_new = stopped.client.get(f"{BASE}/trajectories/new", headers=HTML).text
+    assert "is not answering, so nothing can be submitted" in stopped_new
+    assert 'name="task"' not in stopped_new

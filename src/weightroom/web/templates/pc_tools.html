@@ -1,20 +1,21 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, kv_list, table, empty_state, json_viewer %}
-{% from "_app_page.html" import page_source, refusal %}
+{% from "mirrorwall/components.html" import badge, kv_list, table, empty_state %}
+{% from "_app_page.html" import app_page_header, page_source, refusal %}
+{% from "_pc.html" import tool_link %}
 {% block title %}Tools — PromptCadence — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Tools {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions"><a href="/apps/promptcadence/settings">Settings</a></div>
-</div>
+{% call app_page_header(view, "Tools", "Tools", "Every tool configuration names, registered or not. A tool asked for and withheld is here with its cause — a list of only the working tools cannot tell that apart from a tool nobody asked for.") %}
+<a href="/apps/promptcadence/settings">Settings</a>
+{% endcall %}
 {% include "_app_state.html" %}
-<p class="muted">Every tool configuration names, registered or not. A tool asked for and withheld is
-here with its cause — a list of only the working tools cannot tell that apart from a tool nobody
-asked for.</p>
+<nav class="page-actions" aria-label="Sections">
+  <a href="#pc-tools-registry">Registry</a> · <a href="#pc-tools-create">Create a tool</a>
+</nav>
+
 {{ refusal(sourced.error) }}
 {% set report = sourced.data %}
 {% if report is not none %}
-<h3>Isolation</h3>
+<h3 id="pc-tools-registry">Registry</h3>
 {% set isolation = report.get("isolation") %}
 {% if isolation %}
 {{ kv_list([
@@ -29,11 +30,10 @@ reason rather than executing unisolated.</p>
 <p class="muted">The isolation ladder has not been probed in PromptCadence's process.</p>
 {% endif %}
 
-<h3>Registry</h3>
 {% set rows = [] %}
 {% for one in report.get("tools") or [] %}
 {% set _ = rows.append([
-  one.get("name"),
+  tool_link(one.get("name")),
   badge("registered", tone="success") if one.get("registered") else badge("withheld", tone="warning"),
   one.get("risk_class") or "—",
   one.get("egress") or "—",
@@ -45,12 +45,16 @@ reason rather than executing unisolated.</p>
 {% endfor %}
 {% if rows %}
 {{ table([{"label": "Tool", "mono": true}, {"label": "Registered"}, {"label": "Risk"}, {"label": "Egress"}, {"label": "Isolation required"}, {"label": "Args redacted"}, {"label": "Cause"}, {"label": "Description"}], rows, caption="Configured tools", density="dense", row_count=rows | length, table_id="pc-tools", sortable=true) }}
-{% for one in report.get("tools") or [] %}
-{% if one.get("parameters") %}{{ json_viewer(one.get("parameters"), label=one.get("name") ~ " arguments") }}{% endif %}
-{% endfor %}
 {% else %}
 {{ empty_state("No tools are enabled.") }}
 {% endif %}
 {% endif %}
+
+<h3 id="pc-tools-create">Create a tool</h3>
+<p class="muted">A tool is a Python callable registered in PromptCadence's own registry and named
+under <code>[tools] enabled</code>; every call it makes runs in ToolYard's sandbox, at the isolation
+rung above. There is no console form for this — a tool is code, reviewed and shipped with
+PromptCadence itself. See <a href="/docs?section=apps#docs-apps-promptcadence">the spec's tools
+section</a>.</p>
 {{ page_source(sourced) }}
 {% endblock %}

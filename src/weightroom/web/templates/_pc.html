@@ -19,6 +19,12 @@
 {%- else -%}—{%- endif -%}
 {%- endmacro %}
 
+{% macro tool_link(name) -%}
+{%- if name -%}
+<a class="mono" href="/apps/promptcadence/tools/{{ name | urlencode }}">{{ name }}</a>
+{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
 {% macro measure(value, unit="") -%}
 {#- A number with its unit, or an em dash for one nobody reported — never a fabricated zero
     (ADR-0016). -#}
