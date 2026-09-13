@@ -57,10 +57,10 @@ phases that are gated ([development plan](development-plan.md)):
   text and markdown attachments as context; conversations kept in WeightRoomGym's database.
 * **Database viewer:** read of every application's database — tables, rows, a SQL console;
   curated maintenance operations first; raw writes behind the ADR-0124 guard.
-* **Model catalog and downloads:** every model every application knows, `ollama pull` with
-  progress, GGUF drop-in into a llama.cpp model directory, enable/disable per application
-  ([ADR-0118](../../adr/0118-a-discovered-model-can-be-disabled.md)), the evidence summary,
-  delete with cleanup.
+* **Model enable/disable** per application
+  ([ADR-0118](../../adr/0118-a-discovered-model-can-be-disabled.md)), on the LoadCoach and
+  FreeWeight Models pages. The console-wide model catalog, with its pull, drop-in and delete, was
+  removed at row WY1 ([ADR-0146](../../adr/0146-the-console-has-no-catalog.md)).
 * **Cost and budget dashboard:** LoadLedger balances from PromptCadence and IdeaPress against
   their ceilings; ceilings editable through the settings path.
 * **Backups and migrations:** every application's `db backup`, `db status`, `db upgrade`, the
@@ -106,7 +106,6 @@ phases that are gated ([development plan](development-plan.md)):
 | Docs | Rendering, tree, ADR index, search index, mermaid, link rewriting |
 | Chat | Conversations, streaming, thinking collapse, attachments, routing/cost display, PromptCadence approvals inline |
 | Database viewer | Read-only browsing and SQL; curated operations; the ADR-0124 guard |
-| Catalog | Models across applications; pull, drop-in, enable/disable, evidence summary, delete with cleanup |
 | Costs | Balances and ceilings across the ledger-mounting applications |
 | Backups | Every application's backup/status/upgrade/restore as curated operations; the listing |
 | Jobs | The database-backed queue with leases; four job kinds; history |
@@ -162,8 +161,6 @@ POST /apps/{app}/db/restore      GET  /apps/{app}/db/status
 GET  /apps/{app}/prompts         GET  /apps/{app}/prompts/{id}   PUT  /apps/{app}/prompts/{id}
 DELETE /apps/{app}/prompts/{id}/override
 GET  /ollama                     POST /ollama/restart            GET  /ollama/ps
-GET  /catalog                    POST /catalog/pull              GET  /catalog/pull/{id}/stream
-POST /catalog/dropin             POST /catalog/{ref}/enabled     DELETE /catalog/{ref}
 GET  /costs                      GET  /costs/{app}
 GET  /chat/conversations         POST /chat/conversations        GET  /chat/conversations/{id}
 DELETE /chat/conversations/{id}  POST /chat/conversations/{id}/messages
@@ -319,6 +316,11 @@ SQLite and PostgreSQL both, from the application's own effective `storage.databa
 
 ### 7.9 Catalog, costs, backups
 
+> **Row WY1 (2026-09-12): the console has no catalog** ([ADR-0146](../../adr/0146-the-console-has-no-catalog.md)). The paragraph below
+> records what W8 built. The page, its API, and the console's pull, drop-in and delete are gone;
+> enable/disable stays on the LoadCoach and FreeWeight Models pages, and the `catalog.*` audit
+> names and the `catalog_pull` job-kind name stay readable on historical rows.
+
 **Catalog:** every model each application knows, joined by canonical identity where identical
 (`provider/name@sha256:…`), with per-application `enabled`, evidence freshness from FreeWeight,
 residency, size and context. Actions: `ollama pull <name>` as a job with streamed progress;
@@ -364,7 +366,7 @@ retention — finished jobs after 90 days, guarded-write backups after `guarded_
 ADR-0134 rule 3 — and FreeWeight's own deletion of results older than
 `freeweight_older_than_days` when that is set; LoadCoach and PromptCadence retain inside their own
 processes and IdeaPress keeps everything), `backup` (§7.9 per application), `model_refresh` (each
-application's `models refresh`, then the catalog join), plus `catalog_pull` and `docs_index`, and
+application's `models refresh`, then the catalog join), plus `docs_index` (`catalog_pull` until ADR-0146), and
 `self_restore` — WeightRoomGym's own database restored by a job handed to a transient unit that
 stops the console, restores, carries the job forward and starts it again
 ([ADR-0136](../../adr/0136-weightroom-restores-its-own-database-through-a-job-handed-to-a-transient-unit.md)).

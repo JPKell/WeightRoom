@@ -185,3 +185,12 @@ def test_actions_alone_render_a_bar_with_no_links_list() -> None:
     markup = _macro('{{ page_nav(actions=[{"label": "Docs", "href": "/docs"}]) }}')
     assert "page-nav-actions" in markup
     assert "page-nav-links" not in markup
+
+
+def test_the_catalog_is_gone_and_no_page_links_to_it(tmp_path: Path) -> None:
+    """ADR-0146: no `/catalog` page, API or link anywhere in the console."""
+    console = _console(tmp_path)
+    assert console.client.get("/catalog", headers={"Accept": "text/html"}).status_code == 404
+    assert console.client.get("/api/v1/catalog").status_code == 404
+    for path, page in rendered_pages(console).items():
+        assert 'href="/catalog' not in page, path

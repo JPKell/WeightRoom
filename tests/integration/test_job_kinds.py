@@ -28,7 +28,6 @@ from weightroom.services.jobs import (
     OutputBuffer,
     claim_next,
     enqueue,
-    list_jobs,
 )
 
 if TYPE_CHECKING:
@@ -346,36 +345,6 @@ def test_retention_deletes_old_freeweight_results_through_freeweights_own_previe
     )
     assert b'"token":"tok-1"' in deletion.calls.last.request.content
     assert f"2 run(s) created before {cutoff} deleted by FreeWeight" in text
-
-
-# --- catalog_pull ---------------------------------------------------------------------------------
-
-
-def test_a_pull_holds_ollamas_progress_for_the_page_and_summarises_it_on_the_job(
-    tmp_path: Path, database: Database
-) -> None:
-    lines = (
-        b'{"status": "pulling manifest"}\n'
-        b'{"status": "downloading", "total": 10, "completed": 5}\n'
-        b'{"status": "downloading", "total": 10, "completed": 10}\n'
-        b'{"status": "success"}\n'
-    )
-    client = httpx.Client(
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=lines))
-    )
-    services = replace(services_for(), ollama_http=client)
-    outcome, text, job = run_kind(
-        database, settings_for(tmp_path), services, "catalog_pull", {"name": "gemma3:1b"}
-    )
-    assert outcome == Outcome("completed")
-    assert text.splitlines()[:3] == ["pulling manifest", "downloading", "success"]
-    queued, _more = list_jobs(database, kind="model_refresh", limit=10)
-    assert [one.state for one in queued] == ["queued"], "a successful pull queues the refresh"
-    assert text.splitlines()[3] == f"queued model_refresh {queued[0].id}"
-    held = services.pulls.get(job.id)
-    assert held is not None
-    assert held.ok
-    assert len(held.events) == 4
 
 
 # --- freeweight_goal_calibrate (row WP4) ----------------------------------------------------------

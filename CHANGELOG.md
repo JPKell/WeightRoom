@@ -6,6 +6,21 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed (row WY1)
+- **The page bar.** `_app_page.html` gains `page_nav(links, actions)`: one bar at the top of a page
+  for its own subsections, with JSON/Docs actions muted at its right. It renders nothing when it has
+  nothing. `tests/integration/test_page_nav.py` renders every GET UI route in the route table and
+  fails a page whose bar repeats a link of its left menu; routes it cannot render are named with a
+  reason.
+- **Chat is in the top bar**, before the alerts count, and stays in the left menu's Tools section.
+- **An application's tab and the docs viewer no longer list the console's pages** in their left
+  menu, on the operator's instruction (reverses row WX3). The brand links home.
+### Removed (row WY1)
+- **The catalog** ([ADR-0146](docs/adr/0146-the-console-has-no-catalog.md)): the `/catalog` page,
+  `/api/v1/catalog`, the console's `ollama pull`, GGUF drop-in and model delete, `PullRegistry`, and
+  `catalog_pull` as a job that can be queued. Enable/disable stays on the LoadCoach and FreeWeight
+  Models pages. The `catalog.*` audit names stay, and a stored `catalog_pull` job still lists and
+  renders; a queued one left behind is failed with its reason.
 ### Added (row WX15)
 - **The console-wide Databases page (`/database`) prints a PostgreSQL bootstrap script** — it is
   never run. `services/database.py` gains `postgres_bootstrap_script` (pure, no I/O): a Docker

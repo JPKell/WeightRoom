@@ -71,7 +71,6 @@ if TYPE_CHECKING:
     from sqlalchemy import CursorResult
 
     from weightroom.config import Settings
-    from weightroom.services.catalog import PullRegistry
     from weightroom.services.database import Database
     from weightroom.services.db_reader import DatabaseUrlCache
     from weightroom.services.processes import Runner, SystemdController
@@ -784,7 +783,6 @@ class JobServices:
 
     controller: SystemdController
     http: httpx.Client
-    pulls: PullRegistry
     urls: DatabaseUrlCache
     ollama_http: httpx.Client | None = None
     which: Callable[[str], str | None] | None = None
@@ -909,6 +907,8 @@ class _CancelProbe:
 
 
 def _audit_app(kind: str) -> str:
+    # `catalog_pull` can no longer be started (ADR-0146), but a stored row of it can still be
+    # cancelled or failed, and its audit row keeps naming Ollama as it always did.
     return {"freeweight_suite_run": "freeweight", "catalog_pull": "ollama"}.get(kind, "weightroom")
 
 
