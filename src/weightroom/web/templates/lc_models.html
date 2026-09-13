@@ -1,19 +1,16 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
-{% from "_app_page.html" import page_source, refusal, context_k %}
-{% from "_lc.html" import model_link, recorded, measure, breaker_badge, model_actions, capability_badges with context %}
+{% from "_app_page.html" import page_source, refusal, context_k, app_page_header, docs_link %}
+{% from "_lc.html" import model_link, recorded, measure, num, stat, breaker_badge, model_actions, capability_badges with context %}
 {% block title %}Models — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
-<div class="page-head">
-  <h2>Models {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
-  <div class="page-actions">
-    <a href="/apps/loadcoach/reliability">Reliability</a> · <a href="/apps/loadcoach/providers">Providers</a> · <a href="/catalog">Catalog</a>
-    <form method="post" action="/apps/loadcoach/models/discover" class="kit-inline">
-      <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-      <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="LoadCoach is not answering"{% endif %}>Scan for models</button>
-    </form>
-  </div>
-</div>
+{% call app_page_header(view, "Models", "Models", "Every model discovery has seen, available or not — what it is, what it has been measured to do, and how fast it has actually been.") %}
+  <a href="/apps/loadcoach/reliability">Reliability</a> · <a href="/apps/loadcoach/providers">Providers</a> · <a href="/catalog">Catalog</a> · {{ docs_link("loadcoach") }}
+  <form method="post" action="/apps/loadcoach/models/discover" class="kit-inline">
+    <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+    <button type="submit" data-variant="primary"{% if not sourced.live %} disabled title="LoadCoach is not answering"{% endif %}>Scan for models</button>
+  </form>
+{% endcall %}
 {% include "_app_state.html" %}
 {{ refusal(action_error) }}
 {% if scanned %}
@@ -21,26 +18,51 @@
 {{ scanned.get("unavailable") }} unavailable, {{ scanned.get("total") }} in the registry.
 {% if scanned.get("unreachable") %}Not reached: {{ scanned.get("unreachable") | join(", ") }}.{% endif %}</p>
 {% endif %}
-<p class="muted">Every model discovery has seen, available or not. Scanning asks every registration what
-it serves now. Disabling keeps a model with its evidence and history and routes around it by name
-(<span class="mono">model_disabled</span>, ADR-0118); warming runs one small pinned job, the path any
-job takes, and opens that job.</p>
+<p class="muted">Scanning asks every enabled registration what it serves now. Disabling keeps a model with
+its evidence and history and routes around it by name (<span class="mono">model_disabled</span>, ADR-0118);
+warming runs one small pinned job, the path any job takes, and opens that job. Speed is the last seven days
+of the busiest task profile — measured, not promised. <strong>Context fit</strong> is FreeWeight's, measured
+under the runtime profile the cell names: one number per model would be a lie.</p>
+
+{% if abilities %}
+<form class="filter-bar" action="/apps/loadcoach/models" method="get" role="search">
+  <div class="field"><label for="lc-ability">Ability</label>
+    <select id="lc-ability" name="ability">
+      <option value="">no ability chosen</option>
+      {% for one in abilities %}<option value="{{ one }}"{{ ' selected' if ability == one else '' }}>{{ one }}</option>{% endfor %}
+    </select>
+    <span class="field-hint">Bound evidence only — a capability nothing has measured here is not offered.</span></div>
+  <button type="submit">Rank by it</button>
+  {% if ability %}<a href="/apps/loadcoach/models">Registry order</a>{% endif %}
+</form>
+{% endif %}
+{% if context_fit_error %}
+<p class="muted">Context fit is empty: FreeWeight {{ context_fit_error.message }}</p>
+{% endif %}
 
 {{ refusal(sourced.error) }}
 {% if sourced.data is not none %}
-{% if sourced.data %}
+{% if ordered %}
 {% set rows = [] %}
-{% for model in sourced.data %}
+{% for model in ordered %}
+{% set canonical = model.get("canonical_id") %}
 {% set evidence = model.get("evidence_summary") %}
 {% set reliability = model.get("reliability") %}
 {% set residency = model.get("residency") %}
+{% set fast = speed.get(canonical) or {} %}
+{% set fit = context_fit.get(canonical) or {} %}
 {% set _ = rows.append([
-  model_link(model.get("model_ref"), model.get("canonical_id")) ~ " · " ~ recorded(model.get("provider_name")),
+  model_link(model.get("model_ref"), model.get("provider_model_name") or canonical) ~ '<br><span class="muted mono kit-id">'|safe ~ (canonical or "") ~ '</span>'|safe,
+  recorded(model.get("provider_name")),
   badge("remote", tone="warning") if model.get("is_remote") else recorded(false),
   model.get("family") or "—",
   context_k(model.get("max_context")),
+  ('<span title="runtime profile '|safe ~ (fit.get("runtime_profile_hash") or "not recorded") ~ " · machine " ~ (fit.get("machine_fingerprint") or "not recorded") ~ (" · " ~ ("%.0f" | format(fit.get("observed_mb_per_1k_context"))) ~ " MB per 1k context" if fit.get("observed_mb_per_1k_context") is number else "") ~ '">'|safe ~ context_k(fit.get("max_successful_context_tokens")) ~ (" " ~ badge("capped", tone="warning", title="capped by configuration, not by the card") if fit.get("capped_by_configuration") else "") ~ '</span>'|safe) if fit else measure(none),
   (model.get("size_bytes") | bytes_human) if model.get("size_bytes") is number else measure(none),
   capability_badges((model.get("declared_capabilities") or {}).keys()) if model.get("declared_capabilities") else "none declared",
+] + ([num((scores.get(canonical) or {}).get(ability), "%.3f")] if ability else []) + [
+  ('<span title="'|safe ~ (fast.get("task_profile_id") or "—") ~ " · " ~ ((fast.get("counted") or 0) | string) ~ ' attempts 7d">'|safe ~ stat(fast.get("mean_tokens_per_second"), "%.1f", 1) ~ '</span>'|safe) if fast else measure(none),
+  stat(fast.get("p95_latency_ms"), "%.0f ms", 1) if fast else measure(none),
   measure(none) if evidence is none else ((evidence.get("bound") ~ " bound · " ~ evidence.get("capabilities") ~ " capabilities" ~ (" · " ~ evidence.get("stale") ~ " stale" if evidence.get("stale") else "") ~ (" · " ~ evidence.get("unmatched") ~ " unmatched" if evidence.get("unmatched") else "")) if evidence.get("bound") or evidence.get("unmatched") else "none imported"),
   measure(none) if reliability is none else ((("factor %.3f" | format(reliability.get("lowest_factor"))) if reliability.get("lowest_factor") is number else "neutral") ~ " · " ~ reliability.get("attempts_7d") ~ " attempts 7d" ~ (" · " ~ badge("regression", tone="danger") if reliability.get("regressions") else "") ~ (" · " ~ breaker_badge(reliability.get("circuit_state")) if reliability.get("circuit_state") != "closed" else "") if reliability.get("pairs") else "no production evidence"),
   measure(none) if residency is none else ((badge("resident", tone="success") ~ " GPU " ~ (residency.get("gpu_indexes") or []) | join(", ")) if residency.get("resident") else "no"),
@@ -50,10 +72,10 @@ job takes, and opens that job.</p>
 {% for adapter in model.get("adapters") or [] %}
 {% set _ = rows.append([
   "↳ " ~ (adapter.get("subject_canonical_id") or adapter.get("name") or "—"),
-  "adapter",
-  "local only",
-  "—", "—",
+  "with its base", "adapter", "local only", "—", "—", "—",
   capability_badges(adapter.get("declared_capabilities")) if adapter.get("declared_capabilities") else "none declared",
+] + (["—"] if ability else []) + [
+  "—", "—",
   (adapter.get("evidence_source") or "—") ~ " · " ~ (adapter.get("base_confidence") or "—") ~ " base",
   "per subject",
   "with its base",
@@ -62,7 +84,8 @@ job takes, and opens that job.</p>
 ]) %}
 {% endfor %}
 {% endfor %}
-{{ table([{"label": "Model · registration"}, {"label": "Egress"}, {"label": "Family"}, {"label": "Context", "numeric": true}, {"label": "Size", "numeric": true}, {"label": "Declared"}, {"label": "Evidence"}, {"label": "Reliability"}, {"label": "Resident"}, {"label": "Availability"}, {"label": "Use"}], rows, caption="Every model discovery has seen, each adapter subject under the base it runs on", density="dense", row_count=rows | length, table_id="lc-models", sortable=true) }}
+{% set head = [{"label": "Model"}, {"label": "Registration"}, {"label": "Egress"}, {"label": "Family"}, {"label": "Context", "numeric": true}, {"label": "Context fit", "numeric": true}, {"label": "Size", "numeric": true}, {"label": "Declared"}] + ([{"label": ability, "numeric": true}] if ability else []) + [{"label": "Tokens/s", "numeric": true}, {"label": "p95", "numeric": true}, {"label": "Evidence"}, {"label": "Reliability"}, {"label": "Resident"}, {"label": "Availability"}, {"label": "Use"}] %}
+{{ table(head, rows, caption="Every model discovery has seen, each adapter subject under the base it runs on" ~ (" · ranked by " ~ ability if ability else ""), density="dense", row_count=rows | length, table_id="lc-models", sortable=true) }}
 {% else %}
 {{ empty_state("No model has been discovered yet. Scan for models once a registration answers.", "Providers", "/apps/loadcoach/providers") }}
 {% endif %}

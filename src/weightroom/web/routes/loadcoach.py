@@ -12,7 +12,7 @@ Every action is a form post writing exactly one audit row whether LoadCoach acce
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 from urllib.parse import urlencode
 
@@ -20,6 +20,7 @@ from baseaicore import SuiteError, new_id
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 
+from weightroom.services import freeweight_pages as fw
 from weightroom.services import loadcoach_actions as actions
 from weightroom.services import loadcoach_pages as lc
 from weightroom.services.app_api import outcome_of
@@ -88,17 +89,71 @@ def _clients(request: Request) -> tuple[Any, Any]:
 # --- Models ---------------------------------------------------------------------------------------
 
 
-def _models(
+def _optional[T](read: Callable[[], T], default: T) -> tuple[T, SuiteError | None]:
+    """``read()``, or ``default`` and the refusal — for a column that enriches a page.
+
+    Ability, speed and context fit each come from a *second* read, and none of them is the page:
+    the Models page is the registry, and a reader that refuses costs that page its column and a
+    note, never its rows (ADR-0016 — an unavailable figure says so, it does not become a zero).
+    """
+    try:
+        return read(), None
+    except SuiteError as exc:
+        return default, exc
+
+
+def _by_ability(
+    models: Sequence[Mapping[str, Any]],
+    ability: str,
+    scores: Mapping[str, Mapping[str, float]],
+) -> list[Mapping[str, Any]]:
+    """``models`` in the registry's own order, or ordered by one capability's bound score.
+
+    Highest first; a model with no bound evidence for that capability sorts last and shows a dash,
+    because no measurement is not a low score (ADR-0016). Registry order — LoadCoach's, newest
+    seen first — is returned untouched when no ability is chosen, so the default page is exactly
+    what the API said.
+    """
+    if not ability:
+        return list(models)
+    return sorted(
+        models,
+        key=lambda one: (
+            -float(scores.get(str(one.get("canonical_id") or ""), {}).get(ability, float("-inf")))
+        ),
+    )
+
+
+def _models(  # noqa: PLR0913 — what an action leaves on the page, plus this page's own controls
     request: Request,
     principal: Principal,
     *,
     action_error: SuiteError | None = None,
     scanned: Mapping[str, Any] | None = None,
+    ability: str = "",
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
     sourced = read_app_page(
         request, view, api=lambda: lc.models_api(client, settings), database=lc.models_db
+    )
+    empty: dict[str, Any] = {}
+    no_abilities: dict[str, Any] = {"capabilities": [], "scores": {}}
+    abilities, _abilities_error = (
+        _optional(lambda: lc.abilities_api(client, settings), no_abilities)
+        if sourced.live
+        else (no_abilities, None)
+    )
+    speed, _speed_error = (
+        _optional(lambda: lc.speed_api(client, settings), empty) if sourced.live else (empty, None)
+    )
+    # A cross-application read: FreeWeight measures the context that fits, LoadCoach never does
+    # (row WX7's `GET /results/context-fit`). FreeWeight down, or older than that row, costs the
+    # column its numbers and nothing else.
+    context_fit, context_fit_error = (
+        _optional(lambda: fw.context_fit_api(client, settings), empty)
+        if sourced.data
+        else (empty, None)
     )
     return render_app_page(
         request,
@@ -108,15 +163,29 @@ def _models(
         selected="Models",
         view=view,
         sourced=sourced,
+        ordered=_by_ability(sourced.data or [], ability, abilities["scores"]),
         action_error=action_error,
         scanned=scanned,
+        ability=ability,
+        abilities=abilities["capabilities"],
+        scores=abilities["scores"],
+        speed=speed,
+        context_fit=context_fit,
+        context_fit_error=context_fit_error,
     )
 
 
 @ui_router.get(f"{BASE}/models", summary="Models", response_class=HTMLResponse)
-def models_page(request: Request, principal: CurrentOperator) -> HTMLResponse:
-    """Every model discovery has seen, with evidence, reliability, residency and its switches."""
-    return _models(request, principal)
+def models_page(
+    request: Request, principal: CurrentOperator, ability: str | None = None
+) -> HTMLResponse:
+    """Every model discovery has seen, with evidence, reliability, residency and its switches.
+
+    ``ability`` is one capability id from the bound evidence this LoadCoach holds: the table gains
+    that capability's score per model and is ordered by it, highest first, with every model that
+    has no bound evidence for it last (no evidence is not a low score — ADR-0016).
+    """
+    return _models(request, principal, ability=(ability or "").strip())
 
 
 @ui_router.post(f"{BASE}/models/discover", summary="Scan for models from the page")
@@ -919,6 +988,7 @@ def _providers(  # noqa: PLR0913 — what an action leaves on the page
     form: Mapping[str, Any] | None = None,
     saved: str | None = None,
     removed: str | None = None,
+    prefill: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
@@ -940,6 +1010,7 @@ def _providers(  # noqa: PLR0913 — what an action leaves on the page
         form=dict(form or {}),
         saved=saved,
         removed=removed,
+        prefill=dict(prefill or {}),
     )
 
 
@@ -949,9 +1020,24 @@ def providers_page(
     principal: CurrentOperator,
     saved: str | None = None,
     removed: str | None = None,
+    kind: str | None = None,
 ) -> HTMLResponse:
-    """Every ``[providers.<name>]`` registration as a form, and one to add another (ADR-0117)."""
-    return _providers(request, principal, saved=saved or None, removed=removed or None)
+    """Every ``[providers.<name>]`` registration as a form, and one to add another (ADR-0117).
+
+    ``kind`` prefills the *Add a registration* form — the **Add llama.cpp** link's whole
+    mechanism (row WX9). It is a prefill and nothing more: the form is submitted by a person, the
+    password gate on a new registration is unchanged, and a kind LoadCoach does not support is
+    refused by LoadCoach in its own words rather than filtered here.
+    """
+    wanted = (kind or "").strip()
+    prefill = {"kind": wanted} if wanted else None
+    if wanted == "llamacpp":
+        # The one kind that launches its own server: `model_directory` is required and there is no
+        # default worth guessing, so the form opens with the field empty and marked required.
+        prefill = {"kind": wanted, "base_url": "", "server_path": "llama-server"}
+    return _providers(
+        request, principal, saved=saved or None, removed=removed or None, prefill=prefill
+    )
 
 
 @ui_router.post(f"{BASE}/providers", summary="Save or remove a registration from the page")
@@ -968,6 +1054,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
     model_directory: Annotated[str, Form()] = "",
     state_dir: Annotated[str, Form()] = "",
     server_path: Annotated[str, Form()] = "",
+    enabled: Annotated[str, Form()] = "",
     confirm: Annotated[str, Form()] = "",
     password: Annotated[str, Form()] = "",
 ) -> Response:
@@ -985,7 +1072,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
     form = {
         "name": wanted, "kind": kind, "base_url": base_url, "timeout_seconds": timeout_seconds,
         "remote": remote, "model_directory": model_directory, "state_dir": state_dir,
-        "server_path": server_path,
+        "server_path": server_path, "enabled": enabled,
     }  # fmt: skip
     if action == "delete":
         if confirm != wanted or not wanted:
@@ -1030,6 +1117,7 @@ def provider_from_page(  # noqa: PLR0913 — one parameter per form field, as Fa
         values = actions.registration_values(
             kind=kind, base_url=base_url, timeout_seconds=timeout_seconds, remote=remote == "true",
             model_directory=model_directory, state_dir=state_dir, server_path=server_path,
+            enabled=enabled == "true",
         )  # fmt: skip
         changed, security = actions.touched(current, values)
         if security:

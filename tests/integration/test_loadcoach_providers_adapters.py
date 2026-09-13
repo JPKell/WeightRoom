@@ -104,6 +104,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "model_directory": "",
         "state_dir": "",
         "server_path": "llama-server",
+        "enabled": "true",
         **overrides,
     }
 
@@ -152,6 +153,7 @@ def test_a_non_security_key_saves_without_the_password(tmp_path: Path) -> None:
         "state_dir": "",
         "server_path": "llama-server",
         "remote": False,
+        "enabled": True,
         "timeout_seconds": 301.0,
     }
     (row,) = audit(console, "loadcoach.provider_save")
@@ -254,6 +256,46 @@ def test_a_stopped_loadcoachs_providers_page_reads_only_from_its_api(tmp_path: P
     text = page(console, f"{BASE}/providers")
     assert "reads only from its running API" in text
     assert 'id="provider-' not in text
+
+
+# --- `enabled` and the llama.cpp quick-add (row WX9) ---------------------------------------------
+
+
+def test_a_registration_can_be_disabled_from_the_page(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        put = _providers(router)
+        response = post(console, f"{BASE}/providers", _form(enabled=""))
+    assert response.status_code == 303
+    assert json.loads(put.calls.last.request.content)["enabled"] is False
+    (row,) = audit(console, "loadcoach.provider_save")
+    assert (row["outcome"], row["params"]["fields"]) == ("ok", ["enabled"])
+
+
+def test_the_enabled_box_is_ticked_for_a_registration_that_carries_no_such_key(
+    tmp_path: Path,
+) -> None:
+    """A LoadCoach that predates the key answers without it, and true is its default."""
+    document = fixture("providers")
+    document["registrations"][0].pop("enabled")
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"providers": document})
+        text = page(console, f"{BASE}/providers")
+    assert 'name="enabled" value="true" checked' in text
+
+
+def test_the_llamacpp_quick_add_prefills_the_form_and_says_what_it_needs(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        _providers(router)
+        listing = page(console, f"{BASE}/providers")
+        prefilled = page(console, f"{BASE}/providers?kind=llamacpp")
+    assert 'href="/apps/loadcoach/providers?kind=llamacpp#provider-new"' in listing
+    assert 'id="lc-new-kind" name="kind" value="llamacpp"' in prefilled
+    assert "model_directory</code> is required" in prefilled
+    # The password gate on a new registration is unchanged by the shortcut.
+    assert 'id="lc-new-password" name="password" type="password"' in prefilled
 
 
 # --- Adapters -------------------------------------------------------------------------------------

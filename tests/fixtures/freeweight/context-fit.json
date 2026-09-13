@@ -1,0 +1,25 @@
+{
+ "items": [
+  {
+   "canonical_id": "ollama/deepseek-coder-v2:latest@sha256:63fb193b3a9b",
+   "runtime_profile_hash": "8f2c1d4e",
+   "machine_fingerprint": "jordan-main",
+   "max_successful_context_tokens": 32768,
+   "capped_by_configuration": false,
+   "observed_mb_per_1k_context": 118.4
+  },
+  {
+   "canonical_id": "ollama/gpt-oss:20b@sha256:17052f91a42e",
+   "runtime_profile_hash": "8f2c1d4e",
+   "machine_fingerprint": "jordan-main",
+   "max_successful_context_tokens": 16384,
+   "capped_by_configuration": true,
+   "observed_mb_per_1k_context": 96.0
+  }
+ ],
+ "page": {
+  "limit": 500,
+  "next_cursor": null,
+  "has_more": false
+ }
+}

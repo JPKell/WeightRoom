@@ -16,6 +16,7 @@ import httpx
 import respx
 
 from tests.support import (
+    FREEWEIGHT_URL,
     JSON_HEADERS,
     LOADCOACH_URL,
     Console,
@@ -23,12 +24,15 @@ from tests.support import (
     fake_application,
     fill_rows,
     fixture_database,
+    mock_freeweight,
     mock_loadcoach,
 )
 from weightroom.services.apps import AppState
 from weightroom.services.processes import FakeSystemdController
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "loadcoach"
+FW_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "freeweight"
+FW_FIXTURES_DEFAULT = json.loads((FW_FIXTURES / "context-fit.json").read_text(encoding="utf-8"))
 HTML = {"Accept": "text/html"}
 BASE = "/apps/loadcoach"
 API = f"{LOADCOACH_URL}/api/v1"
@@ -72,6 +76,7 @@ def mock_api(
     *,
     version: str = "1.5.0",
     bodies: dict[str, Any] | None = None,
+    context_fit: Any = None,  # noqa: ANN401 — a recorded JSON document
 ) -> dict[str, Any]:
     """LoadCoach's recorded reads, by path under ``/api/v1``; ``bodies`` replaces or adds some."""
     mock_loadcoach(router, version=version)
@@ -84,12 +89,20 @@ def mock_api(
         "task-profiles": fixture("task-profiles"),
         "task-profiles/general.chat": fixture("task-profile"),
         "reliability": fixture("reliability"),
+        "evidence": fixture("evidence"),
     }
     recorded.update(bodies or {})
-    return {
+    routes = {
         path: router.get(f"{API}/{path}").mock(return_value=httpx.Response(200, json=body))
         for path, body in recorded.items()
     }
+    # The Models page reads FreeWeight for its Context fit column (row WX9/WX7): a cross-
+    # application read the console makes, not one LoadCoach makes.
+    mock_freeweight(router)
+    routes["results/context-fit"] = router.get(f"{FREEWEIGHT_URL}/api/v1/results/context-fit").mock(
+        return_value=httpx.Response(200, json=context_fit or FW_FIXTURES_DEFAULT)
+    )
+    return routes
 
 
 def page(console: Console, path: str) -> str:
@@ -136,6 +149,75 @@ def test_the_models_page_reads_the_registry_and_offers_its_switches(tmp_path: Pa
     assert f'action="{BASE}/models/{MODEL}/enabled"' in text
     assert '<a href="/apps/loadcoach/models" aria-current="page">Models</a>' in text
     assert "From the API" in text
+
+
+def test_the_models_page_names_the_model_the_registration_and_the_context_that_fits(
+    tmp_path: Path,
+) -> None:
+    """Row WX9: the name column is the provider's own name, the registration is its own column,
+    and Context fit is FreeWeight's measurement with the runtime profile it was measured under.
+    """
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        text = page(console, f"{BASE}/models")
+    assert "deepseek-coder-v2:latest</a>" in text  # provider_model_name, not the canonical id
+    assert ">Registration<" in text and ">Context fit<" in text
+    assert "32k" in text  # 32 768 measured tokens
+    assert "runtime profile 8f2c1d4e · machine jordan-main · 118 MB per 1k context" in text
+    assert "capped" in text  # the 16k row is capped by configuration, and says so
+
+
+def test_context_fit_is_a_dash_and_a_reason_when_freeweight_does_not_answer(
+    tmp_path: Path,
+) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        router.get(f"{FREEWEIGHT_URL}/api/v1/results/context-fit").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        text = page(console, f"{BASE}/models")
+    assert "Context fit is empty: FreeWeight" in text
+    assert CANONICAL in text  # the registry is the page; the column is not
+
+
+def test_an_ability_ranks_the_registry_by_its_bound_evidence(tmp_path: Path) -> None:
+    console, _database = loadcoach_console(tmp_path, state="active")
+    bound = fixture("evidence")
+    bound["items"] = [
+        _bound_record(CANONICAL, "structured_output", 0.42),
+        _bound_record("ollama/gpt-oss:20b@sha256:17052f91a42e", "structured_output", 0.91),
+    ]
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router, bodies={"evidence": bound})
+        offered = page(console, f"{BASE}/models")
+        ranked = page(console, f"{BASE}/models?ability=structured_output")
+    assert '<option value="structured_output"' in offered
+    assert "ranked by structured_output" in ranked
+    assert ranked.index("0.910") < ranked.index("0.420")
+
+
+def _bound_record(canonical: str, capability: str, score: float) -> dict[str, Any]:
+    """One ``capability.evidence`` envelope as ``GET /evidence?match_state=bound`` returns it."""
+    provider_kind, _, rest = canonical.partition("/")
+    name = rest.split("@", 1)[0]
+    return {
+        "schema": "capability.evidence",
+        "schema_version": "1.0",
+        "payload": {
+            "model": {
+                "canonical_id": canonical,
+                "provider_kind": provider_kind,
+                "provider_model_name": name,
+            },
+            "capability_id": capability,
+            "score": score,
+            "confidence": 0.7,
+            "sample_count": 40,
+            "measured_at": "2026-09-09T00:00:00Z",
+        },
+    }
 
 
 def test_one_model_shows_its_identity_reliability_and_breaker(tmp_path: Path) -> None:

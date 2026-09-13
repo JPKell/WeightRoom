@@ -38,6 +38,7 @@ __all__ = [
     "MATCH_STATES",
     "TERMINAL_JOB_STATES",
     "NotRecorded",
+    "abilities_api",
     "adapters_api",
     "adapters_db",
     "decision_api",
@@ -61,6 +62,7 @@ __all__ = [
     "reliability_api",
     "reliability_db",
     "segment",
+    "speed_api",
     "system_api",
     "task_profile_api",
     "task_profile_db",
@@ -862,6 +864,83 @@ def _evidence_record(record: Mapping[str, Any]) -> dict[str, Any]:
         "stale_reason": None,
         "source_id": None,
     }
+
+
+def abilities_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
+    """``GET /evidence?match_state=bound``: the capability vocabulary, and each model's score.
+
+    One call answers both halves of the Models page's **Ability** control (row WX9): the
+    vocabulary is the capability ids that actually have bound evidence here — not a list this
+    console keeps, which would name capabilities nothing has measured — and the scores are those
+    records' own, joined by ``canonical_id``. Only ``bound`` records are read: an unmatched record
+    names no model on this machine, so it can neither fill a column nor order one.
+
+    Returns:
+        ``capabilities`` (sorted ids) and ``scores`` (``canonical_id`` → ``capability_id`` →
+        score). Where a model carries several records for one capability — several runtime
+        profiles, several machines — the highest is kept, which is the one routing would see at
+        its best, and the page says the column is evidence rather than a promise.
+
+    Raises:
+        AppRefused: LoadCoach refused.
+        AppUnreachable: It did not answer.
+    """
+    body = call(
+        client, settings, APP, "GET", "evidence",
+        params={"match_state": "bound", "limit": EVIDENCE_PAGE}, timeout_seconds=30.0,
+    )  # fmt: skip
+    scores: dict[str, dict[str, float]] = {}
+    capabilities: set[str] = set()
+    for item in _listed(body, "items"):
+        record = _evidence_record(_document(item.get("payload")))
+        canonical, capability = record.get("canonical_id"), record.get("capability_id")
+        score = record.get("score")
+        if not canonical or not capability or not isinstance(score, int | float):
+            continue
+        capabilities.add(str(capability))
+        held = scores.setdefault(str(canonical), {})
+        held[str(capability)] = max(float(score), held.get(str(capability), float(score)))
+    return {"capabilities": sorted(capabilities), "scores": scores}
+
+
+def speed_api(client: httpx.Client, settings: Settings) -> dict[str, dict[str, Any]]:
+    """``GET /reliability``: how fast each model has actually been, over the last seven days.
+
+    Per model, the window of the **busiest** task profile — the pair with the most counted
+    attempts in 7d — rather than an average across profiles: LoadCoach's arithmetic produces these
+    numbers per pair, and averaging them here would be the console inventing a figure
+    (``loadcoach_pages`` module docstring). The profile is carried so the page can name it; a
+    number with no profile beside it does not say what it measured.
+
+    Returns:
+        ``canonical_id`` → ``mean_tokens_per_second``, ``p95_latency_ms``, ``counted`` and
+        ``task_profile_id``. A model no job has run is absent, and the page renders ``—``. The two
+        figures are LoadCoach's own bounded measurements — ``{value, samples, minimum, reason}``
+        (ADR-0016 rule 5) — and are passed through whole: below its minimum the page must render
+        the dash and the reason, not a number.
+
+    Raises:
+        AppRefused: LoadCoach refused.
+        AppUnreachable: It did not answer.
+    """
+    body = call(client, settings, APP, "GET", "reliability", timeout_seconds=30.0)
+    fastest: dict[str, dict[str, Any]] = {}
+    for entry in _listed(body, "reliability"):
+        model = _document(entry.get("model"))
+        canonical = str(model.get("subject_canonical_id") or model.get("canonical_id") or "")
+        week = _document(_document(entry.get("windows")).get("7d"))
+        counted = week.get("counted")
+        if not canonical or not isinstance(counted, int) or counted <= 0:
+            continue
+        if counted <= int(fastest.get(canonical, {}).get("counted") or 0):
+            continue
+        fastest[canonical] = {
+            "mean_tokens_per_second": week.get("mean_tokens_per_second"),
+            "p95_latency_ms": week.get("p95_latency_ms"),
+            "counted": counted,
+            "task_profile_id": entry.get("task_profile_id"),
+        }
+    return fastest
 
 
 def evidence_api(client: httpx.Client, settings: Settings) -> dict[str, Any]:
