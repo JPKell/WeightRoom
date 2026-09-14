@@ -105,6 +105,23 @@
 </div>
 {%- endmacro %}
 
+{% macro fit_action(canonical, fit, configured) -%}
+{#- ADR-0149 §1: FreeWeight's measured fit beside what LoadCoach's config serves, and the write that
+    makes them agree. Imported `with context`: the form carries the CSRF token. -#}
+{%- set tokens = fit.get("max_successful_context_tokens") -%}
+{%- if tokens is number -%}
+{%- if configured.get(canonical) == tokens | int %} {{ badge("applied", tone="success", title="LoadCoach config serves this model at the measured context") }}
+{%- else %}
+<form method="post" action="/apps/loadcoach/models/context-fit" class="kit-actions">
+  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+  <input type="hidden" name="canonical_id" value="{{ canonical }}">
+  <input type="hidden" name="context_tokens" value="{{ tokens | int }}">
+  <button type="submit" title="{{ ('LoadCoach config serves ' ~ configured.get(canonical)) if configured.get(canonical) else 'LoadCoach config names no context for this model' }}">Apply</button>
+</form>
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
 {% macro rejections(rejected, caption="Rejected, each by its code") -%}
 {%- if rejected -%}
 {% set rows = [] %}

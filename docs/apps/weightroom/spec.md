@@ -438,8 +438,11 @@ records in its own `audit_log`. It never mounts a package table of its own.
    A page under one application's tab may show another application's measurement where only that
    application produces it — LoadCoach's Models page carries FreeWeight's *Context fit* from
    `GET /api/v1/results/context-fit` (row WX9). It stays a console read over HTTP: neither
-   application learns of the other, nothing is written back, and the column carries the runtime
-   profile and machine the number was measured under, because one number per model would be a lie.
+   application learns of the other, and the column carries the runtime profile and machine the
+   number was measured under, because one number per model would be a lie. The one thing written
+   back is an operator's **Apply**, which lands the number in LoadCoach's `config.toml` as
+   `[runtime.models."<id>"].context_size` through the same validated settings write every settings
+   page uses ([ADR-0149](../../adr/0149-the-console-applies-a-context-fit-to-loadcoach.md)).
    An unreachable second application costs that page its column and a note, never its rows.
 2. **Every action is an audit row.** Process control, settings writes, guarded database writes,
    curated operations, catalog changes, prompt overrides, job runs, alert acknowledgements,

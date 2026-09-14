@@ -13,6 +13,7 @@ Every action is a form post writing exactly one audit row whether LoadCoach acce
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 from urllib.parse import urlencode
 
@@ -27,6 +28,7 @@ from weightroom.services.app_api import outcome_of
 from weightroom.services.app_api import stream as app_stream
 from weightroom.services.audit import record
 from weightroom.services.auth import require_fresh_reauth
+from weightroom.services.config_files import read_config
 from weightroom.web.routes.apps import app_view, back_to, read_app_page, render_app_page
 from weightroom.web.session import CurrentOperator, now_of, reauthenticated
 
@@ -131,6 +133,7 @@ def _models(  # noqa: PLR0913 — what an action leaves on the page, plus this p
     action_error: SuiteError | None = None,
     scanned: Mapping[str, Any] | None = None,
     ability: str = "",
+    applied: Mapping[str, Any] | None = None,
 ) -> HTMLResponse:
     view = app_view(request, APP)
     client, settings = _clients(request)
@@ -172,7 +175,38 @@ def _models(  # noqa: PLR0913 — what an action leaves on the page, plus this p
         speed=speed,
         context_fit=context_fit,
         context_fit_error=context_fit_error,
+        configured=_configured_contexts(request),
+        applied=applied,
     )
+
+
+def _loadcoach_config_path(request: Request) -> Path:
+    """The file LoadCoach reads, as its cached schema document states it (ADR-0127).
+
+    The document alone, not the Settings form: the form also reads LoadCoach's live settings, which
+    this page has no use for.
+    """
+    import time
+
+    from weightroom.services.settings_forms import config_file_path, read_schema_document
+
+    state = request.app.state
+    document, _error = state.schemas.get(
+        APP, now=time.monotonic(), read=lambda: read_schema_document(state.settings, APP)
+    )
+    return config_file_path(document, app=APP)
+
+
+def _configured_contexts(request: Request) -> dict[str, int]:
+    """The per-model contexts LoadCoach's file names; empty when it cannot be read.
+
+    Empty offers Apply on every measured row, which is safe: the write is validated by LoadCoach.
+    """
+    try:
+        text, _mtime = read_config(_loadcoach_config_path(request))
+        return actions.configured_contexts(text)
+    except ValueError:
+        return {}
 
 
 @ui_router.get(f"{BASE}/models", summary="Models", response_class=HTMLResponse)
@@ -232,6 +266,37 @@ def enabled_from_page(  # noqa: PLR0913 — one parameter per form field
         params=params,
     )  # fmt: skip
     return RedirectResponse(back_to(APP, next_path), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@ui_router.post(f"{BASE}/models/context-fit", summary="Apply a measured context fit from the page")
+def context_fit_from_page(
+    request: Request,
+    principal: CurrentOperator,
+    canonical_id: Annotated[str, Form()] = "",
+    context_tokens: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """ADR-0149 §1: FreeWeight's measured fit written into LoadCoach's config, on operator's word.
+
+    Never automatic — a changed context changes LoadCoach's runtime profile hash — and never
+    restarts LoadCoach: the page says a restart is pending, as every settings write does.
+    """
+    tokens = int(context_tokens) if context_tokens.strip().isdigit() else 0
+    params = {"app": APP, "canonical_id": canonical_id, "context_tokens": tokens}
+    try:
+        landed = actions.apply_context_fit(
+            request.app.state.settings, _loadcoach_config_path(request), canonical_id, tokens
+        )
+    except SuiteError as exc:
+        _audit(
+            request, principal, "loadcoach.context_fit_applied", target=canonical_id or None,
+            outcome=outcome_of(exc), params=params, message=exc.message,
+        )  # fmt: skip
+        return _models(request, principal, action_error=exc)
+    _audit(
+        request, principal, "loadcoach.context_fit_applied", target=canonical_id, outcome="ok",
+        params={**params, "backup": str(landed.backup) if landed.backup else None},
+    )  # fmt: skip
+    return _models(request, principal, applied={"canonical_id": canonical_id, "tokens": tokens})
 
 
 @ui_router.post(f"{BASE}/models/{{model_ref}}/warm", summary="Warm a model from the page")

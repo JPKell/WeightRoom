@@ -679,6 +679,11 @@ EXERCISES.update(
             {"enabled": "false"},
             reply=("POST", f"models/{_LC_MODEL}/enabled", 200, {}),
         ),
+        # ADR-0149: LoadCoach answers nothing here — the write is to its config file.
+        ("POST", "/apps/loadcoach/models/context-fit"): _lc_form(
+            "/apps/loadcoach/models/context-fit",
+            {"canonical_id": "llamacpp/example@sha256:0123456789ab", "context_tokens": "32768"},
+        ),
         ("POST", "/apps/loadcoach/models/{model_ref}/warm"): _lc_form(
             f"/apps/loadcoach/models/{_LC_MODEL}/warm",
             {},

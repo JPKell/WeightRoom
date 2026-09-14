@@ -1077,7 +1077,9 @@ def context_fit_api(client: httpx.Client, settings: Settings) -> dict[str, dict[
     body = call(client, settings, APP, "GET", "results/context-fit", timeout_seconds=30.0)
     found: dict[str, dict[str, Any]] = {}
     for row in _listed(body, "items"):
-        canonical = str(row.get("canonical_id") or "")
+        # FreeWeight names the subject `model` (`ContextFit.as_json`); `canonical_id` is what the
+        # first recording said, kept so an older document still reads.
+        canonical = str(row.get("model") or row.get("canonical_id") or "")
         if canonical:
             found.setdefault(canonical, dict(row))
     return found

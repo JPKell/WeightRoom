@@ -6,6 +6,17 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (row CF4)
+- **Apply a measured context fit to LoadCoach from its Models page.** The Context fit column offers
+  **Apply**, which writes `[runtime.models."<canonical_id>"].context_size` into LoadCoach's
+  `config.toml` through LoadCoach's own validation, audited `loadcoach.context_fit_applied`; a model
+  whose file already serves the measured context reads *applied* (ADR-0149).
+
+### Fixed (row CF4)
+- **The Context fit column reads FreeWeight's real shape.** FreeWeight names the subject `model`;
+  the console looked for `canonical_id`, which only the recorded fixture carried, so the column was
+  empty against a live FreeWeight.
+
 ### Changed
 - **Every Overview's Start, Stop and Restart sit at the right of its heading row**
   (`app_page_header(controls=true)`); LoadCoach, IdeaPress and PromptCadence's Overview now wears

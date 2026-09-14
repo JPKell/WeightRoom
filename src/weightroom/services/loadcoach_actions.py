@@ -15,9 +15,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final
 from baseaicore import DataClassification, SuiteError
 
 from weightroom.services.app_api import call
+from weightroom.services.config_files import WriteOutcome, apply_changes, read_config, write_config
 from weightroom.services.loadcoach_pages import APP, segment
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import httpx
 
     from weightroom.config import Settings
@@ -28,7 +31,9 @@ __all__ = [
     "RUNTIME_PROFILE_FIELDS",
     "SECURITY_FIELDS",
     "LoadCoachFormInvalid",
+    "apply_context_fit",
     "cancel_job",
+    "configured_contexts",
     "delete_registration",
     "discover",
     "evidence_bundle",
@@ -559,3 +564,69 @@ def delete_registration(client: httpx.Client, settings: Settings, name: str) -> 
         timeout_seconds=_ACTION_TIMEOUT_SECONDS,
     )  # fmt: skip
     return dict(document) if isinstance(document, Mapping) else {}
+
+
+def configured_contexts(text: str) -> dict[str, int]:
+    """``[runtime.models."<canonical_id>"].context_size`` per model, from LoadCoach's config text.
+
+    Args:
+        text: The file's text; ``""`` for a file that does not exist.
+
+    Returns:
+        Canonical ID → the context LoadCoach's file serves it at. A model with no per-model
+        context is absent: LoadCoach then serves ``[runtime]``'s, or the provider's.
+
+    Raises:
+        ValueError: ``text`` is not valid TOML.
+    """
+    import tomllib
+
+    models = tomllib.loads(text).get("runtime", {}).get("models", {}) if text else {}
+    return {
+        str(name): entry["context_size"]
+        for name, entry in models.items()
+        if isinstance(entry, dict) and isinstance(entry.get("context_size"), int)
+    }
+
+
+def apply_context_fit(
+    settings: Settings, path: Path, canonical_id: str, context_tokens: int
+) -> WriteOutcome:
+    """Write a measured context fit into LoadCoach's ``config.toml`` (ADR-0149 §1).
+
+    Sets ``[runtime.models."<canonical_id>"].context_size`` and keeps every other line, through
+    the write every settings page uses: LoadCoach's own ``config validate --file`` first, then an
+    atomic replace with a ``.bak``. LoadCoach reads the file at its next start.
+
+    Args:
+        settings: The validated settings.
+        path: LoadCoach's config file.
+        canonical_id: The model, as LoadCoach and FreeWeight both name it.
+        context_tokens: FreeWeight's ``max_successful_context_tokens`` for it.
+
+    Returns:
+        The landed write.
+
+    Raises:
+        LoadCoachFormInvalid: ``canonical_id`` is empty or ``context_tokens`` is not positive;
+            nothing was written.
+        ConfigChangedOnDisk: The file changed between reading and writing it.
+        ConfigValidationFailed: LoadCoach refused the result; nothing was written.
+    """
+    if not canonical_id or context_tokens <= 0:
+        message = "Applying a context fit needs a model and a positive number of tokens."
+        raise LoadCoachFormInvalid(
+            message, details={"canonical_id": canonical_id, "context_tokens": context_tokens}
+        )
+    text, base_mtime = read_config(path)
+    key: tuple[str, ...] = ("runtime", "models", canonical_id, "context_size")
+    changes: dict[tuple[str, ...], Any] = {key: context_tokens}
+    changed = apply_changes(text, changes)
+    return write_config(
+        settings,
+        APP,
+        path,
+        changed,
+        base_mtime=base_mtime,
+        keys=(f'runtime.models."{canonical_id}".context_size',),
+    )
