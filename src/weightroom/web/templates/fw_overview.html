@@ -1,42 +1,24 @@
 {% extends "_shell.html" %}
-{% from "mirrorwall/components.html" import badge, card, kv_list, table, empty_state, chart_container %}
-{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
-{% from "_fw.html" import filter_styles, run_link, value, status_badge %}
+{% from "mirrorwall/components.html" import card, table, empty_state, chart_container %}
+{% from "_app_page.html" import page_source, refusal, app_page_header, page_nav with context %}
+{% from "_fw.html" import filter_styles, run_link, value, start_form with context %}
 {% block title %}FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {{ filter_styles() }}
 <style>
-  /* Row WX8's heatmap ↔ matrix switch: two radios and two sections, no JavaScript and no
-     `<details>` — the reader sees which view is showing without opening anything, and the choice
-     survives a keyboard alone. `:has()` is what lets each radio sit inside its own label, where
-     it belongs; a browser without it shows both sections, which is complete rather than broken.
-     Kept here rather than in the shell's stylesheet: one page uses it. */
-  .fw-views { margin-top: 8px; }
-  .fw-view-switch { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0 0 8px; }
-  .fw-view-switch label { display: flex; align-items: baseline; gap: 6px; font-weight: 600; }
-  .fw-view-switch input { width: auto; margin: 0; }
-  .fw-view { margin: 0; }
-  .fw-views:has(#fw-view-tests:checked) .fw-view-suites,
-  .fw-views:has(#fw-view-suites:checked) .fw-view-tests { display: none; }
-  /* A canonical ID in the first column of a seven-column dense table wraps to one character a
-     line; the table scrolls instead (`.table-scroll`). */
-  [data-table="fw-dashboard"] td:first-child,
-  [data-table="fw-tests-matrix"] td:first-child { white-space: nowrap; }
+  /* The Active run card names a 26-character run id: cut to the card, whole in the title. */
+  .fw-card-link { min-width: 0; }
+  .fw-card-link .card-value { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fw-alt { margin-top: 8px; }
+  .fw-test-pick { max-width: 100%; margin: 0 0 8px; }
+  .fw-test-pick select { max-width: 100%; }
+  /* A model's name in the first column of a wide dense table scrolls rather than wrapping one
+     character a line. */
+  [data-table="fw-scores"] td:first-child { white-space: nowrap; }
 </style>
 {{ page_nav(links=[{"label": "Compare", "href": "/apps/freeweight/results/compare"}], actions=[{"label": "JSON", "href": "/api/v1/apps/freeweight"}, docs_action("freeweight")]) }}
-{{ app_page_header(view, "Overview", "Overview", "") }}
+{{ app_page_header(view, "Overview", "Overview", "", controls=true) }}
 {% with full_controls = true %}{% include "_app_state.html" %}{% endwith %}
-
-<form method="get" action="/apps/freeweight" class="filter-bar" aria-label="Dashboard filters">
-  <div class="field"><label for="fw-dash-suite">Suite</label><input id="fw-dash-suite" name="suite" value="{{ filters.suite }}"></div>
-  <div class="field"><label for="fw-dash-model">Model</label><input id="fw-dash-model" name="model" value="{{ filters.model }}" placeholder="canonical ID, ULID or name"></div>
-  <div class="field"><label for="fw-dash-machine">Machine</label><input id="fw-dash-machine" name="machine" value="{{ filters.machine }}"></div>
-  <div class="field"><label for="fw-dash-since">Since (RFC 3339)</label><input id="fw-dash-since" name="since" value="{{ filters.since }}"></div>
-  <button type="submit">Apply</button>
-  <a href="/apps/freeweight">Clear</a>
-</form>
-<p class="muted">One headline metric per suite, from each model's latest completed run in this scope.
-Nothing here is averaged across runs — every figure links to the samples that produced it.</p>
 
 {{ refusal(sourced.error) }}
 {% set data = sourced.data %}
@@ -56,149 +38,140 @@ Nothing here is averaged across runs — every figure links to the samples that 
   {{ card("Latest run", latest[:10] if latest else "—", note=("Completed at " ~ latest[11:19] ~ " UTC.") if latest else "No completed run.", kind="figure") }}
   {% endif %}
   {% for figure in overview.figures %}
+  {% if figure.href %}
+  <li class="card card--figure fw-card-link">
+    <span class="card-label">{{ figure.label }}</span>
+    <span class="card-value"><a class="mono" href="{{ figure.href }}" title="{{ figure.value }}">{{ figure.value }}</a></span>
+    {% if figure.note %}<span class="card-note">{{ figure.note }}</span>{% endif %}
+  </li>
+  {% else %}
   {{ card(figure.label, figure.value, note=figure.note, kind="figure") }}
+  {% endif %}
   {% endfor %}
 </ul>
+
+<form method="get" action="/apps/freeweight" class="filter-bar" aria-label="Dashboard filters">
+  <div class="field"><label for="fw-dash-suite">Suite</label><input id="fw-dash-suite" name="suite" value="{{ filters.suite }}"></div>
+  <div class="field"><label for="fw-dash-model">Model</label><input id="fw-dash-model" name="model" value="{{ filters.model }}" placeholder="canonical ID, ULID or name"></div>
+  <div class="field"><label for="fw-dash-machine">Machine</label><input id="fw-dash-machine" name="machine" value="{{ filters.machine }}"></div>
+  <div class="field"><label for="fw-dash-since">Since (RFC 3339)</label><input id="fw-dash-since" name="since" value="{{ filters.since }}"></div>
+  <button type="submit">Apply</button>
+  <a href="/apps/freeweight">Clear</a>
+</form>
+<p class="muted">Each model's latest completed run per suite in this scope. Nothing is averaged across runs.</p>
+
+{% if data is not none %}
+{% set matrix = data.get("tests_matrix") or {} %}
+{% set tests = matrix.get("tests") or [] %}
+{% set matrix_models = matrix.get("models") or [] %}
+<h3 id="heatmap">Scores by test</h3>
+{% if not cards.get("completed_runs") %}
+{{ empty_state("No completed run matches this scope.", "Runs", "/apps/freeweight/runs") }}
+{% elif not (tests and matrix_models) %}
+{{ empty_state("No run in this scope recorded a test outcome.") }}
+{% else %}
+{% if (data.get("heatmap") or {}).get("separated") %}
+<div class="warning-state">
+  <strong>Separated:</strong> these runs span more than one machine or more than one version of a
+  suite. FreeWeight does not merge them into one figure.
+</div>
+{% endif %}
+{% set by_cell = {} %}
+{% for cell in matrix.get("cells") or [] %}{% set _ = by_cell.update({(cell.get("model"), cell.get("test")): cell}) %}{% endfor %}
+{% set head = [{"label": "Model", "mono": true}] %}
+{% for test in tests %}{% set _ = head.append({"label": test, "numeric": true}) %}{% endfor %}
+{% set rows = [] %}
+{% for model in matrix_models %}
+{% set cells = [model | canonical_name] %}
+{% for test in tests %}
+{% set cell = by_cell.get((model, test)) %}
+{% set _ = cells.append(
+  value(cell.get("mean_score"), cell.get("skip_reason") or "no sample could be scored", fmt="%.2f") ~ " " ~ run_link(cell.get("run_id"))
+  if cell else "<span class=\"muted\" title=\"that run recorded no such test\">—</span>" | safe
+) %}
+{% endfor %}
+{% set _ = rows.append(cells) %}
+{% endfor %}
+{% set caption = (matrix_models | length) ~ " models × " ~ (tests | length) ~ " tests: mean sample score." %}
+{% if score_chart %}
+{% call chart_container("fw-score-heatmap", "Mean sample score by test", "1 is every sample scored in full. A failed sample counts 0 and a skipped one is left out; an empty square is a test that model never ran, never a zero.", option=score_chart) %}
+<details class="fw-alt"><summary>As a table</summary>
+{{ table(head, rows, caption=caption, density="dense", complete=true, row_count=rows | length, table_id="fw-scores", sortable=true) }}
+</details>
+{% endcall %}
+{% else %}
+{{ table(head, rows, caption=caption, density="dense", complete=true, row_count=rows | length, table_id="fw-scores", sortable=true) }}
+{% endif %}
+
+{% if test_charts %}
+<h3 id="by-test">One test</h3>
+<div class="field fw-test-pick"><label for="fw-test-pick">Test</label>
+  <select id="fw-test-pick">
+    {% for one in test_charts %}<option value="{{ loop.index0 }}">{{ one.test }}</option>{% endfor %}
+  </select></div>
+{% for one in test_charts %}
+<section class="fw-test-chart" data-test-chart="{{ loop.index0 }}" aria-label="{{ one.test }}"{% if not loop.first %} hidden{% endif %}>
+  {% if one.metrics | length > 1 %}
+  <fieldset class="fw-picker"><legend>Metrics</legend>
+    <div class="fw-picker-grid">
+      {% for metric in one.metrics %}
+      <label class="fw-picker-item"><input type="checkbox" data-metric="{{ metric.key }}"{% if loop.first %} checked{% endif %}> {{ metric.key }}{% if metric.unit %} ({{ metric.unit }}){% endif %}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
+  <div class="chart-surface" data-echarts='{{ one.option | tojson }}'></div>
+  <details class="fw-alt"><summary>As a table</summary>
+  {{ table(one.head, one.rows, caption=one.test ~ ": every model in scope, every metric.", density="dense", complete=true, row_count=one.rows | length, table_id="fw-test-" ~ loop.index0) }}
+  </details>
+</section>
+{% endfor %}
+<script>
+  // One test's bars at a time; each checkbox shows or hides that metric's series. The legend is
+  // hidden and drives the selection, which a theme redraw resets, so it is re-applied after one.
+  (function () {
+    var pick = document.getElementById("fw-test-pick");
+    var sections = document.querySelectorAll("[data-test-chart]");
+    function chartOf(section) {
+      var el = section.querySelector("[data-echarts]");
+      return window.echarts && el ? window.echarts.getInstanceByDom(el) : null;
+    }
+    function apply(section) {
+      var chart = chartOf(section);
+      if (!chart) { return; }
+      section.querySelectorAll("[data-metric]").forEach(function (box) {
+        chart.dispatchAction({ type: box.checked ? "legendSelect" : "legendUnSelect", name: box.getAttribute("data-metric") });
+      });
+    }
+    pick.addEventListener("change", function () {
+      sections.forEach(function (section) {
+        section.hidden = section.getAttribute("data-test-chart") !== pick.value;
+        var chart = section.hidden ? null : chartOf(section);
+        if (chart) { chart.resize(); apply(section); }
+      });
+    });
+    sections.forEach(function (section) {
+      section.addEventListener("change", function () { apply(section); });
+    });
+    document.addEventListener("mirrorwall:themechange", function () {
+      setTimeout(function () { sections.forEach(apply); }, 0);
+    });
+  })();
+</script>
+{% endif %}
+{% endif %}
+{% endif %}
 
 <h3 id="start">Start a run</h3>
 {{ refusal(start_error) }}
 {#- On FreeWeight answering at all, not on *this page's* read: a refused dashboard filter is no
     reason to take away the form that starts a run, and the run is a job, not a dashboard call. -#}
 {% if view.reachable %}
-<p class="muted">One model against one suite, launched as the console's capped
-<code>freeweight_suite_run</code> job: the run executes in a transient scope under the host memory cap
-(<code>[host] memory_high</code>/<code>memory_max</code>, swap denied — ADR-0119), so a model that does not fit is
-killed rather than thrashing the machine. The page follows the job until FreeWeight names the run, then opens it.</p>
-<form method="post" action="/apps/freeweight/runs" class="card kit-form">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <div class="field"><label for="fw-start-model">Model</label>
-    {% if models %}
-    <select id="fw-start-model" name="model" required>
-      {% for one in models %}<option value="{{ one.get('canonical_id') }}"{{ " selected" if form.get("model") == one.get("canonical_id") else "" }}>{{ one.get("display_name") or one.get("canonical_id") }}</option>{% endfor %}
-    </select>
-    <span class="field-hint">Enabled models only (ADR-0118).</span>
-    {% else %}
-    <input id="fw-start-model" name="model" value="{{ form.get('model', '') }}" required>
-    <span class="field-hint">No enabled model is listed; <a href="/apps/freeweight/models">refresh from the provider</a> first.</span>
-    {% endif %}</div>
-  <div class="field"><label for="fw-start-suite">Suite</label>
-    {% if benchmarks %}
-    <select id="fw-start-suite" name="suite" required>
-      {% for one in benchmarks %}<option value="{{ one.get('key') }}"{{ " selected" if form.get("suite") == one.get("key") else "" }}>{{ one.get("key") }} {{ one.get("version") or "" }} · {{ one.get("test_count") }} test{{ "" if one.get("test_count") == 1 else "s" }}</option>{% endfor %}
-    </select>
-    {% else %}
-    <input id="fw-start-suite" name="suite" value="{{ form.get('suite', '') }}" required placeholder="native.echo">
-    {% endif %}</div>
-  {% if adapters %}
-  <div class="field"><label for="fw-start-adapter">Adapter</label>
-    <select id="fw-start-adapter" name="adapter">
-      <option value="">none — the bare base</option>
-      {% for one in adapters %}<option value="{{ one.get('name') }}"{{ " selected" if form.get("adapter") == one.get("name") else "" }}>{{ one.get("name") }} · base {{ one.get("base_model_name") }}</option>{% endfor %}
-    </select>
-    <span class="field-hint">A run under an adapter measures a different subject, never the base (ADR-0058). Available adapters only.</span></div>
-  {% endif %}
-  <div class="field"><label for="fw-start-label">Label</label>
-    <input id="fw-start-label" name="label" value="{{ form.get('label', '') }}" maxlength="120"></div>
-  <div class="kit-wide"><button type="submit" data-variant="primary">Start run</button></div>
-</form>
+{{ start_form(models, benchmarks, adapters, form) }}
+<p class="muted"><a href="/apps/freeweight/runs/new">New run</a> queues several, one after another.</p>
 {% else %}
 <p class="muted">A run is started through FreeWeight's own API; this form comes back when it answers.</p>
 {% endif %}
-
-{% if data is not none %}
-{% set heatmap = data.get("heatmap") or {} %}
-{% set matrix = data.get("tests_matrix") or {} %}
-{% set models_measured = heatmap.get("models") or [] %}
-{% set suites = heatmap.get("suites") or [] %}
-<h3 id="heatmap">How the models did</h3>
-{% if not cards.get("completed_runs") %}
-{{ empty_state("No completed run matches this scope.", "Runs", "/apps/freeweight/runs") }}
-{% elif not (models_measured and suites) %}
-{{ empty_state("No suite in this scope has a declared headline metric yet.") }}
-{% else %}
-{% if heatmap.get("separated") %}
-<div class="warning-state">
-  <strong>Separated:</strong> these cells span more than one machine or more than one version of a
-  suite. Read them down a column, not across a row; FreeWeight does not merge them into one figure.
-</div>
-{% endif %}
-<div class="fw-views">
-  <p class="fw-view-switch" role="group" aria-label="Which view of the runs to show">
-    <label><input type="radio" id="fw-view-suites" name="fw-view" checked> Suites — one headline metric each</label>
-    <label><input type="radio" id="fw-view-tests" name="fw-view"> Matrix — what actually ran</label>
-  </p>
-
-  <section class="fw-view fw-view-suites" aria-label="Comparison heatmap">
-    <p class="muted">An empty cell means that model has never completed that suite — not that it scored zero.</p>
-    {% set by_key = {} %}
-    {% for cell in heatmap.get("cells") or [] %}{% set _ = by_key.update({(cell.get("model"), cell.get("suite")): cell}) %}{% endfor %}
-    {% set head = [{"label": "Model", "mono": true}] %}
-    {% for suite in suites %}{% set _ = head.append({"label": suite ~ " (" ~ (heatmap.get("headline_metric", {}).get(suite) or "—") ~ ")", "numeric": true}) %}{% endfor %}
-    {% set rows = [] %}
-    {% for model in models_measured %}
-    {% set cells = [model] %}
-    {% for suite in suites %}
-    {% set cell = by_key.get((model, suite)) %}
-    {% set _ = cells.append(
-      run_link(cell.get("run_id")) ~ " " ~ value(cell.get("value"), cell.get("unavailable_reason")) ~ " " ~ (cell.get("unit") or "")
-      if cell else "<span class=\"muted\" title=\"never completed this suite\">—</span>" | safe
-    ) %}
-    {% endfor %}
-    {% set _ = rows.append(cells) %}
-    {% endfor %}
-    {% set caption = (models_measured | length) ~ " models × " ~ (suites | length) ~ " suites." %}
-    {% if chart %}
-    {% call chart_container("fw-heatmap-chart", "Headline metric by suite", "Colour is each cell's position within its own suite — the columns are different units and are never compared to each other.", option=chart) %}
-    {{ table(head, rows, caption=caption, density="dense", complete=true, row_count=rows | length, table_id="fw-dashboard", sortable=true) }}
-    {% endcall %}
-    {% else %}
-    {{ table(head, rows, caption=caption, density="dense", complete=true, row_count=rows | length, table_id="fw-dashboard", sortable=true) }}
-    {% endif %}
-  </section>
-
-  <section class="fw-view fw-view-tests" aria-label="Tests completion matrix">
-    <p class="muted">The same runs, test by test: a suite whose hardest test was skipped still shows a headline
-    number beside it, and only this view says so. A cell is empty where that run recorded no such test.</p>
-    {% set tests = matrix.get("tests") or [] %}
-    {% set matrix_models = matrix.get("models") or [] %}
-    {% if tests and matrix_models %}
-    {% set by_cell = {} %}
-    {% for cell in matrix.get("cells") or [] %}{% set _ = by_cell.update({(cell.get("model"), cell.get("test")): cell}) %}{% endfor %}
-    {% set head = [{"label": "Model", "mono": true}] %}
-    {% for test in tests %}{% set _ = head.append({"label": test}) %}{% endfor %}
-    {% set rows = [] %}
-    {% for model in matrix_models %}
-    {% set cells = [model] %}
-    {% for test in tests %}
-    {% set cell = by_cell.get((model, test)) %}
-    {% set _ = cells.append(
-      status_badge(cell.get("status")) ~ " " ~ run_link(cell.get("run_id")) ~ (" " ~ cell.get("skip_reason") if cell.get("skip_reason") else "")
-      if cell else "<span class=\"muted\" title=\"that run recorded no such test\">—</span>" | safe
-    ) %}
-    {% endfor %}
-    {% set _ = rows.append(cells) %}
-    {% endfor %}
-    {{ table(head, rows, caption=(matrix_models | length) ~ " models × " ~ (tests | length) ~ " tests, from the same runs.", density="dense", complete=true, row_count=rows | length, table_id="fw-tests-matrix", sortable=true) }}
-    {% else %}
-    {{ empty_state("No run in this scope recorded a test outcome. FreeWeight older than the tests matrix answers nothing here.") }}
-    {% endif %}
-  </section>
-</div>
-{% endif %}
-{% endif %}
-
-<h3>The unit</h3>
-{{ kv_list([
-  {"label": "Unit", "value": view.unit},
-  {"label": "Executable", "value": view.executable or "—"},
-  {"label": "API", "value": view.base_url or "—"},
-  {"label": "API version", "value": view.api_version or "—"},
-  {"label": "Last API error", "value": view.error or "—"},
-]) }}
-<p class="muted">{{ overview.source_detail }}.
-<a href="/api/v1/apps/freeweight">JSON</a> ·
-<a href="/api/v1/apps/freeweight/health">health</a> ·
-<a href="/apps/freeweight/system">System</a></p>
 
 <h3>{{ overview.table.caption | capitalize }}</h3>
 {% if overview.table.rows %}

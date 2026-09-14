@@ -1,18 +1,18 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
 {% from "_app_page.html" import page_source, refusal, app_page_header, page_nav %}
-{% from "_fw.html" import filter_styles, run_link, status_badge, machine_link %}
+{% from "_fw.html" import filter_styles, run_link, status_badge, machine_link, run_queue with context %}
 {% block title %}Runs — FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
-{{ page_nav(links=[{"label": "Machines", "href": "/apps/freeweight/machines"}], actions=[{"label": "Jobs", "href": "/jobs"}, docs_action("freeweight")]) }}
+{{ page_nav(links=[{"label": "New run", "href": "/apps/freeweight/runs/new"}, {"label": "Machines", "href": "/apps/freeweight/machines"}], actions=[{"label": "Jobs", "href": "/jobs"}, docs_action("freeweight")]) }}
 {{ filter_styles() }}
-{{ app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded; the form that starts another is on the Overview.") }}
+{{ app_page_header(view, "Runs", "Runs", "One model against one suite: every run FreeWeight has recorded, and the runs still waiting in the console's queue.") }}
 {% include "_app_state.html" %}
 
-{# Row WX8 moved the Start form onto the Overview, where the dashboard's figures say what is
-   worth measuring next; this page keeps the way to it. #}
-<p><a href="/apps/freeweight#start" data-variant="primary">Start a run</a> — the form moved to the
-Overview, beside the figures it answers.</p>
+{% if queue %}
+<h3 id="queue">Queue</h3>
+{{ run_queue(queue) }}
+{% endif %}
 
 <form method="get" action="/apps/freeweight/runs" class="filter-bar" aria-label="Run filters">
   <div class="field"><label for="fw-runs-status">Status</label>

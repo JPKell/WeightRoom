@@ -48,6 +48,7 @@ __all__ = [
     "adapter_db",
     "adapters_api",
     "adapters_db",
+    "bar_charts_by_test",
     "benchmarks_api",
     "charts",
     "compare_api",
@@ -58,7 +59,6 @@ __all__ = [
     "database_stats_api",
     "evidence_api",
     "evidence_record",
-    "heatmap_option",
     "export_params",
     "machine_api",
     "machine_db",
@@ -78,6 +78,7 @@ __all__ = [
     "sample_api",
     "sample_db",
     "samples_api",
+    "score_heatmap_option",
     "samples_db",
     "segment",
     "system_api",
@@ -1163,74 +1164,59 @@ def compare_bar_options(
     return charts
 
 
-def heatmap_option(dashboard: Mapping[str, Any]) -> dict[str, Any] | None:
-    """``GET /dashboard``'s heatmap as an ECharts option (row WX8, ADR-0142), or ``None``.
+def _row_labels(models: Sequence[str]) -> list[str]:
+    """Each model's provider-side name (``smollm2:135m`` out of ``ollama/smollm2:135m@sha256:…``),
+    or every canonical ID the moment two models would share one label."""
+    short = [model.rsplit("/", 1)[-1].split("@", 1)[0] for model in models]
+    return short if len(set(short)) == len(models) else list(models)
 
-    **The colour is a position within one suite, never a value across suites.** A column is one
-    suite's headline metric in its own unit — ``tokens/s`` beside a ``ratio`` — and one colour
-    scale over both would paint the fast model dark and call the accurate one pale. So each suite's
-    column is normalised on its own: ``1`` is the best cell in that column, ``0`` the worst, and
-    ``higher_is_better`` decides which end is which. A column whose cells all read the same (one
-    model measured, or a tie) is all ``1`` — every one of them is the best there is.
 
-    A cell FreeWeight could not measure is left out of the series rather than plotted at zero
-    (ADR-0016): the square stays empty, as the table beside it stays ``—``. The table under the
-    chart carries every real figure and its run link, so a reader who never sees the drawing loses
-    nothing (ADR-0020 rule 5) — which is also why no figure is baked into the chart.
+def _number(value: Any) -> float | None:  # noqa: ANN401 — a JSON value
+    """A JSON number as a float; ``"unsupported"``, ``null`` or a boolean is ``None``."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
 
-    A row is labelled by the model's provider-side name (``smollm2:135m`` out of
-    ``ollama/smollm2:135m@sha256:…``) so the drawing is not two thirds axis, and by the whole
-    canonical ID the moment two models would share one label — a category that named two subjects
-    would draw their cells in one row. Each cell's hover carries the full identity either way.
+
+def score_heatmap_option(dashboard: Mapping[str, Any]) -> dict[str, Any] | None:
+    """``GET /dashboard``'s tests matrix as an ECharts heatmap of mean sample scores, or ``None``.
+
+    Models down, tests across, each square a cell's ``mean_score`` on one ``0``–``1`` scale: a
+    failed sample counts ``0`` and a skipped one is left out (FreeWeight's rule, api.md §5a). A cell
+    with no scorable sample, or a test the model never ran, is left out of the series rather than
+    drawn at zero (ADR-0016). The option carries no colour: ``charts.js`` themes it (ADR-0142).
 
     Args:
         dashboard: ``GET /dashboard``'s body.
 
     Returns:
-        The option, carrying no colour — ``charts.js`` themes it at draw time — or ``None`` when
-        the heatmap has no numeric cell to draw.
+        The option, or ``None`` when no cell has a score — a FreeWeight older than ``mean_score``
+        included.
     """
-    heatmap = dashboard.get("heatmap") or {}
-    models = [str(one) for one in heatmap.get("models") or []]
-    suites = [str(one) for one in heatmap.get("suites") or []]
-    numeric: dict[tuple[str, str], tuple[float, str, bool]] = {}
-    for cell in heatmap.get("cells") or []:
-        value = cell.get("value")
-        if not isinstance(value, int | float) or isinstance(value, bool):
-            continue
-        key = (str(cell.get("model")), str(cell.get("suite")))
-        numeric[key] = (
-            float(value),
-            str(cell.get("unit") or ""),
-            bool(cell.get("higher_is_better")),
-        )
-    if not numeric or not models or not suites:
-        return None
-    short = [model.rsplit("/", 1)[-1].split("@", 1)[0] for model in models]
-    labels = short if len(set(short)) == len(models) else models
+    matrix = dashboard.get("tests_matrix") or {}
+    models = [str(one) for one in matrix.get("models") or []]
+    tests = [str(one) for one in matrix.get("tests") or []]
     points: list[dict[str, Any]] = []
-    for column, suite in enumerate(suites):
-        values = [numeric[(model, suite)][0] for model in models if (model, suite) in numeric]
-        low, high = min(values, default=0.0), max(values, default=0.0)
-        for row, model in enumerate(models):
-            found = numeric.get((model, suite))
-            if found is None:
-                continue
-            value, unit, higher_is_better = found
-            share = 1.0 if high == low else (value - low) / (high - low)
-            points.append(
-                {
-                    "value": [column, row, round(share if higher_is_better else 1.0 - share, 4)],
-                    "name": f"{model} · {suite} · {value:.4g} {unit}".strip(),
-                }
-            )
+    for cell in matrix.get("cells") or []:
+        score = _number(cell.get("mean_score"))
+        model, test = str(cell.get("model")), str(cell.get("test"))
+        if score is None or model not in models or test not in tests:
+            continue
+        points.append(
+            {
+                "value": [tests.index(test), models.index(model), round(score, 4)],
+                "name": f"{model} · {test} · {score:.2f}",
+            }
+        )
+    if not points:
+        return None
     return {
         "tooltip": {"formatter": "{b}"},
         "grid": {"containLabel": True, "left": 8, "right": 8, "top": 8, "bottom": 56},
-        # No split-area shading: an alternating background paints an *unmeasured* square as
-        # convincingly as a measured one, and in the dark theme it read as a low value.
-        "xAxis": {"type": "category", "data": suites},
-        "yAxis": {"type": "category", "data": labels},
+        # No split-area shading: an alternating background paints an unmeasured square as
+        # convincingly as a measured one.
+        "xAxis": {"type": "category", "data": tests, "axisLabel": {"rotate": 30}},
+        "yAxis": {"type": "category", "data": _row_labels(models)},
         "visualMap": {
             "min": 0,
             "max": 1,
@@ -1238,10 +1224,83 @@ def heatmap_option(dashboard: Mapping[str, Any]) -> dict[str, Any] | None:
             "orient": "horizontal",
             "left": "center",
             "bottom": 0,
-            "text": ["best in its suite", "worst in its suite"],
+            "text": ["1 — every sample scored", "0"],
         },
         "series": [{"type": "heatmap", "data": points, "label": {"show": False}}],
     }
+
+
+def bar_charts_by_test(dashboard: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """One bar chart per test from ``GET /dashboard``'s ``test_metrics``: every model in scope along
+    the axis, one series per metric.
+
+    Only a test's first metric starts shown — its metrics are in different units (``ms`` beside
+    ``tokens/s``) and the page's checkboxes add the others. A metric a model has no number for is
+    no bar, never a zero bar (ADR-0016).
+
+    Args:
+        dashboard: ``GET /dashboard``'s body.
+
+    Returns:
+        ``{"test", "metrics": [{"key", "unit"}], "option", "head", "rows"}`` per test, in test
+        order — ``head`` and ``rows`` are the chart's table alternative. Empty for a FreeWeight
+        older than ``test_metrics``.
+    """
+    models = [str(one) for one in (dashboard.get("tests_matrix") or {}).get("models") or []]
+    values: dict[str, dict[str, dict[str, float | None]]] = {}
+    units: dict[tuple[str, str], str] = {}
+    for row in dashboard.get("test_metrics") or []:
+        test, metric = str(row.get("test")), str(row.get("metric_key"))
+        model = str(row.get("model"))
+        if model not in models:
+            models.append(model)
+        values.setdefault(test, {}).setdefault(metric, {}).setdefault(
+            model, _number(row.get("value"))
+        )
+        units.setdefault((test, metric), str(row.get("unit") or ""))
+    labels = _row_labels(models)
+    charts: list[dict[str, Any]] = []
+    for test, by_metric in sorted(values.items()):
+        metrics = sorted(by_metric)
+        named = [f"{m} ({units[(test, m)]})" if units[(test, m)] else m for m in metrics]
+        charts.append(
+            {
+                "test": test,
+                "metrics": [{"key": m, "unit": units[(test, m)]} for m in metrics],
+                "option": {
+                    "tooltip": {"trigger": "axis"},
+                    "legend": {
+                        "show": False,
+                        "selected": {m: index == 0 for index, m in enumerate(metrics)},
+                    },
+                    "grid": {"containLabel": True, "left": 8, "right": 8, "top": 16, "bottom": 8},
+                    "xAxis": {"type": "category", "data": labels, "axisLabel": {"rotate": 30}},
+                    "yAxis": {"type": "value"},
+                    "series": [
+                        {
+                            "name": m,
+                            "type": "bar",
+                            "data": [by_metric[m].get(model) for model in models],
+                        }
+                        for m in metrics
+                    ],
+                },
+                "head": [
+                    {"label": "Model", "mono": True},
+                    *({"label": name, "numeric": True} for name in named),
+                ],
+                "rows": [
+                    [label, *(_shown(by_metric[m].get(model)) for m in metrics)]
+                    for model, label in zip(models, labels, strict=True)
+                ],
+            }
+        )
+    return charts
+
+
+def _shown(value: float | None) -> str:
+    """A bar's figure for the table beside the chart: ``—`` for no number, never ``0``."""
+    return "—" if value is None else f"{value:.4g}"
 
 
 def export_params(form: Mapping[str, str]) -> dict[str, str]:

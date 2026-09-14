@@ -363,6 +363,8 @@ h3.docs-folder-title {
 .app-page-availability-label {
   color: var(--mw-text-subtle); font-size: var(--mw-font-size-xs, 11px); text-transform: uppercase;
 }
+/* An Overview's Start/Stop/Restart, pushed to the heading row's right; wraps under on a phone. */
+.app-page-controls { margin: 0 0 0 auto; }
 
 /* A document's own branch of the docs tree, opened folder by folder under its section. Each
    level is indented by one rule rather than by a nesting-depth calculation, so a deep folder

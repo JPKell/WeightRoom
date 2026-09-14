@@ -1,8 +1,9 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, card, kv_list, table, empty_state %}
+{% from "_app_page.html" import app_page_header with context %}
 {% block title %}{{ view.name | app_label }} — WeightRoom{% endblock %}
 {% block page_content %}
-<h2>Overview {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}</h2>
+{{ app_page_header(view, "Overview", "Overview", "", controls=true) }}
 <p class="muted">{{ overview.source_detail }}.
 <a href="/api/v1/apps/{{ view.name }}">JSON</a> ·
 <a href="/api/v1/apps/{{ view.name }}/health">health</a></p>

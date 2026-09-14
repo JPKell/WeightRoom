@@ -308,6 +308,17 @@ def _days(minimum: int) -> _Check:
     return check
 
 
+def _seconds(minimum: int, maximum: int) -> _Check:
+    def check(kind: str, name: str, value: Any) -> int | None:  # noqa: ANN401 — JSON input
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+            raise _refuse(kind, name, f"must be a whole number of seconds, {minimum} to {maximum}")
+        return int(value)
+
+    return check
+
+
 def _targets(allowed: tuple[str, ...]) -> _Check:
     def check(kind: str, name: str, value: Any) -> list[str]:  # noqa: ANN401 — JSON input
         if (
@@ -331,6 +342,8 @@ _PARAMS: Final[Mapping[str, Mapping[str, tuple[_Check, Any]]]] = {
         # Row WPF2: the adapter, passed through as `run start --adapter`. One more argument to the
         # same capped command, never a second path (ADR-0119, WP3 §2 item 2).
         "adapter": (_optional_text(_ADAPTER_NAME, max_chars=64), None),
+        # The Start form's cooldown: seconds waited after the previous suite run finished.
+        "cooldown_seconds": (_seconds(0, 3600), None),
     },
     # Row WP4: a goal's calibration — its jury grading the holdout — run as `goals calibrate`.
     "freeweight_goal_calibrate": {

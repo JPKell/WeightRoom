@@ -125,8 +125,9 @@ def test_a_stopped_overviews_dashboard_reads_only_from_the_api(tmp_path: Path) -
 def test_the_injection_corpus_renders_inert_on_the_overview(tmp_path: Path) -> None:
     console, _database = freeweight_console(tmp_path, state="active")
     dashboard = copy.deepcopy(fixture("dashboard"))
-    dashboard["heatmap"]["cells"][0]["unavailable_reason"] = HOSTILE
-    dashboard["heatmap"]["models"][0] = HOSTILE
+    matrix = dashboard["tests_matrix"]
+    matrix["models"][0] = HOSTILE
+    matrix["cells"][0] = {**matrix["cells"][0], "skip_reason": HOSTILE, "mean_score": None}
     with respx.mock(assert_all_called=False) as router:
         gate_api(router, dashboard=dashboard)
         text = page(console, BASE)

@@ -15,7 +15,8 @@ should read into its output, checks ``context.cancelled()`` between steps, and r
   rule: the job passes ``--allow-prompt-override`` only when its own parameter says so, and
   FreeWeight refuses otherwise (prompt standards §6). ``--adapter`` is one more argument to the
   same command (row WPF2): an adapter FreeWeight cannot serve is refused by name, never replaced
-  by its base (ADR-0058, ADR-0140).
+  by its base (ADR-0058, ADR-0140). A ``cooldown_seconds`` parameter holds the job, before it
+  launches anything, until that long after the previous suite run finished.
 * ``freeweight_goal_calibrate`` — ``freeweight goals calibrate <slug> --progress --json`` (row WP4):
   a goal's jury grading its held-out samples, under the same scope, prefix and cap as a suite run —
   the jurors are model loads — its output one JSON line per holdout sample judged, naming no grade,
@@ -55,6 +56,7 @@ from weightroom.services.jobs import (
     FINISHED_RETENTION_DAYS,
     Executor,
     Outcome,
+    list_jobs,
     run_streaming,
     trim_finished_jobs,
 )
@@ -177,6 +179,33 @@ def freeweight_goal_calibrate(context: JobContext) -> Outcome:
     return Outcome("failed", f"freeweight exited {result.returncode}")
 
 
+def _cooled_down(context: JobContext, seconds: int) -> bool:
+    """Wait until ``seconds`` after the previous suite run finished; ``False`` if cancelled.
+
+    The previous run is the newest finished ``freeweight_suite_run`` job other than this one.
+    None, or one that finished long enough ago, waits nothing.
+    """
+    if seconds <= 0:
+        return True
+    recent, _ = list_jobs(context.database, limit=10, kind="freeweight_suite_run")
+    finished = [job.finished_at for job in recent if job.id != context.job.id and job.finished_at]
+    if not finished:
+        return True
+    last, now = max(finished), context.now()
+    if (last.tzinfo is None) != (now.tzinfo is None):  # both UTC; one stored without its zone
+        last, now = last.replace(tzinfo=None), now.replace(tzinfo=None)
+    remaining = seconds - (now - last).total_seconds()
+    if remaining <= 0:
+        return True
+    context.output.line(f"Cooling down {remaining:.0f} s after the previous run.")
+    deadline = time.monotonic() + remaining
+    while (left := deadline - time.monotonic()) > 0:
+        if context.cancelled():
+            return False
+        time.sleep(min(1.0, left))
+    return True
+
+
 def freeweight_suite_run(context: JobContext) -> Outcome:
     """One FreeWeight suite run, capped, followed to its end (module docstring)."""
     params = context.job.params
@@ -203,6 +232,8 @@ def freeweight_suite_run(context: JobContext) -> Outcome:
         argv += ["--adapter", str(params["adapter"])]
     if params.get("allow_prompt_override"):
         argv.append("--allow-prompt-override")
+    if not _cooled_down(context, int(params.get("cooldown_seconds") or 0)):
+        return Outcome("cancelled", "the run was cancelled during its cooldown")
     started = time.monotonic()
     result = _stream(context, argv, timeout_seconds=SUITE_RUN_TIMEOUT_SECONDS)
     if result.returncode == _RUN_SLOT_TAKEN and not (result.cancelled or result.timed_out):

@@ -76,6 +76,18 @@ _STATUS_TIMEOUT_SECONDS: Final = 3.0
 _TABLE_ROW_LIMIT: Final = 10
 _TABLE_COLUMN_LIMIT: Final = 6
 
+_PRIMARY_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
+    # FreeWeight's models by provider and name only; the ULID, digest and identity confidence are
+    # the Models page's, and a column that is not rendered is not in the Columns menu either.
+    "freeweight": ("provider_kind", "provider_model_name"),
+}
+"""Columns shown instead of the first :data:`_TABLE_COLUMN_LIMIT`, per application."""
+
+_COLUMN_LABELS: Final[dict[str, str]] = {
+    "provider_kind": "Provider",
+    "provider_model_name": "Model",
+}
+
 _PRIMARY_TABLE: Final[dict[str, str]] = {
     "freeweight": "models",
     "loadcoach": "models",
@@ -129,6 +141,8 @@ class Figure:
     label: str
     value: str
     note: str | None = None
+    href: str | None = None
+    """The console page the value names — FreeWeight's active run — or ``None``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +156,7 @@ class OverviewTable:
 
     def columns_for_table_macro(self) -> tuple[dict[str, str], ...]:
         """``columns`` in the shape MirrorWall's ``table()`` macro takes (spec §4)."""
-        return tuple({"label": name} for name in self.columns)
+        return tuple({"label": _COLUMN_LABELS.get(name, name)} for name in self.columns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,10 +222,16 @@ def _shown(value: Any, how: str) -> str:  # noqa: ANN401 — whatever the status
 
 
 def _figures_from_status(app: str, body: dict[str, Any]) -> tuple[Figure, ...]:
-    return tuple(
-        Figure(label=label, value=_shown(_dig(body, path), how))
-        for label, path, how in _STATUS_FIGURES.get(app, ())
-    )
+    from urllib.parse import quote
+
+    figures = []
+    for label, path, how in _STATUS_FIGURES.get(app, ()):
+        raw = _dig(body, path)
+        href = None
+        if app == "freeweight" and path == ("active_run",) and isinstance(raw, str) and raw:
+            href = f"/apps/freeweight/runs/{quote(raw, safe='')}"
+        figures.append(Figure(label=label, value=_shown(raw, how), href=href))
+    return tuple(figures)
 
 
 def _promptcadence_figures(body: dict[str, Any]) -> tuple[Figure, ...]:
@@ -369,12 +389,19 @@ def _table_from_database(engine: Any, app: str) -> OverviewTable:  # noqa: ANN40
     table = reflect_table(engine, name)
     if table is None:
         return _empty_table(app, message=f"{name} is not a table this build knows how to read.")
+    names = [column.name for column in table.columns]
+    wanted = _PRIMARY_COLUMNS.get(app)
+    columns = (
+        tuple(name for name in wanted if name in names)
+        if wanted
+        else tuple(names)[:_TABLE_COLUMN_LIMIT]
+    )
+    # Only the columns shown: a column the page never renders is never parsed either.
+    statement = select(*(table.c[name] for name in columns))
     order_columns = list(table.primary_key.columns)
-    statement = select(table)
     if order_columns:
         statement = statement.order_by(order_columns[0].desc())
     statement = statement.limit(_TABLE_ROW_LIMIT)
-    columns = tuple(column.name for column in table.columns)[:_TABLE_COLUMN_LIMIT]
     try:
         with engine.connect() as connection:
             rows = connection.execute(statement).mappings().all()

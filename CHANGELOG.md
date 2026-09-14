@@ -6,6 +6,20 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed
+- **Every Overview's Start, Stop and Restart sit at the right of its heading row**
+  (`app_page_header(controls=true)`); LoadCoach, IdeaPress and PromptCadence's Overview now wears
+  the common page header.
+- **FreeWeight's Overview** puts Summary first. Its *Active run* card is cut to the card and links
+  to the run. *How the models did* is replaced by a models × tests heatmap of mean sample scores
+  and a per-test bar chart (a test picker, one checkbox per metric), each with a table beside it;
+  this needs FreeWeight's `mean_score` and `test_metrics` on `GET /dashboard`. *The unit* moved to
+  the System page, and the models table shows only provider and model name.
+- **FreeWeight runs queue in view.** A *New run* page (Runs' page bar) adds runs one at a time and
+  lists the console's queued and running suite-run jobs, each cancellable; the Runs page shows the
+  same queue. Every start form takes a cooldown (default 30 s), which the job waits after the
+  previous suite run finished before launching.
+
 ### Changed (row WY10)
 - **`app_page_header` takes no caller.** Its action slot is gone, with the `.page-actions` styles:
   a page's links are in its page bar and its forms sit below the header. FreeWeight Runs' last

@@ -219,6 +219,7 @@ def test_parameters_are_filled_with_defaults_and_unknown_keys_refused() -> None:
         "allow_prompt_override": False,
         "label": None,
         "adapter": None,
+        "cooldown_seconds": None,
     }
     assert (
         validate_params(

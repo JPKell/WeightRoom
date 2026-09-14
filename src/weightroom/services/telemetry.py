@@ -283,18 +283,19 @@ class FigureScale:
 
 
 FIGURE_SCALES: Final[dict[str, FigureScale]] = {
-    "cpu_percent": FigureScale("CPU", "percent", high=100.0),
-    "ram_used_bytes": FigureScale("RAM", "bytes", total="ram_total_bytes"),
-    "gpu_utilization_percent": FigureScale("GPU", "percent", high=100.0),
+    # Top row the GPU's four, bottom row the host's three (operator's order, 2026-09-13).
     "gpu_vram_used_bytes": FigureScale("VRAM", "bytes", total="gpu_vram_total_bytes"),
-    # ponytail: 30–100 °C is a desktop-CPU guess (an idle floor, Tjmax as the ceiling); take the
-    # sensor's own critical threshold if SweatMeter ever reports one.
-    "cpu_temperature_c": FigureScale("CPU temp", "celsius", low=30.0, high=100.0),
+    "gpu_utilization_percent": FigureScale("GPU", "percent", high=100.0),
     # ponytail: 30–95 °C is a consumer-GPU guess, 10 °C over `[alerts] gpu_temperature_c`'s 85;
     # take the card's slowdown temperature if the telemetry ever carries it.
     "gpu_temperature_c": FigureScale("GPU temp", "celsius", low=30.0, high=95.0),
     # The telemetry carries no power limit: 0 to the highest sample in the window.
     "gpu_power_watts": FigureScale("GPU power", "watts"),
+    "cpu_percent": FigureScale("CPU", "percent", high=100.0),
+    # ponytail: 30–100 °C is a desktop-CPU guess (an idle floor, Tjmax as the ceiling); take the
+    # sensor's own critical threshold if SweatMeter ever reports one.
+    "cpu_temperature_c": FigureScale("CPU temp", "celsius", low=30.0, high=100.0),
+    "ram_used_bytes": FigureScale("RAM", "bytes", total="ram_total_bytes"),
 }
 """Every charted figure, in page order, with its scale — the one table the page reads.
 

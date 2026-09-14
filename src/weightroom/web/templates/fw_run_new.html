@@ -1,0 +1,19 @@
+{% extends "_shell.html" %}
+{% from "_app_page.html" import refusal, app_page_header, page_nav %}
+{% from "_fw.html" import filter_styles, start_form, run_queue with context %}
+{% block title %}New run — FreeWeight — WeightRoom{% endblock %}
+{% block page_content %}
+{{ page_nav(actions=[{"label": "Jobs", "href": "/jobs"}, docs_action("freeweight")]) }}
+{{ filter_styles() }}
+{{ app_page_header(view, "New run", "Runs", "Add runs one at a time, whenever you like. Each waits its turn in the console's queue, and its cooldown after the run before it.") }}
+{% include "_app_state.html" %}
+{% if queued %}<p class="notice" role="status">Queued job <code>{{ queued }}</code>.</p>{% endif %}
+{{ refusal(start_error) }}
+{% if view.reachable %}
+{{ start_form(models, benchmarks, adapters, form, next_page="new") }}
+{% else %}
+<p class="muted">A run is queued through FreeWeight's own API; this form comes back when it answers.</p>
+{% endif %}
+<h3 id="queue">Queue</h3>
+{{ run_queue(queue) }}
+{% endblock %}

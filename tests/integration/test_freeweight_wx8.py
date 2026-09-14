@@ -26,7 +26,7 @@ from tests.integration.test_freeweight_pages import (
     route_for,
 )
 from tests.security.test_chat_isolation import HOSTILE, _assert_inert
-from weightroom.services.freeweight_pages import heatmap_option
+from weightroom.services.freeweight_pages import bar_charts_by_test, score_heatmap_option
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -67,11 +67,11 @@ def test_the_overview_carries_the_dashboard_the_start_form_and_the_unit(tmp_path
     # The unit's own controls and log, which the generic Overview always had.
     assert 'value="restart"' in text
     assert "Journal history as JSON" in text
-    # And the Runs page keeps the way to the form.
+    # And the Runs page's bar links to New run, which queues them.
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
         runs = page(console, f"{BASE}/runs")
-    assert 'href="/apps/freeweight#start"' in runs
+    assert 'href="/apps/freeweight/runs/new"' in runs
     assert 'id="fw-start-model"' not in runs
 
 
@@ -90,23 +90,18 @@ def test_a_refused_start_comes_back_on_the_overview_with_what_was_typed(tmp_path
     assert row["outcome"] == "refused"
 
 
-# --- The heatmap ↔ matrix toggle ------------------------------------------------------------------
+# --- Scores by test, and one test's bars ---------------------------------------------------------
 
 
-def test_both_views_are_rendered_and_the_switch_is_two_radios(tmp_path: Path) -> None:
-    """Two sections and a native radio pair — no JavaScript decides which is showing, so a reader
-    with none sees the suites view and can still reach the matrix."""
+def test_the_overview_draws_scores_by_test_and_one_tests_bars(tmp_path: Path) -> None:
+    """The heatmap is models × tests on one 0–1 scale; below it a picker shows one test's bars,
+    with a checkbox per metric where the test has more than one."""
     console, _database = freeweight_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
         text = page(console, BASE)
-    assert 'id="fw-view-suites"' in text
-    assert 'id="fw-view-tests"' in text
-    assert text.count('name="fw-view"') == 2
-    # The suites view: one headline metric per suite, and the metric named in the column head.
-    assert "harness_roundtrip_success" in text
-    assert "decode_tokens_per_second" in text
-    # The matrix: every test of both runs, sparse, with each cell's own run.
+    assert 'id="fw-score-heatmap"' in text
+    assert 'data-table="fw-scores"' in text
     for test in (
         "echo.short",
         "echo.long",
@@ -114,16 +109,28 @@ def test_both_views_are_rendered_and_the_switch_is_two_radios(tmp_path: Path) ->
         "performance.streaming_latency",
     ):
         assert test in text, test
-    assert 'data-table="fw-tests-matrix"' in text
+    assert 'id="fw-test-pick"' in text
+    assert text.count("data-test-chart=") == 2
+    assert 'data-metric="decode_ms" checked>' in text
+    assert 'data-metric="output_tokens">' in text
+    # Summary is the first section under the header, and the controls sit in the header.
+    assert 'class="kit-actions app-page-controls"' in text
+    assert text.index('value="restart"') < text.index("<h3>Summary</h3>")
+    assert text.index("<h3>Summary</h3>") < text.index('id="fw-dash-suite"')
 
 
 def test_a_skipped_test_says_why_and_a_test_that_never_ran_is_empty(tmp_path: Path) -> None:
-    """The matrix exists for exactly this: a suite whose hardest test was skipped still shows a
-    headline number beside it, and only this view says so (spec §13 — a reason, or nothing)."""
+    """A skipped test has no score, and its reason is what the cell says (spec §13); a test that
+    run never recorded is empty, never a zero."""
     console, _database = freeweight_console(tmp_path, state="active")
     dashboard = copy.deepcopy(fixture("dashboard"))
     cells = dashboard["tests_matrix"]["cells"]
-    cells[0] = {**cells[0], "status": "skipped", "skip_reason": "would not fit in VRAM"}
+    cells[0] = {
+        **cells[0],
+        "status": "skipped",
+        "skip_reason": "would not fit in VRAM",
+        "mean_score": None,
+    }
     dashboard["tests_matrix"]["tests"].append("echo.never_ran")
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"dashboard": dashboard})
@@ -132,8 +139,8 @@ def test_a_skipped_test_says_why_and_a_test_that_never_ran_is_empty(tmp_path: Pa
     assert "that run recorded no such test" in text
 
 
-def test_freeweight_answering_no_matrix_leaves_the_suites_view_whole(tmp_path: Path) -> None:
-    """1.2.1 does not emit ``tests_matrix``; the page says so where the matrix would be and
+def test_freeweight_answering_no_matrix_still_renders_its_summary(tmp_path: Path) -> None:
+    """1.2.1 does not emit ``tests_matrix``; the page says so where the scores would be and
     renders every figure it did answer."""
     console, _database = freeweight_console(tmp_path, state="active")
     dashboard = copy.deepcopy(fixture("dashboard"))
@@ -142,7 +149,7 @@ def test_freeweight_answering_no_matrix_leaves_the_suites_view_whole(tmp_path: P
         mock_api(router, bodies={"dashboard": dashboard})
         text = page(console, BASE)
     assert "No run in this scope recorded a test outcome" in text
-    assert "harness_roundtrip_success" in text
+    assert "Completed runs" in text
 
 
 def test_the_injection_corpus_renders_inert_in_the_matrix(tmp_path: Path) -> None:
@@ -152,58 +159,52 @@ def test_the_injection_corpus_renders_inert_in_the_matrix(tmp_path: Path) -> Non
     dashboard["tests_matrix"]["cells"][0] = {
         **dashboard["tests_matrix"]["cells"][0],
         "skip_reason": HOSTILE,
+        "mean_score": None,
     }
+    dashboard["test_metrics"][0]["test"] = HOSTILE
+    dashboard["test_metrics"][0]["metric_key"] = HOSTILE
     with respx.mock(assert_all_called=False) as router:
         mock_api(router, bodies={"dashboard": dashboard})
         text = page(console, BASE)
     _assert_inert(text)
 
 
-# --- The heatmap's ECharts option -----------------------------------------------------------------
+# --- The charts' ECharts options ------------------------------------------------------------------
 
 
-def test_each_column_is_scaled_on_its_own_and_an_unmeasured_cell_is_not_a_zero() -> None:
-    """Two suites in two units: a colour scale over both would say the faster model is the more
-    accurate one. And ``unsupported`` is not ``0`` (ADR-0016) — it draws nothing."""
+def test_the_score_heatmap_is_one_scale_and_an_unscored_cell_is_not_a_zero() -> None:
+    """Mean sample scores are 0–1 in every column, so one scale; a cell with nothing scorable
+    draws nothing (ADR-0016)."""
     recorded = fixture("dashboard")
-    option = heatmap_option(recorded)
+    option = score_heatmap_option(recorded)
     assert option is not None
     (series,) = option["series"]
     assert series["type"] == "heatmap"
-    # One numeric cell in the recording; the other reads `unsupported`.
-    assert [point["value"][2] for point in series["data"]] == [1.0]
-    assert option["xAxis"]["data"] == recorded["heatmap"]["suites"]
-
-    two_ways = {
-        "heatmap": {
-            "models": ["a", "b"],
-            "suites": ["fast", "slow"],
-            "cells": [
-                {"model": "a", "suite": "fast", "value": 10.0, "higher_is_better": True},
-                {"model": "b", "suite": "fast", "value": 20.0, "higher_is_better": True},
-                {"model": "a", "suite": "slow", "value": 1.0, "higher_is_better": False},
-                {"model": "b", "suite": "slow", "value": 5.0, "higher_is_better": False},
-            ],
-        }
-    }
-    both = heatmap_option(two_ways)
-    assert both is not None
-    (series,) = both["series"]
-    by_cell = {
-        (point["value"][0], point["value"][1]): point["value"][2] for point in series["data"]
-    }
-    assert by_cell[(0, 1)] == 1.0  # b is fastest, and higher is better there
-    assert by_cell[(1, 0)] == 1.0  # a is lowest, and lower is better there
-    assert by_cell[(0, 0)] == 0.0
-    assert by_cell[(1, 1)] == 0.0
+    assert (option["visualMap"]["min"], option["visualMap"]["max"]) == (0, 1)
+    assert option["xAxis"]["data"] == recorded["tests_matrix"]["tests"]
+    # Seven cells recorded, one of them with no score.
+    assert sorted(point["value"][2] for point in series["data"]) == [0.0, 0.5, 0.8, 1.0, 1.0, 1.0]
 
 
-def test_no_numeric_cell_means_no_chart_and_no_echarts_on_the_landing_page(
-    tmp_path: Path,
-) -> None:
+def test_each_tests_bars_list_every_model_and_start_on_one_metric() -> None:
+    """A test's metrics are in different units, so one starts shown; ``unsupported`` is no bar."""
+    charts = bar_charts_by_test(fixture("dashboard"))
+    assert [one["test"] for one in charts] == ["echo.short", "performance.decode_throughput"]
+    decode = charts[1]
+    keys = ["decode_ms", "decode_tokens_per_second", "output_tokens"]
+    assert [metric["key"] for metric in decode["metrics"]] == keys
+    option = decode["option"]
+    assert option["legend"]["selected"] == dict(zip(keys, [True, False, False], strict=True))
+    assert option["xAxis"]["data"] == ["fake-model:8b-q8_0"]
+    by_name = {series["name"]: series["data"] for series in option["series"]}
+    assert by_name["decode_ms"] == [None]
+    assert by_name["decode_tokens_per_second"] == [42.5]
+    assert decode["rows"] == [["fake-model:8b-q8_0", "—", "42.5", "128"]]
+
+
+def test_nothing_to_draw_means_no_echarts_on_the_landing_page(tmp_path: Path) -> None:
     """ECharts is 1.1 MB and this is the tab's landing page: it is asked for when there is a
     drawing to make, and the table is the page either way (ADR-0020 rule 5)."""
-    assert heatmap_option({"heatmap": {"models": [], "suites": [], "cells": []}}) is None
     console, _database = freeweight_console(tmp_path, state="active")
     with respx.mock(assert_all_called=False) as router:
         mock_api(router)
@@ -211,14 +212,16 @@ def test_no_numeric_cell_means_no_chart_and_no_echarts_on_the_landing_page(
     assert "vendor/echarts/" in drawn
     assert "data-echarts=" in drawn
 
-    unsupported = copy.deepcopy(fixture("dashboard"))
-    for cell in unsupported["heatmap"]["cells"]:
-        cell["value"] = "unsupported"
+    plain_body = copy.deepcopy(fixture("dashboard"))
+    for cell in plain_body["tests_matrix"]["cells"]:
+        cell["mean_score"] = None
+    plain_body["test_metrics"] = []
+    assert score_heatmap_option(plain_body) is None
     with respx.mock(assert_all_called=False) as router:
-        mock_api(router, bodies={"dashboard": unsupported})
+        mock_api(router, bodies={"dashboard": plain_body})
         plain = page(console, BASE)
     assert "vendor/echarts/" not in plain
-    assert "harness_roundtrip_success" in plain  # the table is still the page
+    assert 'data-table="fw-scores"' in plain
 
 
 # --- Goals: three sections ------------------------------------------------------------------------
@@ -354,26 +357,27 @@ def test_the_injection_corpus_renders_inert_in_an_unmanifested_name(tmp_path: Pa
 
 def test_a_chart_row_is_labelled_short_until_two_models_would_share_one_label() -> None:
     """A category that named two subjects would draw both their cells in one row."""
+    first, second = "ollama/smollm2:135m@sha256:aa", "llamacpp/Qwen2.5.Q8_0@sha256:bb"
     distinct: dict[str, Any] = {
-        "heatmap": {
-            "models": ["ollama/smollm2:135m@sha256:aa", "llamacpp/Qwen2.5.Q8_0@sha256:bb"],
-            "suites": ["native.echo"],
+        "tests_matrix": {
+            "models": [first, second],
+            "tests": ["echo.short"],
             "cells": [
-                {"model": "ollama/smollm2:135m@sha256:aa", "suite": "native.echo", "value": 1.0},
-                {"model": "llamacpp/Qwen2.5.Q8_0@sha256:bb", "suite": "native.echo", "value": 0.5},
+                {"model": first, "test": "echo.short", "mean_score": 1.0},
+                {"model": second, "test": "echo.short", "mean_score": 0.5},
             ],
         }
     }
-    option = heatmap_option(distinct)
+    option = score_heatmap_option(distinct)
     assert option is not None
     assert option["yAxis"]["data"] == ["smollm2:135m", "Qwen2.5.Q8_0"]
 
     same_name = "llamacpp/smollm2:135m@sha256:bb"
     colliding: dict[str, Any] = copy.deepcopy(distinct)
-    models: list[str] = colliding["heatmap"]["models"]
-    cells: list[dict[str, Any]] = colliding["heatmap"]["cells"]
+    models: list[str] = colliding["tests_matrix"]["models"]
+    cells: list[dict[str, Any]] = colliding["tests_matrix"]["cells"]
     models[1], cells[1]["model"] = same_name, same_name
-    option = heatmap_option(colliding)
+    option = score_heatmap_option(colliding)
     assert option is not None
     assert option["yAxis"]["data"] == models
     # And the hover still carries the whole identity, short label or long.

@@ -60,9 +60,48 @@
       "native.performance"
     ]
   },
+  "test_metrics": [
+    {
+      "higher_is_better": true,
+      "metric_key": "harness_roundtrip_success",
+      "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+      "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
+      "test": "echo.short",
+      "unit": "ratio",
+      "value": 1.0
+    },
+    {
+      "higher_is_better": true,
+      "metric_key": "decode_tokens_per_second",
+      "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+      "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+      "test": "performance.decode_throughput",
+      "unit": "tokens/s",
+      "value": 42.5
+    },
+    {
+      "higher_is_better": false,
+      "metric_key": "decode_ms",
+      "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+      "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+      "test": "performance.decode_throughput",
+      "unit": "ms",
+      "value": "unsupported"
+    },
+    {
+      "higher_is_better": false,
+      "metric_key": "output_tokens",
+      "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
+      "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
+      "test": "performance.decode_throughput",
+      "unit": "tokens",
+      "value": 128.0
+    }
+  ],
   "tests_matrix": {
     "cells": [
       {
+        "mean_score": 1.0,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
         "skip_reason": null,
@@ -70,6 +109,7 @@
         "test": "echo.short"
       },
       {
+        "mean_score": 0.8,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PKE3RTYJWW16FW69J07V",
         "skip_reason": null,
@@ -77,6 +117,7 @@
         "test": "echo.long"
       },
       {
+        "mean_score": 0.5,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
         "skip_reason": null,
@@ -84,6 +125,7 @@
         "test": "performance.prompt_processing"
       },
       {
+        "mean_score": 1.0,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
         "skip_reason": null,
@@ -91,6 +133,7 @@
         "test": "performance.decode_throughput"
       },
       {
+        "mean_score": null,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
         "skip_reason": null,
@@ -98,6 +141,7 @@
         "test": "performance.combined_request"
       },
       {
+        "mean_score": 1.0,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
         "skip_reason": null,
@@ -105,6 +149,7 @@
         "test": "performance.streaming_latency"
       },
       {
+        "mean_score": 0.0,
         "model": "fake/fake-model:8b-q8_0@sha256:fa4efa4efa4e",
         "run_id": "01M2C3PM4G4W2XNXGG0VH314NM",
         "skip_reason": null,

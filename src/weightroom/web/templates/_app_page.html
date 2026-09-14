@@ -1,7 +1,7 @@
 {#- Macros every page under an application's tab shares (row WP1's page kit). -#}
 {% from "mirrorwall/components.html" import badge, empty_state, table %}
 
-{% macro app_page_header(view, title, section, supporting) -%}
+{% macro app_page_header(view, title, section, supporting, controls=false) -%}
 {#- The common head of a page under an application's tab: where the page sits (application /
     section), its title, that application's availability, and one sentence saying what the page
     is for. It takes no caller (row WY10 removed the slot): a page's links go in `page_nav` above
@@ -9,7 +9,10 @@
 
     Availability is `view.pill` verbatim, not a friendlier two-state guess: *starting*,
     *stopped*, *unsupported* and *version mismatch* are operationally different answers, and
-    `_app_state.html` below the header is what explains the one that applies. -#}
+    `_app_state.html` below the header is what explains the one that applies.
+
+    `controls` puts Start, Stop and Restart at the right of the heading row — every Overview does.
+    Import the macro `with context` to use it: the form carries the CSRF token. -#}
 <header class="page-head app-page-intro">
   <div class="app-page-copy">
     <p class="app-page-eyebrow">{{ view.name | app_label }} / {{ section }}</p>
@@ -19,6 +22,15 @@
         <span class="app-page-availability-label">Availability</span>
         {{ badge(view.pill, tone=view.pill | pill_tone, title=view.error or view.unit_state) }}
       </div>
+      {% if controls and view.installed and view.unit_state != "unsupported" %}
+      <form method="post" action="/apps/{{ view.name }}/control" class="kit-actions app-page-controls">
+        <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ current_path }}">
+        <button type="submit" name="verb" value="start" {% if view.running %}disabled{% endif %}>Start</button>
+        <button type="submit" name="verb" value="stop" {% if not view.running %}disabled{% endif %}>Stop</button>
+        <button type="submit" name="verb" value="restart" {% if not view.running %}disabled{% endif %}>Restart</button>
+      </form>
+      {% endif %}
     </div>
     {% if supporting %}
     <p class="muted app-page-supporting">{{ supporting }}</p>

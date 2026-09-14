@@ -436,10 +436,20 @@ def job_output(request: Request, principal: CurrentOperator, job_id: str) -> HTM
 
 
 @ui_router.post("/jobs/{job_id}/cancel", summary="Cancel a job from the page")
-def cancel_from_page(request: Request, principal: CurrentOperator, job_id: str) -> Response:
-    """Cancel, then back to the job's page."""
+def cancel_from_page(
+    request: Request,
+    principal: CurrentOperator,
+    job_id: str,
+    next_path: Annotated[str | None, Form(alias="next")] = None,
+) -> Response:
+    """Cancel, then back to the job's page — or to the application page the button sat on
+    (``next``: a path under ``/apps/`` only, so the redirect never leaves the console)."""
     try:
         _cancel(request, principal, job_id)
     except SuiteError as exc:
         return _page(request, principal, error=exc)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=status.HTTP_303_SEE_OTHER)
+    back = f"/jobs/{job_id}"
+    if next_path and next_path.startswith("/apps/") and "//" not in next_path:
+        if "\\" not in next_path:
+            back = next_path
+    return RedirectResponse(back, status_code=status.HTTP_303_SEE_OTHER)

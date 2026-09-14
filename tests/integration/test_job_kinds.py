@@ -28,6 +28,7 @@ from weightroom.services.jobs import (
     OutputBuffer,
     claim_next,
     enqueue,
+    finish,
 )
 
 if TYPE_CHECKING:
@@ -233,6 +234,85 @@ def test_a_suite_run_is_never_started_uncapped(tmp_path: Path, database: Databas
     )
     assert outcome.state == "failed"
     assert "ADR-0119" in (outcome.error or "")
+    assert not (tmp_path / "systemd-run.argv").exists()
+
+
+def _previous_run_finished(database: Database, *, seconds_ago: float) -> None:
+    job = enqueue(
+        database,
+        kind="freeweight_suite_run",
+        params={"model": "ollama/qwen3:8b", "suite": "native.echo"},
+        now=T0,
+    )
+    claim_next(database, now=T0, lease_seconds=60)
+    finish(
+        database,
+        job.id,
+        state="completed",
+        now=T0 - timedelta(seconds=seconds_ago),
+        output=None,
+        error=None,
+    )
+
+
+def test_a_suite_run_whose_cooldown_has_passed_starts_at_once(
+    tmp_path: Path, database: Database
+) -> None:
+    wrapper = _systemd_run(tmp_path)
+    freeweight = _freeweight(tmp_path)
+    settings = settings_for(tmp_path, f'[apps.freeweight]\nexecutable = "{freeweight}"\n')
+    services = replace(
+        services_for(), which=lambda name: str(wrapper) if name == "systemd-run" else None
+    )
+    _previous_run_finished(database, seconds_ago=60)
+
+    outcome, text, _job = run_kind(
+        database,
+        settings,
+        services,
+        "freeweight_suite_run",
+        {"model": "ollama/qwen3:8b", "suite": "native.performance", "cooldown_seconds": 30},
+    )
+
+    assert outcome == Outcome("completed")
+    assert "Cooling down" not in text
+
+
+def test_a_suite_run_waits_out_its_cooldown_and_a_cancel_ends_the_wait(
+    tmp_path: Path, database: Database
+) -> None:
+    """The wait is before anything launches, so a cancel in it starts no run at all."""
+    wrapper = _systemd_run(tmp_path)
+    freeweight = _freeweight(tmp_path)
+    settings = settings_for(tmp_path, f'[apps.freeweight]\nexecutable = "{freeweight}"\n')
+    services = replace(
+        services_for(), which=lambda name: str(wrapper) if name == "systemd-run" else None
+    )
+    _previous_run_finished(database, seconds_ago=10)
+    job = enqueue(
+        database,
+        kind="freeweight_suite_run",
+        params={"model": "ollama/qwen3:8b", "suite": "native.performance", "cooldown_seconds": 30},
+        now=T0,
+    )
+    claimed = claim_next(database, now=T0, lease_seconds=60)
+    assert claimed is not None
+    assert claimed.id == job.id
+    output = OutputBuffer(1_000_000)
+    context = JobContext(
+        job=claimed,
+        settings=settings,
+        database=database,
+        services=services,
+        output=output,
+        cancelled=lambda: True,
+        now=lambda: T0,
+    )
+
+    outcome = EXECUTORS["freeweight_suite_run"](context)
+
+    assert outcome == Outcome("cancelled", "the run was cancelled during its cooldown")
+    assert "Cooling down 20 s" in output.text()
     assert not (tmp_path / "systemd-run.argv").exists()
 
 

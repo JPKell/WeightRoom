@@ -33,7 +33,9 @@ from weightroom.web.routes.jobs import enqueue_job
 from weightroom.web.session import CurrentOperator, now_of, reauthenticated
 
 if TYPE_CHECKING:
+    from weightroom.services.apps import AppView
     from weightroom.services.auth import Principal
+    from weightroom.services.jobs import JobView
 
 __all__ = ["ui_router"]
 
@@ -385,6 +387,7 @@ def _runs(
         filters={key: value or "" for key, value in wanted.items()},
         statuses=fw.RUN_STATUSES,
         next_href=next_href,
+        queue=_run_queue(request),
         benchmarks=benchmarks,
         # The filter bar offers every model, because a run of a since-disabled model is still a
         # run somebody wants to find; the Overview's Start form is the one that filters to what
@@ -424,6 +427,82 @@ def runs_page(  # noqa: PLR0913 — one parameter per filter FreeWeight's runs l
     return _runs(request, principal, filters=filters, cursor=cursor or None, page=page)
 
 
+def _start_lists(request: Request, view: AppView) -> dict[str, list[dict[str, Any]]]:
+    """What the Start form offers: the suites, the enabled models (ADR-0118), the adapters it can
+    serve — nothing while FreeWeight is not answering."""
+    if not view.reachable:
+        return {"benchmarks": [], "models": [], "adapters": []}
+    client, settings = _clients(request)
+    benchmarks = (
+        read_app_page(
+            request, view, api=lambda: fw.benchmarks_api(client, settings), database=None
+        ).data
+        or []
+    )
+    models = (
+        read_app_page(
+            request,
+            view,
+            api=lambda: fw.models_api(client, settings, sort="canonical_id"),
+            database=None,
+        ).data
+        or []
+    )
+    adapters = _startable_adapters(
+        read_app_page(
+            request, view, api=lambda: fw.adapters_api(client, settings), database=None
+        ).data
+    )
+    return {
+        "benchmarks": benchmarks,
+        "models": [one for one in models if one.get("enabled")],
+        "adapters": adapters,
+    }
+
+
+def _run_queue(request: Request) -> list[JobView]:
+    """The console's suite-run jobs still to finish: the running one, then the queue in the order
+    the worker claims it (oldest first)."""
+    from weightroom.services.jobs import list_jobs
+
+    database = request.app.state.database
+    running, _ = list_jobs(database, limit=10, state="running", kind=SUITE_RUN)
+    queued, _ = list_jobs(database, limit=100, state="queued", kind=SUITE_RUN)
+    return [*running, *reversed(queued)]
+
+
+def _new_run(
+    request: Request,
+    principal: Principal,
+    *,
+    start_error: SuiteError | None = None,
+    form: Mapping[str, str] | None = None,
+    queued: str | None = None,
+) -> HTMLResponse:
+    view = app_view(request, APP)
+    return render_app_page(
+        request,
+        principal,
+        APP,
+        "fw_run_new.html",
+        selected="Runs",
+        view=view,
+        **_start_lists(request, view),
+        queue=_run_queue(request),
+        start_error=start_error,
+        form=dict(form or {}),
+        queued=queued,
+    )
+
+
+@ui_router.get(f"{BASE}/runs/new", summary="New run", response_class=HTMLResponse)
+def new_run_page(
+    request: Request, principal: CurrentOperator, queued: str | None = None
+) -> HTMLResponse:
+    """Add runs to the console's queue one at a time, beside what is already waiting in it."""
+    return _new_run(request, principal, queued=queued)
+
+
 @ui_router.post(f"{BASE}/runs", summary="Start a run from the page")
 def start_from_page(  # noqa: PLR0913 — one parameter per field of FreeWeight's own start form
     request: Request,
@@ -432,6 +511,8 @@ def start_from_page(  # noqa: PLR0913 — one parameter per field of FreeWeight'
     suite: Annotated[str, Form()] = "",
     label: Annotated[str, Form()] = "",
     adapter: Annotated[str, Form()] = "",
+    cooldown_seconds: Annotated[str, Form()] = "",
+    next_page: Annotated[str, Form(alias="next")] = "",
 ) -> Response:
     """Enqueue W9's ``freeweight_suite_run`` job (ADR-0119's cap, one ``job.enqueue`` row), then
     follow it until FreeWeight names the run.
@@ -440,8 +521,16 @@ def start_from_page(  # noqa: PLR0913 — one parameter per field of FreeWeight'
     with that registered LoRA applied and measures a different subject (ADR-0058). FreeWeight
     refuses one it cannot serve by name, and this page renders that refusal rather than deciding
     compatibility itself.
+
+    ``cooldown_seconds`` is how long the job waits after the previous suite run finished.
+    ``next=new`` is the New run page: a queued run returns there so another can be added, and a
+    refusal comes back there with what was typed.
     """
-    form = {"model": model, "suite": suite, "label": label, "adapter": adapter}
+    form = {
+        "model": model, "suite": suite, "label": label, "adapter": adapter,
+        "cooldown_seconds": cooldown_seconds,
+    }  # fmt: skip
+    cooldown = cooldown_seconds.strip()
     try:
         job = enqueue_job(
             request,
@@ -452,13 +541,21 @@ def start_from_page(  # noqa: PLR0913 — one parameter per field of FreeWeight'
                 "suite": suite,
                 "label": label or None,
                 "adapter": adapter or None,
+                # Digits reach the job's own check as a number; anything else as typed, where it
+                # is refused by name.
+                "cooldown_seconds": int(cooldown) if cooldown.isdigit() else (cooldown or None),
             },
             schedule_id=None,
         )
     except SuiteError as exc:
-        # The Start form lives on the Overview since row WX8, so a refusal comes back where it
-        # was pressed — the Runs page only links to it.
+        if next_page == "new":
+            return _new_run(request, principal, start_error=exc, form=form)
         return overview(request, principal, start_error=exc, form=form)
+    if next_page == "new":
+        return RedirectResponse(
+            _href(f"{BASE}/runs/new", queued=job.id) + "#queue",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     return RedirectResponse(
         f"{BASE}/runs/starting/{fw.segment(job.id)}", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -1325,31 +1422,8 @@ def overview(  # noqa: PLR0913 — the dashboard's four filters, and what a refu
     sourced = read_app_page(
         request, view, api=lambda: fw.dashboard_api(client, settings, wanted), database=None
     )
-    benchmarks: list[dict[str, Any]] = []
-    models: list[dict[str, Any]] = []
-    adapters: list[dict[str, Any]] = []
-    if view.reachable:
-        benchmarks = (
-            read_app_page(
-                request, view, api=lambda: fw.benchmarks_api(client, settings), database=None
-            ).data
-            or []
-        )
-        models = (
-            read_app_page(
-                request,
-                view,
-                api=lambda: fw.models_api(client, settings, sort="canonical_id"),
-                database=None,
-            ).data
-            or []
-        )
-        adapters = _startable_adapters(
-            read_app_page(
-                request, view, api=lambda: fw.adapters_api(client, settings), database=None
-            ).data
-        )
-    chart = fw.heatmap_option(sourced.data or {})
+    score_chart = fw.score_heatmap_option(sourced.data or {})
+    test_charts = fw.bar_charts_by_test(sourced.data or {})
     return render_app_page(
         request,
         principal,
@@ -1360,15 +1434,14 @@ def overview(  # noqa: PLR0913 — the dashboard's four filters, and what a refu
         overview=summary,
         sourced=sourced,
         filters={key: value or "" for key, value in wanted.items()},
-        chart=chart,
-        benchmarks=benchmarks,
-        models=[one for one in models if one.get("enabled")],
-        adapters=adapters,
+        score_chart=score_chart,
+        test_charts=test_charts,
+        **_start_lists(request, view),
         start_error=start_error,
         form=dict(form or {}),
         # ECharts is 1.1 MB and this is the tab's landing page: it is asked for only when there
-        # is a heatmap to draw (ADR-0142's per-page opt-in, taken per *render*).
-        mirrorwall={"htmx": True, "echarts": chart is not None},
+        # is a chart to draw (ADR-0142's per-page opt-in, taken per *render*).
+        mirrorwall={"htmx": True, "echarts": score_chart is not None or bool(test_charts)},
     )
 
 

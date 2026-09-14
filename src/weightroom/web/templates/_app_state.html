@@ -1,7 +1,8 @@
 {#- The application's state, the same under every page of its tab (spec §7.3): why process control
     cannot work on this host, the control form, a version outside the range.
 
-    The Overview passes `full_controls` and shows all three buttons. Every other page shows the form
+    The Overview passes `full_controls`: its three buttons are in the header's heading row
+    (`app_page_header(controls=true)`), so nothing is drawn here. Every other page shows the form
     only while the application is not running, so a stopped application's page carries a working
     Start beside its disabled actions. The form posts `next`, and the control route sends the
     operator back to the page they pressed it on (it accepts only a path under this application). -#}
@@ -15,13 +16,6 @@
 it has no unit. Set <code>[apps.{{ view.name }}] executable</code> in WeightRoom's
 configuration and run <code>wr-gym units sync</code>.</p>
 {% elif full_controls | default(false) %}
-<form method="post" action="/apps/{{ view.name }}/control" class="kit-actions">
-  <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
-  <input type="hidden" name="next" value="{{ current_path }}">
-  <button type="submit" name="verb" value="start" {% if view.running %}disabled{% endif %}>Start</button>
-  <button type="submit" name="verb" value="stop" {% if not view.running %}disabled{% endif %}>Stop</button>
-  <button type="submit" name="verb" value="restart" {% if not view.running %}disabled{% endif %}>Restart</button>
-</form>
 {% elif not view.running %}
 <div class="notice app-stopped">
   <span>{{ view.name | app_label }} is <strong>{{ view.pill }}</strong>: this page reads what its database

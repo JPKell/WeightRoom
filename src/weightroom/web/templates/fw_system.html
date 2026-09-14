@@ -27,5 +27,15 @@ them, read from its running API.</p>
 {{ table([{"label": "Component"}, {"label": "Status"}, {"label": "Detail"}], rows, caption="Ten components: database, provider, gpu_telemetry, machine, evidence, prompts, sandbox, external_benchmarks, goals, judges", density="dense", complete=true, row_count=rows | length, table_id="fw-system", sortable=true) }}
 <p class="muted">A degraded component is not a failure to serve.</p>
 {% endif %}
+
+<h3>The unit</h3>
+{{ kv_list([
+  {"label": "Unit", "value": view.unit},
+  {"label": "Executable", "value": view.executable or "—"},
+  {"label": "API", "value": view.base_url or "—"},
+  {"label": "API version", "value": view.api_version or "—"},
+  {"label": "Last API error", "value": view.error or "—"},
+]) }}
+<p class="muted"><a href="/api/v1/apps/freeweight">JSON</a> · <a href="/api/v1/apps/freeweight/health">health</a></p>
 {{ page_source(sourced) }}
 {% endblock %}

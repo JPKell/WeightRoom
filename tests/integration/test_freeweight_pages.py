@@ -273,7 +273,7 @@ def test_the_runs_page_lists_runs_offers_a_start_and_passes_every_filter(tmp_pat
             "&since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z",
         )
     assert f'href="{BASE}/runs/{RUN}"' in text
-    assert "Start a run" in text
+    assert f'href="{BASE}/runs/new"' in text
     assert '<option value="native.echo"' in text
     assert f'<option value="{CANONICAL}"' in text
     params = routes["runs"].calls.last.request.url.params
@@ -320,6 +320,7 @@ def test_start_enqueues_the_capped_suite_run_job_and_the_page_follows_it_to_the_
         "label": "wp3",
         "allow_prompt_override": False,
         "adapter": None,
+        "cooldown_seconds": None,
     }
     (row,) = audit(console, "job.enqueue")
     assert row["outcome"] == "ok"
