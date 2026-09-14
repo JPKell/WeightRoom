@@ -1,13 +1,23 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, empty_state, json_viewer %}
 {% macro field_rows(fields, form, app) %}
-{#- One <tr> per field, plus its hint row. Called by each section's table and by each provider
-    profile card (row WX13), which is why it takes `form` and `app` rather than reading them. -#}
+{#- One <tr> per field, its hint under the key in the key's own cell. Called by each section's table
+    and by each provider profile card (row WX13), which is why it takes `form` and `app` rather
+    than reading them. -#}
 {% for one in fields %}
 {% set field_id = "f-" ~ one.key | replace(".", "-") %}
 <tr{% if one.shadowed %} class="shadowed"{% endif %}>
   <th scope="row">
     <label for="{{ field_id }}"><code>{{ one.key }}</code></label>
+    {% if one.description %}
+    <details class="field-hint-details"><summary>{{ one.description }}</summary>
+      <p class="field-hint">{{ one.description }}</p>
+    </details>
+    {% endif %}
+    {% if one.description or one.bounds_text or one.default_text %}
+    <span class="field-hint field-hint-bounds">
+      {%- if one.bounds_text %}range {{ one.bounds_text }} · {% endif %}default <code>{{ one.default_text or "—" }}</code></span>
+    {% endif %}
   </th>
   <td>
     {#- A select always posts something, so a key the model allows to be unset needs an
@@ -58,33 +68,20 @@
   </div>
   </td>
 </tr>
-{% if one.description or one.bounds_text or one.default_text %}
-<tr class="field-hint-row{% if one.shadowed %} shadowed{% endif %}">
-  <td colspan="4">
-    {% if one.description %}
-    <details class="field-hint-details"><summary>{{ one.description }}</summary>
-      <p class="field-hint">{{ one.description }}</p>
-    </details>
-    {% endif %}
-    {% if one.bounds_text %}<span class="field-hint">range {{ one.bounds_text }}</span>{% endif %}
-    <span class="field-hint">default <code>{{ one.default_text or "—" }}</code></span>
-  </td>
-</tr>
-{% endif %}
 {% endfor %}
 {% endmacro %}
 
 {% block title %}{{ app | app_label }} settings — WeightRoom{% endblock %}
 {% block extra_head %}
 <style>
-  /* Row WX1: the hint spans move off the key cell into their own row, one per field, spanning the
-     table; a long description clamps to one line until the <details> is opened (native, no JS).
-     Range and default are never inside the <details> — they stay visible either way. */
-  tr.field-hint-row td { padding-top: 0; border-top: none; }
-  tr.field-hint-row .field-hint { margin-right: 12px; }
-  .field-hint-details { display: inline; }
+  /* The hint sits under the key, in the key's own cell (operator, 2026-09-14; row WX1 had given it
+     a row of its own). A long description clamps to one line until the <details> is opened
+     (native, no JS); range and default are never inside the <details> and stay visible. */
+  .settings-table tbody th { text-align: start; vertical-align: top; }
+  .settings-table tbody th .field-hint-details,
+  .settings-table tbody th .field-hint-bounds { display: block; font-weight: normal; margin-top: 2px; }
   .field-hint-details summary {
-    display: inline-block;
+    display: block;
     /* Row WX9: `60ch` alone is wider than a phone, so a long description pushed the page into a
        horizontal scroll at 412 px. Clamped against the viewport, not the cell: a percentage
        max-width inside an auto-layout table is circular and blows the table out instead. */
@@ -96,6 +93,10 @@
     cursor: pointer;
   }
   .field-hint-details p.field-hint { margin: 4px 0 0; }
+  /* Opened, the summary itself wraps to the whole description, so the copy below it is hidden
+     rather than shown twice. */
+  .field-hint-details[open] summary { white-space: normal; overflow: visible; }
+  .field-hint-details[open] p.field-hint { display: none; }
   /* Row WX13: a provider profile's card. Page-specific, so it stays here rather than in the
      shell's CSS budget. */
   .provider-card > h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; }
@@ -104,7 +105,7 @@
   .provider-card-active { border-left-color: currentColor; }
   /* Row WY2: Value, Source and Applies right-aligned; Source and Applies shrink to content so Key
      and Value get the room. Applies stacks its pills and buttons one per line, right-aligned. The
-     hint row (colspan 4) is untouched by the nth-child rules below — it is one <td>, not four. */
+     key's hint lives in the <th>, which the start-aligned rule above keeps out of these. */
   .settings-table th:nth-child(2), .settings-table td:nth-child(2),
   .settings-table th:nth-child(3), .settings-table td:nth-child(3),
   .settings-table th:nth-child(4), .settings-table td:nth-child(4) { text-align: end; }

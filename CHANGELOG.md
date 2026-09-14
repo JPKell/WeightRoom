@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Changed
+- **A setting's description sits under its key, in the key's own cell.** Every settings page gave
+  the description, range and default a table row of their own (row WX1); they now sit beneath the
+  key name in the same row. A long description still clamps to one line until opened, and opened
+  it wraps in place instead of repeating below.
+
 ### Added (row CF4)
 - **Apply a measured context fit to LoadCoach from its Models page.** The Context fit column offers
   **Apply**, which writes `[runtime.models."<canonical_id>"].context_size` into LoadCoach's
