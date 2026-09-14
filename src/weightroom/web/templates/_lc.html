@@ -117,7 +117,7 @@
   <input type="hidden" name="{{ csrf_field_name }}" value="{{ csrf_token }}">
   <input type="hidden" name="canonical_id" value="{{ canonical }}">
   <input type="hidden" name="context_tokens" value="{{ tokens | int }}">
-  <button type="submit" title="{{ 'Writes ' ~ (tokens | int) ~ ' (measured ' ~ (fit.get('max_successful_context_tokens') | int) ~ ', less one 4096-token step); ' ~ (('LoadCoach config serves ' ~ configured.get(canonical)) if configured.get(canonical) else 'LoadCoach config names no context for this model') }}">Apply</button>
+  <button type="submit" title="{{ 'Writes ' ~ (tokens | int) ~ ' (measured ' ~ (fit.get('max_successful_context_tokens') | int) ~ ', less FreeWeight\'s margin of ' ~ ((fit.get('max_successful_context_tokens') | int) - (tokens | int)) ~ '); ' ~ (('LoadCoach config serves ' ~ configured.get(canonical)) if configured.get(canonical) else 'LoadCoach config names no context for this model') }}">Apply</button>
 </form>
 {%- endif -%}
 {%- endif -%}

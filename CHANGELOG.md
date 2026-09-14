@@ -11,7 +11,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   **Apply**, which writes `[runtime.models."<canonical_id>"].context_size` into LoadCoach's
   `config.toml` through LoadCoach's own validation, audited `loadcoach.context_fit_applied`; a model
   whose file already serves it reads *applied* (ADR-0149). The number written is FreeWeight's
-  `usable_context_tokens`, the measured fit less one 4 096-token step (ADR-0152).
+  `usable_context_tokens`, the measured fit less FreeWeight's `benchmarks.context_fit_margin_tokens`
+  (4 096 by default; ADR-0152, ADR-0153).
 
 ### Fixed (row CF4)
 - **The Context fit column reads FreeWeight's real shape.** FreeWeight names the subject `model`;

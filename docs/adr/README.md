@@ -187,6 +187,7 @@ an ADR is superseded rather than edited.
 | [0150](0150-the-speed-capability-reads-prompt-throughput-at-one-size.md) | The speed capability reads prompt throughput at one prompt size, `prompt_tokens_per_second_at_4096`, so models benchmarked at different contexts compare (row CF6) | Accepted |
 | [0151](0151-context-fit-refines-between-rungs-and-climbs-to-256k.md) | A benchmark test may choose follow-up cases from the outcomes so far (`next_cases`); `native.context_fit` halves the gap between rungs to 4 096 tokens, and `benchmarks.max_fit_context_tokens` defaults to 262 144; amends ADR-0121 §1's default (row CF8) | Accepted |
 | [0152](0152-a-context-fit-is-used-one-step-below-what-was-measured.md) | A context fit is used one step (4 096 tokens) below what was measured: FreeWeight benchmarks run at it, `GET /results/context-fit` carries `usable_context_tokens`, and the console's Apply writes it; amends ADR-0148 §6 and ADR-0149 §1 (row CF9) | Accepted |
+| [0153](0153-the-context-fit-margin-is-a-setting.md) | The context-fit margin is `[benchmarks] context_fit_margin_tokens` (default 4 096; `0` uses the fit as measured), read wherever the margin applies; amends ADR-0152 §1 (row CF10) | Accepted |
 
 ## Writing a new ADR
 

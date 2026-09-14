@@ -27,3 +27,4 @@ Built in one session on branch `row/cf-context-fit` in worktrees `~/ai/worktrees
 | CF7 | Hash alignment → finding only | Opus 5 · high | — | Why FreeWeight evidence cannot bind in LoadCoach; recorded in ADR-0149 and the handoff, no code | one session |
 | CF8 | Refine between rungs; ceiling 262 144 → FreeWeight | Opus 5 · high | CF2 | The run engine's optional `next_cases`; `native.context_fit` halves the gap to 4 096 tokens; `benchmarks.max_fit_context_tokens` default 262 144. ADR-0151 | one session |
 | CF9 | Use a fit one step below the measurement → FreeWeight, WeightRoom | Opus 5 · high | CF8 | `usable_context` = fit − 4 096; benchmarks run at it; `GET /results/context-fit` carries `usable_context_tokens`; Apply writes it. ADR-0152 | one session |
+| CF10 | The margin is a setting → FreeWeight | Opus 5 · high | CF9 | `[benchmarks] context_fit_margin_tokens` (default 4 096, 0–65 536) read by `create_run` and `GET /results/context-fit`. ADR-0153 | one session |
