@@ -5,6 +5,7 @@
    "runtime_profile_hash": "8f2c1d4e",
    "machine_fingerprint": "jordan-main",
    "max_successful_context_tokens": 32768,
+   "usable_context_tokens": 28672,
    "capped_by_configuration": false,
    "observed_mb_per_1k_context": 118.4
   },
@@ -13,6 +14,7 @@
    "runtime_profile_hash": "8f2c1d4e",
    "machine_fingerprint": "jordan-main",
    "max_successful_context_tokens": 16384,
+   "usable_context_tokens": 12288,
    "capped_by_configuration": true,
    "observed_mb_per_1k_context": 96.0
   }

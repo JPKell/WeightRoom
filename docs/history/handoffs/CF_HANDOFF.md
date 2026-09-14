@@ -103,7 +103,8 @@ served (32 902 prompt tokens), 45 056 refused. **`max_successful_context_tokens 
 9 cases, three refinement launches, three minutes in all. Peak VRAM **15.94 GB of 16.3 GB** at
 40 960 — about 370 MiB spare. Applied to LoadCoach, whose llama-server keeps `--fit on`, a desktop
 that takes more VRAM makes it spill layers rather than fail; under FreeWeight's `--fit off` a later
-benchmark at 40 960 can be refused at launch. The operator decided (2026-09-14) to keep Apply exact — no margin — for now.
+benchmark at 40 960 can be refused at launch. The operator first chose an exact Apply, then (same day) a margin of one step, applied to both
+sides — row CF9, ADR-0152: benchmarks run at, and Apply writes, the fit less 4 096 (36 864 here).
 
 **The refusal is the card.** The failed launch's output is not kept — the per-port stderr log is
 overwritten by the next launch on that port, and the sample stores only the message. Reproduced
