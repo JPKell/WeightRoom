@@ -30,6 +30,7 @@ was served 8 192.
 | CF5 | LoadCoach | `constraints.allow_cpu_spill`; `resolve_runtime_profile(spill_to_tokens=)` raises a *stated* context to the next power of two at or above the need (profile `min_context_tokens`, or input + output budget + margin), before the request override. |
 | CF6 | FreeWeight | `native.performance` `1.1.0` derives `prompt_tokens_per_second_at_4096`; `capability_weights.toml` `1.1` reads it for speed. |
 | CF7 | — | Finding only, §4. |
+| CF8 | FreeWeight | Operator follow-up (ADR-0151): the run engine's optional `next_cases(outcomes)` hook — asked after a test's listed cases until it returns nothing, outcomes read back from stored samples, `run_tests.total_cases` grown each round; `native.context_fit` halves the gap between the largest served rung and the smallest refused on multiples of 4 096; `benchmarks.max_fit_context_tokens` default 262 144 (also moves `native.memory_kv`'s default ladder and hash). |
 
 ## 3. What the plan got wrong, and decisions made in the session
 
@@ -94,6 +95,14 @@ of `llamacpp/digests.json` (without it `models refresh` re-hashes every GGUF). R
 14.6 GB of 16 GB; no server left behind. The launches were watched at `--ctx-size` 8192, 32768 and
 16384 (the case order is shuffled by the run's seed). Before ADR-0148 the same model on the same
 card reported 8 192, capped.
+
+**Refined, row CF8** — run `01M2ERX6WXE67WF4ZC3FC6A573`, 2026-09-14 01:36–01:39Z, ceiling 262 144:
+8 192, 16 384, 32 768 served; 65 536, 131 072 and 262 144 refused; then 49 152 refused, 40 960
+served (32 902 prompt tokens), 45 056 refused. **`max_successful_context_tokens = 40960`**, capped 0,
+9 cases, three refinement launches, three minutes in all. Peak VRAM **15.94 GB of 16.3 GB** at
+40 960 — about 370 MiB spare. Applied to LoadCoach, whose llama-server keeps `--fit on`, a desktop
+that takes more VRAM makes it spill layers rather than fail; under FreeWeight's `--fit off` a later
+benchmark at 40 960 can be refused at launch. A margin below the fit is the operator's call.
 
 **The refusal is the card.** The failed launch's output is not kept — the per-port stderr log is
 overwritten by the next launch on that port, and the sample stores only the message. Reproduced
