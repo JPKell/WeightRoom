@@ -75,6 +75,7 @@ while the venv's editable suite packages stay as they are. Invocation, identical
 | WeightRoom | `f576fc3` | 2094 passed, 3 skipped, 1 failed — `test_every_state_changing_route_has_an_exercise`, fixed by an exercise for the new route; `tests/security/test_audit_routes.py` then 115 passed |
 | FreeWeight | `7b2cffb` | 2823 passed, 30 skipped, 1 failed — a mapping test parsing its own `1.0` body that a version bump had rewritten, restored; the two mapping test files then 49 passed |
 | FreeWeight (CF8) | `6cc9c96` | 2826 passed, 30 skipped, 1 failed — the config-schema golden, stale after the `BenchmarkSettings` docstring was rewrapped (pydantic copies it into the schema); regenerated, the schema and context-fit tests then 20 passed, `generate_config_reference.py --check` current |
+| FreeWeight (CF9) | `5270e63` | 2828 passed, 30 skipped, 0 failed |
 
 ## 6. Live verification
 
