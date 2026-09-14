@@ -25,3 +25,4 @@ Built in one session on branch `row/cf-context-fit` in worktrees `~/ai/worktrees
 | CF5 | `allow_cpu_spill` → LoadCoach | Opus 5 · high | — | Task profile constraint; raise a configured context to the need, next power of two. ADR-0149 §2 | one session |
 | CF6 | Speed at one prompt size → FreeWeight | Opus 5 · high | — | `native.performance` `1.1.0` derives `prompt_tokens_per_second_at_4096`; mapping `1.1`. ADR-0150 | one session |
 | CF7 | Hash alignment → finding only | Opus 5 · high | — | Why FreeWeight evidence cannot bind in LoadCoach; recorded in ADR-0149 and the handoff, no code | one session |
+| CF8 | Refine between rungs; ceiling 262 144 → FreeWeight | Opus 5 · high | CF2 | The run engine's optional `next_cases`; `native.context_fit` halves the gap to 4 096 tokens; `benchmarks.max_fit_context_tokens` default 262 144. ADR-0151 | one session |

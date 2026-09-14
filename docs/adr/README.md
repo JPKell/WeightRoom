@@ -185,6 +185,7 @@ an ADR is superseded rather than edited.
 | [0148](0148-context-fit-is-its-own-suite-and-gates-benchmarks.md) | Context fit is its own suite, `native.context_fit`, each rung served at its own context; every other benchmark of a model waits for it (`benchmarks.require_context_fit`) and then runs at the context it measured (rows CF2, CF3) | Accepted |
 | [0149](0149-the-console-applies-a-context-fit-to-loadcoach.md) | The console applies a measured context fit to LoadCoach's `[runtime.models]` on the operator's word — no payload, no import — and a task profile's `allow_cpu_spill` raises a configured context to what it needs (rows CF4, CF5) | Accepted |
 | [0150](0150-the-speed-capability-reads-prompt-throughput-at-one-size.md) | The speed capability reads prompt throughput at one prompt size, `prompt_tokens_per_second_at_4096`, so models benchmarked at different contexts compare (row CF6) | Accepted |
+| [0151](0151-context-fit-refines-between-rungs-and-climbs-to-256k.md) | A benchmark test may choose follow-up cases from the outcomes so far (`next_cases`); `native.context_fit` halves the gap between rungs to 4 096 tokens, and `benchmarks.max_fit_context_tokens` defaults to 262 144; amends ADR-0121 §1's default (row CF8) | Accepted |
 
 ## Writing a new ADR
 
