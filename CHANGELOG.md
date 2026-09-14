@@ -12,8 +12,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   the common page header.
 - **FreeWeight's Overview** puts Summary first. Its *Active run* card is cut to the card and links
   to the run. *How the models did* is replaced by a models × tests heatmap of mean sample scores
-  and a per-test bar chart (a test picker, one checkbox per metric), each with a table beside it;
-  this needs FreeWeight's `mean_score` and `test_metrics` on `GET /dashboard`. *The unit* moved to
+  and a per-test bar chart (a test picker, one checkbox per metric), each with a table beside it.
+  The tests matrix (*What actually ran*: each test's status, run and skip reason) stays in view
+  between them. This needs FreeWeight's `mean_score` and `test_metrics` on `GET /dashboard`. *The unit* moved to
   the System page, and the models table shows only provider and model name.
 - **FreeWeight runs queue in view.** A *New run* page (Runs' page bar) adds runs one at a time and
   lists the console's queued and running suite-run jobs, each cancellable; the Runs page shows the

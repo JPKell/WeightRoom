@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import card, table, empty_state, chart_container %}
 {% from "_app_page.html" import page_source, refusal, app_page_header, page_nav with context %}
-{% from "_fw.html" import filter_styles, run_link, value, start_form with context %}
+{% from "_fw.html" import filter_styles, run_link, value, status_badge, start_form with context %}
 {% block title %}FreeWeight — WeightRoom{% endblock %}
 {% block page_content %}
 {{ filter_styles() }}
@@ -14,7 +14,8 @@
   .fw-test-pick select { max-width: 100%; }
   /* A model's name in the first column of a wide dense table scrolls rather than wrapping one
      character a line. */
-  [data-table="fw-scores"] td:first-child { white-space: nowrap; }
+  [data-table="fw-scores"] td:first-child,
+  [data-table="fw-tests-matrix"] td:first-child { white-space: nowrap; }
 </style>
 {{ page_nav(links=[{"label": "Compare", "href": "/apps/freeweight/results/compare"}], actions=[{"label": "JSON", "href": "/api/v1/apps/freeweight"}, docs_action("freeweight")]) }}
 {{ app_page_header(view, "Overview", "Overview", "", controls=true) }}
@@ -102,6 +103,25 @@
 {% else %}
 {{ table(head, rows, caption=caption, density="dense", complete=true, row_count=rows | length, table_id="fw-scores", sortable=true) }}
 {% endif %}
+
+<h3 id="matrix">What actually ran</h3>
+<p class="muted">The same runs, test by test: each test's outcome, its run, and why it was skipped. A cell
+is empty where that run recorded no such test.</p>
+{% set head = [{"label": "Model", "mono": true}] %}
+{% for test in tests %}{% set _ = head.append({"label": test}) %}{% endfor %}
+{% set rows = [] %}
+{% for model in matrix_models %}
+{% set cells = [model | canonical_name] %}
+{% for test in tests %}
+{% set cell = by_cell.get((model, test)) %}
+{% set _ = cells.append(
+  status_badge(cell.get("status")) ~ " " ~ run_link(cell.get("run_id")) ~ (" " ~ cell.get("skip_reason") if cell.get("skip_reason") else "")
+  if cell else "<span class=\"muted\" title=\"that run recorded no such test\">—</span>" | safe
+) %}
+{% endfor %}
+{% set _ = rows.append(cells) %}
+{% endfor %}
+{{ table(head, rows, caption=(matrix_models | length) ~ " models × " ~ (tests | length) ~ " tests, from the same runs.", density="dense", complete=true, row_count=rows | length, table_id="fw-tests-matrix", sortable=true) }}
 
 {% if test_charts %}
 <h3 id="by-test">One test</h3>

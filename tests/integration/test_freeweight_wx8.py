@@ -102,6 +102,10 @@ def test_the_overview_draws_scores_by_test_and_one_tests_bars(tmp_path: Path) ->
         text = page(console, BASE)
     assert 'id="fw-score-heatmap"' in text
     assert 'data-table="fw-scores"' in text
+    # The status matrix stays in view between the heatmap and one test's bars.
+    assert 'data-table="fw-tests-matrix"' in text
+    assert text.index('id="fw-score-heatmap"') < text.index('id="matrix"')
+    assert text.index('id="matrix"') < text.index('id="fw-test-pick"')
     for test in (
         "echo.short",
         "echo.long",
