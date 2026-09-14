@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% from "mirrorwall/components.html" import badge, table, empty_state %}
 {% from "_app_page.html" import page_source, refusal, context_k, app_page_header, page_nav %}
-{% from "_lc.html" import model_cell, recorded, measure, num, stat, breaker_badge, model_actions, capability_badges with context %}
+{% from "_lc.html" import model_cell, recorded, measure, num, stat, breaker_badge, model_actions, capability_badges, fit_action with context %}
 {% block title %}Models — LoadCoach — WeightRoom{% endblock %}
 {% block page_content %}
 {{ page_nav(actions=[{"label": "Docs", "href": "/docs?section=apps#docs-apps-loadcoach"}]) }}
@@ -35,6 +35,11 @@ under the runtime profile the cell names: one number per model would be a lie.</
   {% if ability %}<a href="/apps/loadcoach/models">Registry order</a>{% endif %}
 </form>
 {% endif %}
+{% if applied %}
+<p class="notice" role="status">Wrote <span class="mono">context_size = {{ applied.get("tokens") }}</span> for
+<span class="mono">{{ applied.get("canonical_id") }}</span> into LoadCoach's config. LoadCoach reads it at its next
+start — its Settings page shows the restart as pending.</p>
+{% endif %}
 {% if context_fit_error %}
 <p class="muted">Context fit is empty — {{ context_fit_error.message }}</p>
 {% endif %}
@@ -56,7 +61,7 @@ under the runtime profile the cell names: one number per model would be a lie.</
   badge("remote", tone="warning") if model.get("is_remote") else recorded(false),
   model.get("family") or "—",
   context_k(model.get("max_context")),
-  ('<span title="runtime profile '|safe ~ (fit.get("runtime_profile_hash") or "not recorded") ~ " · machine " ~ (fit.get("machine_fingerprint") or "not recorded") ~ (" · " ~ ("%.0f" | format(fit.get("observed_mb_per_1k_context"))) ~ " MB per 1k context" if fit.get("observed_mb_per_1k_context") is number else "") ~ '">'|safe ~ context_k(fit.get("max_successful_context_tokens")) ~ (" " ~ badge("capped", tone="warning", title="capped by configuration, not by the card") if fit.get("capped_by_configuration") else "") ~ '</span>'|safe) if fit else measure(none),
+  ('<span title="runtime profile '|safe ~ (fit.get("runtime_profile_hash") or "not recorded") ~ " · machine " ~ (fit.get("machine_fingerprint") or "not recorded") ~ (" · " ~ ("%.0f" | format(fit.get("observed_mb_per_1k_context"))) ~ " MB per 1k context" if fit.get("observed_mb_per_1k_context") is number else "") ~ '">'|safe ~ context_k(fit.get("max_successful_context_tokens")) ~ (" " ~ badge("capped", tone="warning", title="capped by configuration, not by the card") if fit.get("capped_by_configuration") else "") ~ '</span>'|safe ~ fit_action(canonical, fit, configured)) if fit else measure(none),
   (model.get("size_bytes") | bytes_human) if model.get("size_bytes") is number else measure(none),
   capability_badges((model.get("declared_capabilities") or {}).keys()) if model.get("declared_capabilities") else "none declared",
 ] + ([num((scores.get(canonical) or {}).get(ability), "%.3f")] if ability else []) + [

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -646,3 +647,32 @@ def test_a_field_that_cannot_parse_is_refused_and_nothing_is_sent(tmp_path: Path
     assert "VALIDATION_ERROR" in response.text
     assert "gpu_layers must be a whole number" in response.text
     assert not route.called
+
+
+def test_a_measured_context_fit_is_applied_to_loadcoachs_config_and_then_reads_applied(
+    tmp_path: Path,
+) -> None:
+    """ADR-0149 §1, ADR-0152: Apply writes FreeWeight's usable context (the fit less one step) as
+    ``[runtime.models."<id>"].context_size`` through LoadCoach's own validation, audits it, and the
+    column then reads applied."""
+    console, _database = loadcoach_console(tmp_path, state="active")
+    applied_title = "LoadCoach config serves this model at its usable context"
+    with respx.mock(assert_all_called=False) as router:
+        mock_api(router)
+        offered = page(console, f"{BASE}/models")
+        answer = post(
+            console,
+            f"{BASE}/models/context-fit",
+            {"canonical_id": CANONICAL, "context_tokens": "28672"},
+        )
+        reread = page(console, f"{BASE}/models")
+
+    assert 'action="/apps/loadcoach/models/context-fit"' in offered
+    assert 'name="context_tokens" value="28672"' in offered
+    assert applied_title not in offered
+    assert answer.status_code == 200, answer.text
+    written = tomllib.loads((tmp_path / "loadcoach" / "config.toml").read_text(encoding="utf-8"))
+    assert written["runtime"]["models"][CANONICAL]["context_size"] == 28672
+    (row,) = audit(console, "loadcoach.context_fit_applied")
+    assert row["outcome"] == "ok"
+    assert applied_title in reread

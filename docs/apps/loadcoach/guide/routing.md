@@ -52,6 +52,9 @@ evidence). Every rejection is listed with its reason in words and the numbers be
   profile for this request.
 * **Task profiles** are yours to edit (`config/task_profiles.toml`); `loadcoach tasks validate`
   checks them, and every job records the profile version it used.
+* **`constraints.allow_cpu_spill = true`** lets a task profile raise a configured context to what
+  it or its request needs — the next power of two — instead of being rejected; llama.cpp then
+  spills layers to host RAM, slower but served (ADR-0149).
 * **Feedback** (`loadcoach job feedback`, `POST /jobs/{id}/feedback`) moves the reliability factor
   once five verdicts exist in the window.
 * **Runtime settings** (`PUT /api/v1/settings`): `prefer_resident_bonus`, `min_present_weight`,

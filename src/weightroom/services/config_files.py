@@ -114,12 +114,13 @@ def read_config(path: Path) -> tuple[str, int | None]:
         return "", None
 
 
-def apply_changes(text: str, changes: Mapping[str, Any]) -> str:
+def apply_changes(text: str, changes: Mapping[str, Any] | Mapping[tuple[str, ...], Any]) -> str:
     """Return ``text`` with each dotted key set, and every untouched line byte-identical.
 
     Args:
         text: The file's current text; ``""`` for a file that does not exist yet.
-        changes: Dotted key to new value. A missing intermediate table is created.
+        changes: Dotted key to new value. A missing intermediate table is created. A tuple names
+            the path part by part, for a part that itself holds a dot — a canonical model ID.
 
     Returns:
         The new text.
@@ -135,7 +136,7 @@ def apply_changes(text: str, changes: Mapping[str, Any]) -> str:
         message = f"not valid TOML: {exc}"
         raise ValueError(message) from exc
     for key, value in changes.items():
-        parts = key.split(".")
+        parts = list(key) if isinstance(key, tuple) else key.split(".")
         table: Any = document
         for part in parts[:-1]:
             existing = table.get(part) if hasattr(table, "get") else None

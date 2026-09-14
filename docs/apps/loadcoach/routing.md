@@ -48,6 +48,7 @@ max_latency_p95_seconds   = 120
 min_capability_scores     = { code_review = 0.35 }
 exclude_models            = []
 allow_remote_providers    = false
+allow_cpu_spill           = false                     # ADR-0149: true raises a configured context
 
 [task_profiles."code.review".execution]
 temperature       = 0.1

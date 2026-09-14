@@ -82,6 +82,8 @@ ACTIONS: Final[frozenset[str]] = frozenset(
         # discovery pass, a warm job, and an explanation — `POST /route` persists its decision.
         "loadcoach.discover",
         "loadcoach.warm",
+        # CF4. A measured context fit written into LoadCoach's config.toml (ADR-0149 §1).
+        "loadcoach.context_fit_applied",
         "loadcoach.route",
         # WP2 Gate B. Pause, resume and drain (an unconfirmed post is a `pending` row), a job
         # submitted, cancelled or given feedback, and an evidence import.
